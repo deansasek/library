@@ -109,16 +109,18 @@ struct EditSheet: View {
                     get: { node.isTemplate },
                     set: { on in
                         let url = node.url ?? ""
-                        state.draft.url = on ? url + "{}" : url.replacingOccurrences(of: "{}", with: "")
+                        state.draft.url = on ? url + "{}" : withoutPlaceholders(url)
                     }
                 ))
                 if node.isTemplate {
-                    TextField("Prompt", text: Binding(
-                        get: { node.promptLabel ?? "" },
-                        set: { state.draft.promptLabel = $0 }
-                    ), prompt: Text("Value"))
+                    if node.placeholders.contains(where: { $0.name.isEmpty }) {
+                        TextField("Prompt", text: Binding(
+                            get: { node.promptLabel ?? "" },
+                            set: { state.draft.promptLabel = $0 }
+                        ), prompt: Text("Value"))
+                    }
                     LabeledContent("Opens") {
-                        Text((node.url ?? "").replacingOccurrences(of: "{}", with: "‹value›"))
+                        Text(templatePreview(node.url ?? ""))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -126,7 +128,7 @@ struct EditSheet: View {
                 }
             } footer: {
                 if node.isTemplate {
-                    Text("The value you enter replaces {} in the URL.")
+                    Text("Each value you enter replaces its placeholder. Write {name:Label} to ask for several labeled values in one sheet.")
                 }
             }
         } else if let path = node.appPath {

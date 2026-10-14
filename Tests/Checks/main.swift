@@ -23,6 +23,49 @@ let jira = LibraryItem(name: "Jira", url: "x.example.com/browse/{}")
 check(jira.isTemplate && jira.link(filling: "ABC-123")?.absoluteString == "https://x.example.com/browse/ABC-123", "template fill")
 check(jira.link(filling: "a b/c")?.absoluteString == "https://x.example.com/browse/a%20b%2Fc", "template encodes")
 
+// ---- URL templates with named fields ----
+check(templateFields(in: "x.example.com/{}") == [TemplateField(name: "", label: nil)], "bare placeholder is one unnamed field")
+check(templateFields(in: "a/{}/{}") == [TemplateField(name: "", label: nil)], "repeated bare placeholder is one field")
+check(templateFields(in: "a/{ticket:Ticket number}/{user}/{ticket}") == [
+    TemplateField(name: "ticket", label: "Ticket number"), TemplateField(name: "user", label: nil),
+], "named fields share a name and keep the first label")
+check(templateFields(in: "a/{ticket}/{ticket:Later}").first?.label == "Later", "a label given later fills in a bare name")
+check(templateFields(in: "a/{:Only label}").first == TemplateField(name: "", label: "Only label"), "a label without a name")
+check(templateFields(in: "a/{ticket:}").first == TemplateField(name: "ticket", label: nil), "empty label is no label")
+check(templateFields(in: "a/{open").isEmpty && templateFields(in: "a/{x{}").map(\.name) == [""], "unclosed braces are text")
+check(!LibraryItem(name: "Plain", url: "a.example.com/{open").isTemplate && LibraryItem(name: "N", url: "a/{id}").isTemplate, "isTemplate for named fields")
+
+let bug = LibraryItem(name: "Bug", url: "bugs.example.com/{project}/{id:Issue}?q={project}")
+check(bug.placeholders.map(\.name) == ["project", "id"], "two fields, project shared")
+check(bug.link(values: ["project": "WEB", "id": "12 3"])?.absoluteString == "https://bugs.example.com/WEB/12%203?q=WEB", "several values fill every placeholder")
+check(bug.link(values: ["project": "WEB"]) == nil && bug.link(values: [:]) == nil, "a missing value is rejected")
+check(bug.link(values: ["project": "a b/c", "id": "1"])?.absoluteString == "https://bugs.example.com/a%20b%2Fc/1?q=a%20b%2Fc", "named values encode the same way")
+check(jira.link(values: ["": "ABC-123"])?.absoluteString == "https://x.example.com/browse/ABC-123", "bare value by its empty name")
+check(bug.link(values: ["project": "", "id": ""])?.absoluteString == "https://bugs.example.com//?q=", "empty values still fill, the caller rejects them")
+check(templatePreview("a/{id:Issue}/{}/{id}/{user}") == "a/‹Issue›/‹value›/‹Issue›/‹user›", "preview labels")
+check(withoutPlaceholders("a/{}/{x:Y}/b") == "a///b", "placeholders removed")
+check(LibraryItem(name: "Plain", url: "x.example.com/a").placeholders.isEmpty, "no placeholders for a plain URL")
+
+// ---- Open All selection ----
+let bulk: [LibraryItem] = [
+    LibraryItem(name: "Divider", isDivider: true),
+    LibraryItem(name: "Site", url: "https://a.example.com"),
+    LibraryItem(name: "Ask", url: "https://b.example.com/{}"),
+    LibraryItem(name: "Build", command: "make"),
+    LibraryItem(name: "Gone", appPath: "/Applications/Missing.app"),
+    LibraryItem(name: "Safari", appPath: "/Applications/Safari.app"),
+    LibraryItem(name: "Inner", children: [
+        LibraryItem(name: "Deep", url: "https://c.example.com"),
+        LibraryItem(name: "Run", command: "./run.sh"),
+        LibraryItem(name: "Blank", url: "   "),
+    ]),
+    LibraryItem(name: "Empty", children: []),
+]
+let selected = openAllSelection(in: bulk, appExists: { $0 != "/Applications/Missing.app" }).map(\.name)
+check(selected == ["Site", "Safari", "Deep"], "open all keeps bookmarks and apps, skipping commands, templates, dividers, and missing apps: \(selected)")
+check(openAllSelection(in: [LibraryItem(name: "Only", command: "make")]).isEmpty, "a folder of commands opens nothing")
+check(!needsOpenAllConfirmation(5) && needsOpenAllConfirmation(6), "open all asks above five items")
+
 var nodes = tree()
 let docs = nodes.leaves.first { $0.name == "Docs" }!
 check(nodes.removeNode(docs.id)?.name == "Docs" && nodes.node(withID: docs.id) == nil, "remove nested")
