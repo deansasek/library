@@ -226,6 +226,98 @@ if let url = ClipPreviewSource.url(for: clip(.image, reps: [[ClipItem.gifType: g
     check(url.pathExtension == "gif" && (try? Data(contentsOf: url)) == gifBytes, "GIF data written with a .gif name")
 } else { check(false, "gif preview file") }
 try? FileManager.default.removeItem(at: previewDir)
+// ---- bookmark import ----
+let safariPlist = Data("""
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+<dict>
+<key>WebBookmarkType</key><string>WebBookmarkTypeList</string>
+<key>Children</key>
+<array>
+  <dict>
+    <key>Title</key><string>BookmarksBar</string>
+    <key>WebBookmarkType</key><string>WebBookmarkTypeList</string>
+    <key>Children</key>
+    <array>
+      <dict>
+        <key>WebBookmarkType</key><string>WebBookmarkTypeLeaf</string>
+        <key>URLString</key><string>https://swift.org</string>
+        <key>URIDictionary</key><dict><key>title</key><string>Swift</string></dict>
+      </dict>
+      <dict>
+        <key>Title</key><string>Work</string>
+        <key>WebBookmarkType</key><string>WebBookmarkTypeList</string>
+        <key>Children</key>
+        <array>
+          <dict>
+            <key>WebBookmarkType</key><string>WebBookmarkTypeLeaf</string>
+            <key>URLString</key><string>https://docs.example.com</string>
+            <key>URIDictionary</key><dict><key>title</key><string>Docs</string></dict>
+          </dict>
+          <dict>
+            <key>WebBookmarkType</key><string>WebBookmarkTypeLeaf</string>
+            <key>URLString</key><string>file:///etc/hosts</string>
+            <key>URIDictionary</key><dict><key>title</key><string>Local</string></dict>
+          </dict>
+        </array>
+      </dict>
+    </array>
+  </dict>
+  <dict>
+    <key>Title</key><string>com.apple.ReadingList</string>
+    <key>WebBookmarkType</key><string>WebBookmarkTypeList</string>
+    <key>Children</key>
+    <array>
+      <dict>
+        <key>WebBookmarkType</key><string>WebBookmarkTypeLeaf</string>
+        <key>URLString</key><string>https://reading.example.com</string>
+        <key>URIDictionary</key><dict><key>title</key><string>Later</string></dict>
+      </dict>
+    </array>
+  </dict>
+</array>
+</dict>
+</plist>
+""".utf8)
+
+let chromeJSON = Data("""
+{"checksum": "x", "version": 1, "roots": {
+  "bookmark_bar": {"type": "folder", "name": "Bookmarks bar", "children": [
+    {"type": "url", "name": "GitHub", "url": "https://github.com"},
+    {"type": "folder", "name": "Work", "children": [
+      {"type": "url", "name": "Docs", "url": "https://docs.example.com"},
+      {"type": "url", "name": "Script", "url": "javascript:alert(1)"},
+      {"type": "folder", "name": "Empty", "children": []}
+    ]}
+  ]},
+  "other": {"type": "folder", "name": "Other bookmarks", "children": []},
+  "synced": {"type": "folder", "name": "Mobile bookmarks", "children": [
+    {"type": "url", "name": "Phone", "url": "https://m.example.com"}
+  ]}
+}}
+""".utf8)
+
+if let safari = try? BookmarkImport.parse(safariPlist) {
+    check(safari.browser == .safari && safari.folder.name == "Imported from Safari", "safari folder name")
+    check(safari.imported == 2 && safari.skipped == 1, "safari counts skip file links and Reading List")
+    let bar = safari.folder.children?.first
+    check(bar?.name == "Favorites Bar" && bar?.children?.map(\.name) == ["Swift", "Work"], "safari mirrors folders")
+    check(bar?.children?.last?.children?.map(\.url) == ["https://docs.example.com"], "safari nested bookmark")
+} else { check(false, "safari parse") }
+
+if let chrome = try? BookmarkImport.parse(chromeJSON) {
+    check(chrome.browser == .chrome && chrome.folder.name == "Imported from Chrome", "chrome folder name")
+    check(chrome.imported == 3 && chrome.skipped == 1, "chrome counts skip javascript links")
+    check(chrome.folder.children?.map(\.name) == ["Bookmarks bar", "Mobile bookmarks"], "chrome drops empty roots")
+    let work = chrome.folder.children?.first?.children?.first { $0.name == "Work" }
+    check(work?.children?.map(\.name) == ["Docs"], "chrome nested folder drops empty folder")
+} else { check(false, "chrome parse") }
+
+for bad in ["", "{\"roots\": {", "not a bookmarks file", "<plist version=\"1.0\"><dict><key>a</key><string>b</string></dict></plist>"] {
+    check((try? BookmarkImport.parse(Data(bad.utf8))) == nil, "rejects \"\(bad)\"")
+}
+check((try? BookmarkImport.parse(safariPlist.prefix(300))) == nil, "rejects truncated plist")
+check((try? BookmarkImport.parse(chromeJSON.prefix(120))) == nil, "rejects truncated JSON")
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
