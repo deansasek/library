@@ -12,6 +12,8 @@ struct QuickOpenResult: Identifiable {
         case addSuggestion(AddSuggestion)
         /// An arithmetic or unit answer. Return copies the value.
         case answer(value: String, detail: String)
+        /// A saved snippet. Return copies its text.
+        case snippet(Snippet)
     }
 
     let kind: Kind
@@ -32,7 +34,7 @@ struct QuickOpenResult: Identifiable {
     /// Library items and clipboard items have actions on Tab and right-click.
     var hasActions: Bool {
         switch kind {
-        case .item, .clip: return true
+        case .item, .clip, .snippet, .openLink, .addLink: return true
         default: return false
         }
     }
@@ -43,6 +45,7 @@ struct QuickOpenResult: Identifiable {
         case .addSuggestion(let suggestion): return suggestion.title
         case .clip(let item): return item.title
         case .item(let node, _): return node.name
+        case .snippet(let snippet): return snippet.name
         case .openLink(let url): return "Open \(url.host ?? url.absoluteString)"
         case .addLink(let url): return "Add “\(url.host ?? url.absoluteString)” to Library"
         case .webSearch(let query): return "Search the Web for “\(query)”"
@@ -55,6 +58,7 @@ struct QuickOpenResult: Identifiable {
         case .answer(_, let detail): return "\(detail) · Return copies the answer"
         case .addSuggestion(let suggestion): return suggestion.subtitle
         case .clip(let item): return item.subtitle
+        case .snippet(let snippet): return snippet.text.split(whereSeparator: \.isNewline).joined(separator: " ")
         case .item(let node, let folder):
             let detail = node.url ?? node.command ?? node.appPath ?? ""
             return folder.isEmpty ? detail : "\(folder) · \(detail)"
@@ -131,13 +135,14 @@ final class QuickOpenIndex {
     /// The last query that had words, and the indices of the entries that matched all of them, in index order.
     private var previous: (words: [String], matches: [Int])?
 
-    init(nodes: [LibraryItem]) {
+    /// `snippets` are matched by name and keywords, like items. They are not in the browse list.
+    init(nodes: [LibraryItem], snippets: [Snippet] = []) {
         browse = nodes.sections.flatMap { section -> [QuickOpenResult] in
             var items = Self.leaves(section.nodes, folder: "").map(Self.row)
             if !items.isEmpty { items[0].section = section.title ?? "Library" }
             return items
         }
-        entries = Self.leaves(nodes, folder: "").map { leaf in
+        let items = Self.leaves(nodes, folder: "").map { leaf -> Entry in
             let node = leaf.node
             let keywords = "\(node.keywords ?? "") \(node.color ?? "")".lowercased().split(separator: " ").map(String.init)
             let other = "\(node.url ?? "") \(node.command ?? "") \(node.appPath ?? "") \(leaf.folder) \(keywords.joined(separator: " "))".lowercased()
@@ -145,6 +150,14 @@ final class QuickOpenIndex {
             return Entry(result: Self.row(leaf), name: name, keywords: keywords, other: other,
                          bytes: Self.bytes(name: name, keywords: keywords, other: other))
         }
+        let saved = snippets.map { snippet -> Entry in
+            let keywords = (snippet.keywords ?? "").lowercased().split(separator: " ").map(String.init)
+            let other = keywords.joined(separator: " ")
+            let name = snippet.name.lowercased()
+            return Entry(result: QuickOpenResult(kind: .snippet(snippet), id: "snippet-\(snippet.id.uuidString)"),
+                         name: name, keywords: keywords, other: other, bytes: Self.bytes(name: name, keywords: keywords, other: other))
+        }
+        entries = items + saved
     }
 
     /// Items that match every word of `query` in the name, keywords, target, or folder. Best matches first,

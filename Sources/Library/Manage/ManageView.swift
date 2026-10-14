@@ -157,6 +157,15 @@ struct ManageView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
+                    state.sheet = .snippets
+                } label: {
+                    Label("Snippets", systemImage: "text.quote")
+                }
+                .help("Manage the snippets you copy from Quick Open")
+                .accessibilityLabel("Snippets")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
                     state.editSelection(in: store)
                 } label: {
                     Label("Get Info", systemImage: "info.circle")
@@ -202,6 +211,8 @@ struct ManageView: View {
                 BulkEditSheet(store: store, state: state)
             case .duplicates:
                 DuplicatesSheet(store: store, state: state)
+            case .snippets:
+                SnippetsSheet()
             default:
                 AddSheet(store: store, state: state) { commit(sheet) }
             }
@@ -247,6 +258,8 @@ struct ManageView: View {
                     $0.append(LibraryItem(name: app.name, appPath: app.path, arguments: arguments), to: folder)
                 }
             }
+        case .snippets:
+            break
         case .edit(let id):
             var node = state.draft
             node.shortcuts = node.shortcuts?.filter { !$0.isEmpty }

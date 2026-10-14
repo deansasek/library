@@ -256,6 +256,89 @@ check(answer("5/0") == nil && answer("42") == nil && answer("2+") == nil && answ
 check(answer("5 km in miles")?.hasPrefix("3.10685") == true && answer("72 f to c")?.hasPrefix("22.2222") == true, "conversions")
 check(answer("5 km in kg") == nil, "mismatched units")
 
+// ---- tracking parameters: a table of links and their cleaned copies ----
+let trackingTable: [(link: String, clean: String)] = [
+    ("https://example.com/a?utm_source=x&id=7", "https://example.com/a?id=7"),
+    ("https://example.com/a?id=7&utm_medium=email&utm_campaign=spring", "https://example.com/a?id=7"),
+    ("https://example.com/a?fbclid=abc", "https://example.com/a"),
+    ("https://example.com/a?gclid=1&q=swift%20tips#section", "https://example.com/a?q=swift%20tips#section"),
+    ("https://example.com/a?mc_eid=1&mc_cid=2", "https://example.com/a"),
+    ("https://example.com/a?igshid=xyz", "https://example.com/a"),
+    ("https://example.com/a?ref_src=twsrc%5Etfw", "https://example.com/a"),
+    ("https://example.com/a?UTM_Source=x&FBCLID=2", "https://example.com/a"),
+    ("https://example.com/a?utm_source=x#top", "https://example.com/a#top"),
+    ("https://example.com/a?q=1&&utm_x=2", "https://example.com/a?q=1"),
+    ("https://example.com/a?utm_source=x&utm_source=y", "https://example.com/a"),
+    ("https://example.com/a?flag&utm_term", "https://example.com/a?flag"),
+    ("https://example.com/a?ref=home&page=2", "https://example.com/a?ref=home&page=2"),
+    ("https://example.com/a?utmsource=1&ref_srcs=2", "https://example.com/a?utmsource=1&ref_srcs=2"),
+    ("https://example.com/a?keyword=utm_source&next=/x?fbclid=1", "https://example.com/a?keyword=utm_source&next=/x?fbclid=1"),
+    ("https://example.com/a?id=7", "https://example.com/a?id=7"),
+    ("https://example.com/a", "https://example.com/a"),
+    ("https://example.com/a?", "https://example.com/a?"),
+    ("https://example.com/a#x?utm_source=1", "https://example.com/a#x?utm_source=1"),
+]
+for row in trackingTable {
+    check(TrackingParameters.clean(row.link) == row.clean, "cleaning \(row.link): got \(TrackingParameters.clean(row.link)), want \(row.clean)")
+}
+check(TrackingParameters.isTracking("utm_anything") && TrackingParameters.isTracking("GCLID") && !TrackingParameters.isTracking("ref"), "tracking names")
+let trackingDefault = TrackingPreferences.shared.removesOnCopy
+do {
+    // A copied link is cleaned only when the setting is on. The history keeps the link as it was copied.
+    let board = NSPasteboard(name: NSPasteboard.Name("library-checks-links-\(UUID().uuidString)"))
+    let linkHistory = ClipboardHistory(pasteboard: board, file: nil, key: { throw ClipboardKey.KeychainError(status: -1) })
+    let link = "https://example.com/a?utm_source=x&id=7"
+    board.clearContents()
+    board.setString(link, forType: .string)
+    linkHistory.poll()
+    let deadline = Date().addingTimeInterval(5)
+    while linkHistory.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    if let clip = linkHistory.items.first, clip.kind == .link {
+        TrackingPreferences.shared.removesOnCopy = true
+        linkHistory.copy(clip)
+        check(board.string(forType: .string) == "https://example.com/a?id=7", "a copied link loses its tracking parameters when the setting is on")
+        TrackingPreferences.shared.removesOnCopy = false
+        linkHistory.copy(clip)
+        check(board.string(forType: .string) == link, "with the setting off, a copied link is unchanged")
+        check(clip.plainText == link, "the history keeps the link as it was copied")
+    } else { check(false, "a copied link is recorded as a link") }
+    TrackingPreferences.shared.removesOnCopy = trackingDefault
+}
+check(TrackingPreferences.shared.removesOnCopy == trackingDefault, "the tracking setting is restored")
+
+// ---- snippets ----
+let snippetList = [Snippet(name: "Home address", text: "1 Main St\nSpringfield", keywords: "street mailing")]
+let snippetIndex = QuickOpenIndex(nodes: pt, snippets: snippetList)
+check(snippetIndex.search("home", counts: [:]).map(\.title) == ["Home address"], "a snippet is found by name")
+check(snippetIndex.search("mailing", counts: [:]).map(\.title) == ["Home address"], "a snippet is found by keyword")
+check(snippetIndex.search("springfield", counts: [:]).isEmpty, "snippet text is not searched")
+check(!snippetIndex.search("", counts: [:]).contains { $0.title == "Home address" }, "snippets are not in the browse list")
+check(QuickOpenIndex(nodes: pt).search("home", counts: [:]).isEmpty, "without snippets, no snippet results")
+if let found = snippetIndex.search("home", counts: [:]).first, case .snippet(let saved) = found.kind {
+    check(saved.text.contains("Springfield"), "a snippet result carries its text")
+} else { check(false, "a snippet result has the snippet kind") }
+let snippetDir = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-snippets-\(UUID().uuidString)")
+try? FileManager.default.createDirectory(at: snippetDir, withIntermediateDirectories: true)
+let snippetFile = snippetDir.appendingPathComponent("snippets.json")
+let savedSnippets = SnippetStore(file: snippetFile)
+savedSnippets.add(Snippet(name: "Sig", text: "Thanks,\nDean"))
+let reopenedSnippets = SnippetStore(file: snippetFile)
+check(reopenedSnippets.snippets.map(\.name) == ["Sig"] && reopenedSnippets.snippets.first?.text == "Thanks,\nDean", "snippets reload from snippets.json")
+check((try? Data(contentsOf: snippetFile))?.range(of: Data("Dean".utf8)) != nil, "snippets are plain text in snippets.json, not encrypted")
+var renamedSnippet = savedSnippets.snippets[0]
+renamedSnippet.name = "Signature"
+savedSnippets.update(renamedSnippet)
+check(SnippetStore(file: snippetFile).snippets.first?.name == "Signature", "an edit is saved")
+savedSnippets.remove([renamedSnippet.id])
+check(SnippetStore(file: snippetFile).snippets.isEmpty, "a delete is saved")
+let damagedSnippetFile = snippetDir.appendingPathComponent("damaged-snippets.json")
+try? Data("not a list".utf8).write(to: damagedSnippetFile)
+let movedSnippets = SnippetStore(file: damagedSnippetFile)
+check(movedSnippets.snippets.isEmpty && !FileManager.default.fileExists(atPath: damagedSnippetFile.path)
+      && FileManager.default.fileExists(atPath: snippetDir.appendingPathComponent("snippets-damaged.json").path),
+      "a damaged snippets file is moved aside, not read as snippets")
+try? FileManager.default.removeItem(at: snippetDir)
+
 // ---- a shortcut is equal to the same shortcut ----
 check(Shortcut(modifiers: UInt32(controlKey), button: 1) == Shortcut(modifiers: UInt32(controlKey), button: 1), "shortcut equality")
 check(Shortcut(modifiers: UInt32(controlKey), button: 1) != Shortcut(modifiers: UInt32(cmdKey), button: 1), "shortcut inequality")
