@@ -773,14 +773,51 @@ let dupGroups = Duplicates.groups(in: dupTree)
 check(dupGroups.count == 2 && dupGroups[0].items.map(\.name) == ["Docs", "Docs copy"] && dupGroups[1].isApp, "groups by link and by app path, in library order")
 check(Duplicates.groups(in: [LibraryItem(name: "A", url: "https://a.com"), LibraryItem(name: "B", url: "https://b.com")]).isEmpty, "no duplicates means no groups")
 check(Duplicates.folderTitle(of: dupTree[1].children![0].id, in: dupTree) == "Work" && Duplicates.folderTitle(of: dupTree[0].id, in: dupTree) == "Top level", "folder titles")
-let merged = Duplicates.merged(dupTree)
+let merged = Duplicates.merge(dupTree).nodes
 check(merged.leaves.map(\.name) == ["Docs", "Other", "Safari", "Commands", "Divider"], "the first item of each group is kept by default")
 check(merged.leaves.first { $0.name == "Docs" }?.keywords == "wiki handbook" && merged.leaves.first { $0.name == "Safari" }?.keywords == "browser web", "keywords join unique words, first spelling wins")
 check(merged.node(withID: dupTree[1].children![0].id) == nil, "removed item is gone")
-let chosen = Duplicates.merged(dupTree, keeping: [dupGroups[0].id: dupTree[1].children![0].id])
+let chosen = Duplicates.merge(dupTree, keeping: [dupGroups[0].id: dupTree[1].children![0].id]).nodes
 check(chosen.leaves.map(\.name) == ["Docs copy", "Other", "Safari", "Commands", "Divider"] && chosen.folders().map(\.title) == ["Work"], "a chosen item is kept, in its own folder")
 check(chosen.leaves.first { $0.name == "Docs copy" }?.shortcuts?.isEmpty == false, "the kept item keeps its shortcuts")
 check(Duplicates.joinKeywords([nil, "a B", "b c", " "]) == "a B c" && Duplicates.joinKeywords([nil]) == nil, "keyword join")
+
+// ---- merging keeps the shortcuts of the copies (pure) ----
+let mergeCmdD = Shortcut(keyCode: 2, modifiers: UInt32(cmdKey), key: "D")
+let mergeCmdE = Shortcut(keyCode: 14, modifiers: UInt32(cmdKey), key: "E")
+let inheritTree = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs old", url: "https://docs.example.com/"),
+]
+let inherit = Duplicates.merge(inheritTree)
+check(inherit.nodes.map(\.name) == ["Docs"] && inherit.nodes[0].shortcuts == [mergeCmdD], "the kept item inherits a shortcut from a copy")
+check(inherit.summary == "Merged 3 items. 1 shortcut was kept from another copy." && inherit.conflicts.isEmpty, "summary after inheriting one shortcut")
+let chosenCopy = Duplicates.merge(inheritTree, keeping: [Duplicates.groups(in: inheritTree)[0].id: inheritTree[1].id])
+check(chosenCopy.nodes.map(\.name) == ["Docs copy"] && chosenCopy.inheritedCount == 0 && chosenCopy.summary == "Merged 3 items.", "a chosen copy keeps its own shortcut and inherits nothing it already has")
+let clashTree = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [Shortcut(keyCode: 2, modifiers: UInt32(cmdKey), key: "d"), mergeCmdE]),
+]
+let clash = Duplicates.merge(clashTree)
+check(clash.nodes[0].shortcuts == [mergeCmdD, mergeCmdE], "a clashing copy shortcut is dropped, the other is inherited")
+check(clash.conflicts == ["⌘d (Docs copy)"] && clash.summary == "Merged 2 items. 1 shortcut was kept from another copy. Not kept, because the key is already used: ⌘d (Docs copy).", "a clash is listed in the summary")
+let elsewhere = [
+    LibraryItem(name: "Mail", url: "https://mail.example.com", shortcuts: [mergeCmdE]),
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [mergeCmdE]),
+]
+let elsewhereResult = Duplicates.merge(elsewhere)
+check(elsewhereResult.nodes.first { $0.name == "Docs" }?.shortcuts == nil && elsewhereResult.summary == "Merged 2 items. Not kept, because the key is already used: ⌘E (Docs copy).", "a key used by another item is a clash")
+let twoCopies = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs b", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs c", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+]
+let twoCopiesResult = Duplicates.merge(twoCopies)
+check(twoCopiesResult.nodes[0].shortcuts == [mergeCmdD] && twoCopiesResult.inheritedCount == 1 && twoCopiesResult.conflicts == ["⌘D (Docs c)"], "two copies with one key: the first wins, the second is listed")
+let plainCopies = [LibraryItem(name: "A", url: "https://a.example.com"), LibraryItem(name: "B", url: "https://a.example.com")]
+check(Duplicates.merge(plainCopies).summary == "Merged 2 items." && Duplicates.merge(plainCopies).nodes[0].shortcuts == nil, "no shortcuts to keep means a plain summary")
 
 // ---- bulk edit (pure) ----
 let bulkTree = [

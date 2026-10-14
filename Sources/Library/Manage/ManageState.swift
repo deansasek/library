@@ -52,6 +52,8 @@ final class ManageState: ObservableObject {
 
     // Find Duplicates sheet: the item to keep in each group, by group id. Missing groups keep their first item.
     @Published var keepChoices: [String: UUID] = [:]
+    /// The summary of the last merge, shown in an alert until dismissed.
+    @Published var mergeSummary: String?
 
     var filteredApps: [InstalledApp] {
         let query = search.trimmingCharacters(in: .whitespaces)
