@@ -144,18 +144,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// Turns file URLs into library nodes: an app for each `.app` bundle, an empty folder for each other directory.
-    /// Skips apps already in `existing` (by path), folders already in `existing` (by name, since folder items
-    /// store no path), and repeats within `urls`. Files that are neither are returned as `rejected`.
+    /// Turns file URLs into library nodes: an app for each `.app` bundle, and a link to each other directory, which
+    /// opens it in Finder. Skips apps already in `existing` (by path), folders already in `existing` (by link), and
+    /// repeats within `urls`. Files that are neither are returned as `rejected`.
     static func fileNodes(from urls: [URL], existing: [LibraryItem]) -> (nodes: [LibraryItem], rejected: [URL]) {
-        func folderNames(_ items: [LibraryItem]) -> [String] {
-            items.flatMap { item -> [String] in
-                guard let children = item.children else { return [] }
-                return [item.name.lowercased()] + folderNames(children)
-            }
-        }
         var knownApps = Set(existing.leaves.compactMap(\.appPath))
-        var knownFolders = Set(folderNames(existing))
+        var knownFolders = Set(existing.leaves.compactMap(\.url))
         var nodes: [LibraryItem] = []
         var rejected: [URL] = []
         for url in urls {
@@ -166,9 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard knownApps.insert(path).inserted else { continue }
                 nodes.append(LibraryItem(name: appName(at: path), appPath: path))
             } else if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
-                let name = url.lastPathComponent
-                guard knownFolders.insert(name.lowercased()).inserted else { continue }
-                nodes.append(LibraryItem(name: name, children: []))
+                let link = url.standardizedFileURL.absoluteString
+                guard knownFolders.insert(link).inserted else { continue }
+                nodes.append(LibraryItem(name: url.lastPathComponent, url: link, icon: "folder"))
             } else {
                 rejected.append(url)
             }

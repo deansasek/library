@@ -99,17 +99,19 @@ MainActor.assumeIsolated {
     let existing = [
         LibraryItem(name: "Safari", appPath: "/Applications/Safari.app"),
         LibraryItem(name: "Work", children: [LibraryItem(name: "Projects", children: [])]),
+        LibraryItem(name: "Notes", url: notes.standardizedFileURL.absoluteString, icon: "folder"),
     ]
     let (added, rejected) = AppDelegate.fileNodes(from: [
         URL(fileURLWithPath: "/Applications/Safari.app"),   // already in library
         fake,                                                // new app
         fake,                                                // repeated in the same drop
-        notes,                                               // new folder
-        base.appendingPathComponent("projects"),             // folder name already in library, different case
+        notes,                                               // folder already linked in the library
+        base.appendingPathComponent("projects"),             // new folder; a group with the same name does not block it
         text, web,                                           // unsupported
     ], existing: existing)
-    check(added.map(\.name) == ["Fake", "Notes"], "apps and folders added, duplicates skipped")
-    check(added[0].appPath == fake.path && added[1].isFolder && added[1].children?.isEmpty == true, "app and folder shapes")
+    check(added.map(\.name) == ["Fake", "projects"], "apps and folders added, duplicates skipped")
+    check(added[0].appPath == fake.path && added[1].url?.hasPrefix("file:") == true && !added[1].isFolder, "app and folder shapes")
+    check(added[1].link?.isFileURL == true && added[1].modeLabels == nil, "a folder link opens in Finder")
     check(rejected == [text, web], "files and links rejected")
     check(AppDelegate.fileNodes(from: [], existing: []).nodes.isEmpty, "nothing dropped, nothing added")
     try? fm.removeItem(at: base)

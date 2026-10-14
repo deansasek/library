@@ -38,7 +38,8 @@ struct LibraryItem: Codable, Identifiable {
     /// Names for the two open behaviors. Nil for items without a choice.
     var modeLabels: (existing: String, new: String)? {
         if appPath != nil { return ("Bring Forward", "New Instance") }
-        if url != nil { return ("New Tab", "New Window") }
+        // A folder link opens in Finder, so there is no tab or window to choose.
+        if let url, !url.hasPrefix("file:") { return ("New Tab", "New Window") }
         return nil
     }
 
