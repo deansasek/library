@@ -106,8 +106,9 @@ enum PopupMenu {
             if !menu.items.isEmpty { menu.addItem(.separator()) }
             menu.addItem(NSMenuItem.sectionHeader(title: String(localized: "Paste Queue (\(history.pasteQueue.count))", bundle: L10n.bundle)))
             for clip in history.pasteQueue {
-                let queued = NSMenuItem(title: clip.menuTitle, action: nil, keyEquivalent: "")
-                queued.image = clip.icon
+                // A locked pinned item shows its lock and Pinned Item, as the other rows do.
+                let queued = NSMenuItem(title: ClipboardLock.shared.menuTitle(for: clip), action: nil, keyEquivalent: "")
+                queued.image = ClipboardLock.shared.icon(for: clip)
                 queued.isEnabled = false
                 menu.addItem(queued)
             }
