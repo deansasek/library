@@ -72,3 +72,36 @@
 
 /* Menu item at the top of the Library menu when a newer version exists. The argument is the version number. */
 "Update Available — Version %@" = "Update Available — Version %@";
+
+/* Quick Open action that opens the ways to copy a text clip rewritten. */
+"Copy as…" = "Copy as…";
+
+/* Copy as menu item that copies the text unchanged, as plain text. */
+"Plain Text" = "Plain Text";
+
+/* Copy as menu item that removes spaces and line breaks at both ends. */
+"Trimmed Whitespace" = "Trimmed Whitespace";
+
+/* Copy as menu item that copies the text in lowercase. */
+"Lowercase" = "Lowercase";
+
+/* Copy as menu item that copies the text in uppercase. */
+"Uppercase" = "Uppercase";
+
+/* Copy as menu item that turns each line break into a space. */
+"Joined Lines" = "Joined Lines";
+
+/* Quick Open action that copies a bookmark or link as a Markdown link, [Title](url). */
+"Copy as Markdown Link" = "Copy as Markdown Link";
+
+/* Quick Open action that adds a clip to the queue of clips to paste one at a time. */
+"Add to Paste Queue" = "Add to Paste Queue";
+
+/* Clipboard menu section title with the number of clips waiting in the paste queue. */
+"Paste Queue (%lld)" = "Paste Queue (%lld)";
+
+/* Clipboard menu item that copies the next clip in the paste queue and removes it from the queue. */
+"Paste Next" = "Paste Next";
+
+/* Clipboard menu item that removes every clip from the paste queue. */
+"Clear Queue" = "Clear Queue";

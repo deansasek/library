@@ -208,8 +208,12 @@ struct QuickOpenView: View {
                         .contentShape(Rectangle())
                         .onTapGesture {
                             model.actionSelection = index
-                            close()
-                            action.run()
+                            if action.children.isEmpty {
+                                close()
+                                action.run()
+                            } else {
+                                model.openGroup(action)
+                            }
                         }
                         .accessibilityElement(children: .combine)
                         .accessibilityAddTraits(.isButton)
@@ -267,9 +271,20 @@ struct QuickOpenView: View {
         .contextMenu {
             // Right-click shows the same actions as Tab.
             ForEach(model.actions(for: result)) { action in
-                Button(action.title) {
-                    close()
-                    action.run()
+                if action.children.isEmpty {
+                    Button(action.title) {
+                        close()
+                        action.run()
+                    }
+                } else {
+                    Menu(action.title) {
+                        ForEach(action.children) { child in
+                            Button(child.title) {
+                                close()
+                                child.run()
+                            }
+                        }
+                    }
                 }
             }
         }

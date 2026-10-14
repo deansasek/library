@@ -302,5 +302,7 @@ final class QuickOpenIndex {
 struct QuickOpenAction: Identifiable {
     let id: String
     let title: String
+    /// A submenu. When it is not empty, choosing the action lists these instead of running `run`.
+    var children: [QuickOpenAction] = []
     let run: @MainActor () -> Void
 }

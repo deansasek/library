@@ -225,12 +225,20 @@ final class ClipboardHistory: ObservableObject {
         items.filter(\.pinned) + items.filter { !$0.pinned }
     }
 
-    /// Items whose text contains every word.
-    func search(_ query: String) -> [ClipItem] {
+    /// The apps that copied something in the history, each once, in name order.
+    var sourceApps: [String] {
+        Array(Set(items.compactMap(\.sourceApp))).sorted()
+    }
+
+    /// Items whose text contains every word. With `app`, only the items copied while that app was in front.
+    func search(_ query: String, from app: String? = nil) -> [ClipItem] {
         let words = query.lowercased().split(separator: " ").map(String.init)
         // Built once for this search. Each item's text was capped at maxSearchableCharacters when it was copied.
         // A locked pinned item is left out, so a search cannot reveal its text before the user authenticates.
-        let order = displayOrder.filter { !ClipboardLock.shared.isHidden($0) }
+        // With `app`, only the items copied while that app was in front.
+        let order = displayOrder.filter { item in
+            !ClipboardLock.shared.isHidden(item) && (app.map { SourceFilter.includes(item.sourceApp, app: $0) } ?? true)
+        }
         guard !words.isEmpty else { return order }
         return order.filter { item in words.allSatisfy(item.searchText.contains) }
     }
@@ -261,6 +269,12 @@ final class ClipboardHistory: ObservableObject {
 
     func copyPlainText(_ item: ClipItem) {
         guard let text = item.plainText else { return }
+        copyText(text)
+    }
+
+    /// Puts `text` on the clipboard as plain text. It becomes a new entry when the change is seen, and the history keeps
+    /// what it had.
+    func copyText(_ text: String) {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
     }
@@ -295,6 +309,25 @@ final class ClipboardHistory: ObservableObject {
     /// Removes everything that is not pinned.
     func clear() {
         items.removeAll { !$0.pinned }
+    }
+
+    // MARK: Paste queue
+
+    /// Clips to paste one at a time, in order. Kept in memory only, so it is empty again when Library starts.
+    @Published private(set) var pasteQueue: [ClipItem] = []
+
+    func enqueue(_ item: ClipItem) {
+        pasteQueue.append(item)
+    }
+
+    /// Copies the first queued clip and takes it out of the queue. A Command-V in the app in front then pastes it.
+    func pasteNext() {
+        guard !pasteQueue.isEmpty else { return }
+        copy(pasteQueue.removeFirst())
+    }
+
+    func clearPasteQueue() {
+        pasteQueue.removeAll()
     }
 
     // MARK: Watching

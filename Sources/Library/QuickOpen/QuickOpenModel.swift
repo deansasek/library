@@ -48,6 +48,8 @@ final class QuickOpenModel: ObservableObject {
     /// Tab swaps the results for the actions of the selected item.
     @Published var showActions = false
     @Published var actionSelection = 0
+    /// The id of the action whose submenu, such as Copy as…, is listed in place of the actions. Nil otherwise.
+    @Published var actionGroup: String?
     /// Drives the entrance: the card fades and grows in once the panel is placed.
     @Published var appeared = false
 
@@ -152,7 +154,10 @@ final class QuickOpenModel: ObservableObject {
 
     private func computeResults() -> [QuickOpenResult] {
         let text = query.trimmingCharacters(in: .whitespaces)
-        var list = searchIndex().search(text, counts: store.openCounts)
+        let history = ClipboardHistory.shared
+        // "from <app>" shows only the clips copied while that app was in front, so the library is not searched.
+        let source = text.isEmpty ? nil : SourceFilter.parse(text, apps: history.sourceApps)
+        var list = source == nil ? searchIndex().search(text, counts: store.openCounts) : []
         guard !text.isEmpty else {
             // The same Frequently Used section the menu has, first. Its ids differ from the library rows' ids,
             // so an item can sit in both without clashing.
@@ -161,14 +166,18 @@ final class QuickOpenModel: ObservableObject {
             return suggestion(section: "Suggested") + frequent + list
                 + clipboardResults(ClipboardHistory.shared.displayOrder.prefix(5))
         }
-        list += clipboardResults(ClipboardHistory.shared.search(text).prefix(8))
-        // Typing "add" or part of "add to library" also offers the copied link or application.
-        if text.count >= 2, "add to library".contains(text.lowercased()) {
-            list = suggestion(section: nil) + list
-        }
-        if let link = QuickOpenResult.link(from: text) {
-            list.insert(QuickOpenResult(kind: .openLink(link), id: "open"), at: 0)
-            list.append(QuickOpenResult(kind: .addLink(link), id: "add"))
+        if let source {
+            list += clipboardResults(history.search(source.rest, from: source.app))
+        } else {
+            list += clipboardResults(history.search(text).prefix(8))
+            // Typing "add" or part of "add to library" also offers the copied link or application.
+            if text.count >= 2, "add to library".contains(text.lowercased()) {
+                list = suggestion(section: nil) + list
+            }
+            if let link = QuickOpenResult.link(from: text) {
+                list.insert(QuickOpenResult(kind: .openLink(link), id: "open"), at: 0)
+                list.append(QuickOpenResult(kind: .addLink(link), id: "add"))
+            }
         }
         // Headers as Spotlight has them: the first result is the Top Hit, and each kind of result after it
         // gets its own header the first time it appears.
@@ -199,7 +208,7 @@ final class QuickOpenModel: ObservableObject {
     }
 
     /// Clipboard history rows, under a Clipboard header.
-    private func clipboardResults(_ items: ArraySlice<ClipItem>) -> [QuickOpenResult] {
+    private func clipboardResults<Items: Sequence>(_ items: Items) -> [QuickOpenResult] where Items.Element == ClipItem {
         var rows = items.map { QuickOpenResult(kind: .clip($0), id: "clip-\($0.id)") }
         if !rows.isEmpty { rows[0].section = "Clipboard" }
         return rows
@@ -261,6 +270,7 @@ final class QuickOpenModel: ObservableObject {
         selectedByHover = false
         selection = results.first?.id
         showActions = false
+        actionGroup = nil
     }
 
     func move(_ step: Int) {
@@ -290,15 +300,31 @@ final class QuickOpenModel: ObservableObject {
     func toggleActions() {
         if showActions {
             showActions = false
+            actionGroup = nil
         } else if selected?.hasActions == true {
             actionSelection = 0
             showActions = true
         }
     }
 
-    /// Actions for the selected item.
+    /// Actions for the selected item, or the submenu that is open.
     var actions: [QuickOpenAction] {
-        selected.map(actions(for:)) ?? []
+        guard let result = selected else { return [] }
+        let list = actions(for: result)
+        if let actionGroup, let group = list.first(where: { $0.id == actionGroup }) { return group.children }
+        return list
+    }
+
+    /// True when Return would open a submenu rather than run an action.
+    var selectedActionOpensGroup: Bool {
+        guard showActions, actionGroup == nil, actions.indices.contains(actionSelection) else { return false }
+        return !actions[actionSelection].children.isEmpty
+    }
+
+    /// Lists the submenu of an action in place of the actions. Escape goes back.
+    func openGroup(_ action: QuickOpenAction) {
+        actionGroup = action.id
+        actionSelection = 0
     }
 
     /// Actions for a result: open it, open it the other way, or copy what it points to.
@@ -322,6 +348,11 @@ final class QuickOpenModel: ObservableObject {
         if let url = node.url {
             copy("Copy Link", url)
             copy("Copy Clean Link", TrackingParameters.clean(url))
+            if !node.isTemplate {
+                list.append(QuickOpenAction(id: "markdown", title: String(localized: "Copy as Markdown Link", bundle: L10n.bundle)) {
+                    MarkdownLink.copy(title: node.name, url: url, to: .general)
+                })
+            }
         }
         if let command = node.command { copy("Copy Command", command) }
         if let path = node.appPath {
@@ -376,8 +407,31 @@ final class QuickOpenModel: ObservableObject {
         if item.kind == .link, let link = item.plainText?.trimmingCharacters(in: .whitespacesAndNewlines) {
             list.append(QuickOpenAction(id: "copy-clean", title: "Copy Clean Link") { lock.perform(item, for: .copy) { Self.copyText(TrackingParameters.clean(link)) } })
         }
+        if item.kind == .text, let text = item.plainText {
+            let transforms = ClipTransform.allCases.map { transform in
+                QuickOpenAction(id: "\(transform)", title: transform.title) { [pastes] in
+                    lock.perform(item, for: .copy) {
+                        history.copyText(transform.apply(text))
+                        if pastes { FrontApp.pasteSoon() }
+                    }
+                }
+            }
+            list.append(QuickOpenAction(id: "copy-as", title: String(localized: "Copy as…", bundle: L10n.bundle),
+                                        children: transforms) {})
+        }
+        if item.kind == .link, let link = item.link {
+            list.append(QuickOpenAction(id: "markdown", title: String(localized: "Copy as Markdown Link", bundle: L10n.bundle)) { [pastes] in
+                lock.perform(item, for: .copy) {
+                    MarkdownLink.copy(title: link.host ?? link.absoluteString, url: link.absoluteString, to: .general)
+                    if pastes { FrontApp.pasteSoon() }
+                }
+            })
+        }
         list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { lock.perform(item, for: .show) { ClipPreview.shared.show(item) } })
         list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })
+        list.append(QuickOpenAction(id: "queue", title: String(localized: "Add to Paste Queue", bundle: L10n.bundle)) {
+            history.enqueue(item)
+        })
         if item.libraryNode != nil {
             list.append(QuickOpenAction(id: "add", title: "Add to Library") { [store] in
                 lock.perform(item, for: .show) { store.addToLibrary(item) }
@@ -391,7 +445,9 @@ final class QuickOpenModel: ObservableObject {
     func activate(flip: Bool) {
         if showActions {
             let list = actions
-            if list.indices.contains(actionSelection) { list[actionSelection].run() }
+            guard list.indices.contains(actionSelection) else { return }
+            let action = list[actionSelection]
+            if action.children.isEmpty { action.run() } else { openGroup(action) }
             return
         }
         guard let result = selected else { return }

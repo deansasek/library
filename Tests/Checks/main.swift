@@ -591,11 +591,86 @@ MainActor.assumeIsolated {
     check(menu.items.filter(\.isSectionHeader).map(\.title) == ["Recent"], "copy header")
     let (pasteMenu, pasteTarget) = PopupMenu.makeClipboardMenu(history: history, suggestion: nil, pastes: true)
     check(pasteMenu.items.filter(\.isSectionHeader).map(\.title) == ["Paste Recent"], "paste header")
+    // The paste queue: in order, Paste Next copies the first clip and takes it out, and Clear Queue empties it.
+    let queued = Array(history.displayOrder.prefix(2))
+    check(history.pasteQueue.isEmpty && queued.count == 2, "the queue starts empty")
+    history.enqueue(queued[0])
+    history.enqueue(queued[1])
+    check(history.pasteQueue.map(\.id) == queued.map(\.id), "queued clips keep their order")
+    let (queueMenu, queueTarget) = PopupMenu.makeClipboardMenu(history: history, suggestion: nil, pastes: false)
+    check(queueMenu.items.contains { $0.isSectionHeader && $0.title == "Paste Queue (2)" }, "queue header counts the clips")
+    check(queueMenu.items.filter { !$0.isEnabled && !$0.isSeparatorItem && !$0.isSectionHeader }.map(\.title) == queued.map(\.menuTitle), "queued clips are listed, not chosen")
+    check(queueMenu.items.contains { $0.title == "Paste Next" && $0.isEnabled } && queueMenu.items.contains { $0.title == "Clear Queue" }, "queue has Paste Next and Clear Queue")
+    history.pasteNext()
+    check(board.string(forType: .string) == queued[0].plainText && history.pasteQueue.map(\.id) == [queued[1].id], "Paste Next copies the first clip and removes it")
+    history.pasteNext()
+    history.pasteNext()
+    check(history.pasteQueue.isEmpty && board.string(forType: .string) == queued[1].plainText, "Paste Next on an empty queue does nothing")
+    history.enqueue(queued[0])
+    history.clearPasteQueue()
+    check(history.pasteQueue.isEmpty, "Clear Queue empties the queue")
+    check(PopupMenu.makeClipboardMenu(history: history, suggestion: nil, pastes: false).menu.items.allSatisfy { !($0.title.hasPrefix("Paste Queue")) }, "no queue section when the queue is empty")
+    _ = queueTarget
     let node = LibraryItem(name: "docs.example.com", url: "https://docs.example.com")
     let (withAdd, addTarget) = PopupMenu.makeClipboardMenu(history: history, suggestion: AddSuggestion(node: node, source: .selection), pastes: false)
     check(withAdd.items.first?.title == "Add “docs.example.com” to Library", "suggestion first")
     _ = (target, pasteTarget, addTarget)
 }
+
+// ---- clipboard transforms (Copy as…) ----
+let transformTable: [(ClipTransform, String, String)] = [
+    (.plainText, "  Hi\nthere ", "  Hi\nthere "),
+    (.trimmed, "  Hi there \n\t", "Hi there"),
+    (.trimmed, "\n \n", ""),
+    (.trimmed, "inner  spaces\nkept", "inner  spaces\nkept"),
+    (.lowercase, "Hello WORLD é", "hello world é"),
+    (.lowercase, "already", "already"),
+    (.uppercase, "Straße café", "STRASSE CAFÉ"),
+    (.uppercase, "", ""),
+    (.joinedLines, "one\ntwo\r\nthree\rfour", "one two three four"),
+    (.joinedLines, "a\n\nb", "a  b"),
+    (.joinedLines, "single", "single"),
+    (.joinedLines, "trailing\n", "trailing "),
+]
+for (transform, input, expected) in transformTable {
+    check(transform.apply(input) == expected, "\(transform) of \(input.debugDescription) gives \(expected.debugDescription)")
+}
+check(ClipTransform.allCases.map(\.title).allSatisfy { !$0.isEmpty } && ClipTransform.allCases.count == 5, "five named transforms")
+
+// ---- Markdown links ----
+check(MarkdownLink.escapedTitle("a [b] *c* _d_ `e` \\f") == "a \\[b\\] \\*c\\* \\_d\\_ \\`e\\` \\\\f", "Markdown special characters are escaped")
+check(MarkdownLink.escapedTitle("Plain (words) & #tags") == "Plain (words) & #tags", "other characters are left alone")
+check(MarkdownLink.markdown(title: "Docs", url: "https://docs.example.com/a") == "[Docs](https://docs.example.com/a)", "plain Markdown link")
+check(MarkdownLink.markdown(title: "Hi (there)", url: "https://x.example.com/a b(c)") == "[Hi (there)](https://x.example.com/a%20b%28c%29)", "destination encodes spaces and parentheses")
+check(MarkdownLink.markdown(title: "  Docs  ", url: "https://d.example.com") == "[Docs](https://d.example.com)", "title is trimmed")
+check(MarkdownLink.markdown(title: " ", url: "https://d.example.com") == "[https://d.example.com](https://d.example.com)", "a blank title uses the URL")
+check(MarkdownLink.markdown(title: "a_b [c]", url: "https://e.example.com") == "[a\\_b \\[c\\]](https://e.example.com)", "escaped title in the link")
+let mdRich = MarkdownLink.richText(title: "Docs & *more*", url: "https://docs.example.com")
+let mdBack = mdRich.flatMap { NSAttributedString(rtf: $0, documentAttributes: nil) }
+check(mdBack?.string == "Docs & *more*" && (mdBack?.attribute(.link, at: 0, effectiveRange: nil) as? URL) == URL(string: "https://docs.example.com"), "rich text holds the unescaped title as a link")
+check(MarkdownLink.richText(title: "  ", url: "https://docs.example.com") == nil && MarkdownLink.richText(title: "Docs", url: "") == nil, "no rich text without a title or valid URL")
+let mdPasteboard = NSPasteboard(name: NSPasteboard.Name("library-checks-markdown-\(UUID().uuidString)"))
+MarkdownLink.copy(title: "Docs", url: "https://docs.example.com", to: mdPasteboard)
+check(mdPasteboard.string(forType: .string) == "[Docs](https://docs.example.com)" && mdPasteboard.data(forType: .rtf) != nil, "copy writes plain text and rich text")
+MarkdownLink.copy(title: "", url: "https://docs.example.com", to: mdPasteboard)
+check(mdPasteboard.string(forType: .string) == "[https://docs.example.com](https://docs.example.com)" && mdPasteboard.data(forType: .rtf) == nil, "copy without a title writes plain text only")
+mdPasteboard.releaseGlobally()
+
+// ---- from <app> filter ----
+let fromApps = ["Safari", "Google", "Google Chrome", "Notes", "Safari Technology Preview"]
+check(SourceFilter.parse("from safari", apps: fromApps) == SourceFilter.Match(app: "Safari", rest: ""), "from an app alone")
+check(SourceFilter.parse("FROM safari hello world", apps: fromApps) == SourceFilter.Match(app: "Safari", rest: "hello world"), "case-insensitive, words after the app")
+check(SourceFilter.parse("from google chrome docs", apps: fromApps) == SourceFilter.Match(app: "Google Chrome", rest: "docs"), "the longest app name wins")
+check(SourceFilter.parse("from google docs", apps: fromApps) == SourceFilter.Match(app: "Google", rest: "docs"), "a shorter app name when the longer one does not match")
+check(SourceFilter.parse("from  notes   meeting ", apps: fromApps) == SourceFilter.Match(app: "Notes", rest: "meeting"), "extra spaces are ignored")
+check(SourceFilter.parse("from safari technology", apps: fromApps) == SourceFilter.Match(app: "Safari", rest: "technology"), "a name is not taken from a longer name not typed")
+check(SourceFilter.parse("from safari technology preview", apps: fromApps) == SourceFilter.Match(app: "Safari Technology Preview", rest: ""), "the full name matches")
+check(SourceFilter.parse("from", apps: fromApps) == nil && SourceFilter.parse("from zzz", apps: fromApps) == nil, "from alone is a word")
+check(SourceFilter.parse("from safari", apps: []) == nil && SourceFilter.parse("from notes", apps: ["Google"]) == nil, "no app in the history, no filter")
+check(SourceFilter.parse("from google chrome", apps: ["Google"]) == SourceFilter.Match(app: "Google", rest: "chrome"), "a shorter name leaves the rest as text")
+check(SourceFilter.parse("hello from safari", apps: fromApps) == nil && SourceFilter.parse("fromage cheese", apps: fromApps) == nil, "from must start the query")
+check(SourceFilter.parse("from safari", apps: ["", "  "]) == nil, "blank app names never match")
+check(SourceFilter.includes("Safari", app: "safari") && !SourceFilter.includes("Notes", app: "Safari") && !SourceFilter.includes(nil, app: "Safari"), "clips match their source app, case-insensitively")
 
 // ---- Quick Look sources ----
 func clip(_ kind: ClipItem.Kind, text: String? = nil, files: [URL] = [], reps: [[NSPasteboard.PasteboardType: Data]] = [],
