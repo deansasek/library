@@ -123,7 +123,7 @@ struct ManageView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Get Info", systemImage: "info.circle") {
+                Button("Edit…", systemImage: "pencil") {
                     if let id = state.selection.first { state.edit(id, in: store) }
                 }
                 .disabled(state.selection.count != 1)
@@ -216,7 +216,7 @@ struct ManageView: View {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
             }
             Divider()
-            Button("Get Info") { state.edit(id, in: store) }
+            Button("Edit…") { state.edit(id, in: store) }
             Button("Rename") { state.renamingID = id }
             Divider()
         }
