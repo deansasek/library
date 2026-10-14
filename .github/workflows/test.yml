@@ -1,15 +1,27 @@
 name: Test
 
+# Pull requests run the checks; a push to main also builds the release app and renders the screens. Documentation-only
+# changes skip the run, and a new push to a pull request cancels the run it replaces.
 on:
   pull_request:
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - ".gitignore"
+      - ".gitattributes"
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
 jobs:
-  test:
+  checks:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
@@ -22,12 +34,26 @@ jobs:
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.swift') }}-${{ hashFiles('Package.resolved') }}-${{ hashFiles('Sources/**/*.swift') }}
           restore-keys: |
             ${{ runner.os }}-spm-${{ hashFiles('Package.swift') }}-
-      - name: Build
-        run: ./build.sh
+      # test.sh compiles the app's sources itself, so a pull request does not need a separate release build.
       - name: Run the checks
         run: ./test.sh
-      # Draws every screen in light and dark appearance and checks text contrast. Any failure stops the run. The PNGs are
-      # uploaded even when a check fails, so a reviewer can look at them.
+
+  # The release build is what main ships, so it runs on main only.
+  build:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: ./build.sh
+
+  # Draws every screen in light and dark appearance and checks text contrast. Runs on main and on demand, since it is the
+  # slowest step. The PNGs are uploaded even when a check fails, so a reviewer can look at them.
+  render:
+    if: github.event_name != 'pull_request'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
       - name: Render the screens
         run: Tests/render.sh "$RUNNER_TEMP/renders"
       - name: Upload the renders
