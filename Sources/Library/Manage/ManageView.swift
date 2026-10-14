@@ -39,9 +39,6 @@ struct ManageView: View {
         .accessibilityLabel("Sort by \(title)")
     }
 
-    /// The tree the search field leaves in view.
-    private var visible: [LibraryItem] { store.nodes.matching(state.query) }
-
     /// The one share URL for a single selected item, or nil.
     private var singleShareURL: URL? {
         guard state.selection.count == 1, let id = state.selection.first else { return nil }
@@ -87,8 +84,10 @@ struct ManageView: View {
     }
 
     private func list(pathWidth: CGFloat) -> some View {
-        let shown = visible.leaves.count
-        return List(displayed(visible), children: \.children, selection: $state.selection) { node in
+        // The search runs once per change to the query or the library, not on every redraw.
+        let found = state.searches.result(for: state.query, revision: store.revision, in: store.nodes)
+        let shown = found.count
+        return List(displayed(found.tree), children: \.children, selection: $state.selection) { node in
             NodeRow(pathWidth: pathWidth, node: node, store: store, state: state)
         }
         .listStyle(.inset(alternatesRowBackgrounds: true))
@@ -105,7 +104,7 @@ struct ManageView: View {
                 } actions: {
                     Button("Add Bookmark") { state.present(.bookmark) }
                 }
-            } else if visible.isEmpty {
+            } else if found.tree.isEmpty {
                 ContentUnavailableView.search(text: state.query)
             }
         }

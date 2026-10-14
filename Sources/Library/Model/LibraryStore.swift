@@ -13,15 +13,24 @@ final class LibraryStore: ObservableObject {
 
     @Published var nodes: [LibraryItem] = [] {
         didSet {
+            revision += 1
             if !undoSuppressed {
                 registerUndo(restoring: oldValue)
             }
             // Changes read from disk are already saved, so writing them back would only reformat the file.
             if !loadingFromDisk { scheduleSave() }
-            scheduleIconFetch()
-            registerHotKeys()
+            // Only the previous fingerprint is kept, so an edit builds one new fingerprint, not two.
+            let previous = fingerprint
+            fingerprint = TreeFingerprint(nodes)
+            if needsIconFetch(old: previous, new: fingerprint) { scheduleIconFetch() }
+            scheduleSpotlightIndex()
+            if needsHotKeyRegistration(old: previous, new: fingerprint) { registerHotKeys() }
         }
     }
+    /// Counts every change to `nodes`, so a cached search knows when the library changed.
+    private(set) var revision = 0
+    /// The fields of `nodes` that the follow-up work depends on. Matches `nodes` at all times.
+    private var fingerprint = TreeFingerprint([])
     @Published private var icons: [String: NSImage] = [:]
     /// Nodes whose shortcut the system rejected, usually because another app uses it.
     @Published private(set) var failedShortcuts: Set<UUID> = []
@@ -66,6 +75,7 @@ final class LibraryStore: ObservableObject {
     private static let dividerIcon = symbol("minus.rectangle")
 
     private var fetchTask: Task<Void, Never>?
+    private var spotlightTask: Task<Void, Never>?
     private var accessTask: Task<Void, Never>?
     private var watcher: DispatchSourceFileSystemObject?
     /// True when bookmarks.json existed but could not be read, so the app can say so.
@@ -158,8 +168,10 @@ final class LibraryStore: ObservableObject {
         }
         HotKeys.onTapLost = { [weak self] in self?.registerHotKeys(force: true) }
         // Property observers do not run for assignments inside init.
+        fingerprint = TreeFingerprint(nodes)
         registerHotKeys()
         scheduleIconFetch()
+        scheduleSpotlightIndex()
         watchFile()
     }
 
@@ -435,7 +447,6 @@ final class LibraryStore: ObservableObject {
             try? await Task.sleep(nanoseconds: 800_000_000)
             if Task.isCancelled { return }
             let leaves = nodes.leaves
-            indexInSpotlight(leaves)
             // Icons are collected and published once, since every publish redraws the menu. A site with no
             // icon is not asked again until the app restarts.
             var seen = Set<String>()
@@ -467,6 +478,17 @@ final class LibraryStore: ObservableObject {
 
     private static let iconConcurrency = 4
 
+    /// Spotlight shows names too, so every edit schedules a check. It runs on its own debounce, so an icon
+    /// fetch is not restarted for a rename.
+    private func scheduleSpotlightIndex() {
+        spotlightTask?.cancel()
+        spotlightTask = Task {
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            if Task.isCancelled { return }
+            indexInSpotlight(nodes.leaves)
+        }
+    }
+
     /// Updates Spotlight only when what it shows changed, including since the last launch.
     private func indexInSpotlight(_ leaves: [LibraryItem]) {
         let signature = leaves.filter(\.isOpenable).map {
@@ -477,4 +499,82 @@ final class LibraryStore: ObservableObject {
         UserDefaults.standard.set(digest, forKey: "spotlightDigest")
         Spotlight.index(leaves)
     }
+}
+
+/// The fields of a library that the store's follow-up work depends on: every field of every item except its name,
+/// in display order, and the shortcut bindings that hot keys register. Names are left out because only Spotlight
+/// shows them, so renaming an item does not restart icon fetches or hot key registration.
+struct TreeFingerprint: Equatable {
+    struct Entry: Equatable {
+        let id: UUID
+        let isFolder: Bool
+        let url: String?
+        let appPath: String?
+        let arguments: String?
+        let command: String?
+        let shortcuts: [Shortcut]?
+        let keywords: String?
+        let color: String?
+        let icon: String?
+        let browser: String?
+        let promptLabel: String?
+        let isDivider: Bool?
+        let openNew: Bool?
+        let openAtLogin: Bool?
+
+        init(_ node: LibraryItem) {
+            id = node.id
+            isFolder = node.isFolder
+            url = node.url
+            appPath = node.appPath
+            arguments = node.arguments
+            command = node.command
+            shortcuts = node.shortcuts
+            keywords = node.keywords
+            color = node.color
+            icon = node.icon
+            browser = node.browser
+            promptLabel = node.promptLabel
+            isDivider = node.isDivider
+            openNew = node.openNew
+            openAtLogin = node.openAtLogin
+        }
+    }
+
+    /// One shortcut and the item it opens. Hot keys register from these, and only these, in order.
+    struct Binding: Equatable {
+        let node: UUID
+        let shortcut: Shortcut
+    }
+
+    let entries: [Entry]
+    let bindings: [Binding]
+
+    init(_ nodes: [LibraryItem]) {
+        var entries: [Entry] = []
+        var bindings: [Binding] = []
+        func visit(_ list: [LibraryItem]) {
+            for node in list {
+                entries.append(Entry(node))
+                if let children = node.children {
+                    visit(children)
+                } else {
+                    bindings += (node.shortcuts ?? []).map { Binding(node: node.id, shortcut: $0) }
+                }
+            }
+        }
+        visit(nodes)
+        self.entries = entries
+        self.bindings = bindings
+    }
+}
+
+/// True when a change from `old` to `new` can change what icon fetching sees: anything but a name.
+func needsIconFetch(old: TreeFingerprint, new: TreeFingerprint) -> Bool {
+    old.entries != new.entries
+}
+
+/// True when a change from `old` to `new` can change the hot keys: the shortcuts and the items they open.
+func needsHotKeyRegistration(old: TreeFingerprint, new: TreeFingerprint) -> Bool {
+    old.bindings != new.bindings
 }
