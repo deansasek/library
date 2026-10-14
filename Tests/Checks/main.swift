@@ -1549,6 +1549,26 @@ if let data = try? JSONEncoder().encode(linkWithStatus), let back = try? JSONDec
 }
 check(!String(decoding: (try? JSONEncoder().encode(linkOldItem ?? linkPlain)) ?? Data(), as: UTF8.self).contains("linkStatus"), "an item without a status writes no linkStatus key")
 check(!LinkCheck.isCheckable(LibraryItem(name: "Empty", url: "")) && !LinkCheck.isCheckable(LibraryItem(name: "Space", url: "   ")), "a blank address is not checked")
+// ---- page titles for new bookmarks: fixed HTML, no network ----
+check(PageTitle.extract(from: "<html><head><title>Example Domain</title></head></html>") == "Example Domain", "a normal title")
+check(PageTitle.extract(from: "<TITLE lang=\"en\">Upper case tag</Title >") == "Upper case tag", "the tag name and attributes ignore case and spacing")
+check(PageTitle.extract(from: "<title>Tom &amp; Jerry &lt;3 &#39;quoted&#39; &#x263A; &copy; 2026</title>") == "Tom & Jerry <3 'quoted' \u{263A} \u{00A9} 2026",
+      "entities are decoded")
+check(PageTitle.extract(from: "<title>&amp;lt; &unknown; &#xZZ;</title>") == "&lt; &unknown; &#xZZ;", "an entity is decoded once, and unknown ones stay as written")
+check(PageTitle.extract(from: "<head>\n<title>\n    Weekly\n   Report  \n</title>") == "Weekly Report", "a title split over lines is joined with single spaces")
+check(PageTitle.extract(from: "<html><body>No title here</body></html>") == nil, "a page with no title has none")
+check(PageTitle.extract(from: "<title>   \n  </title>") == nil, "an empty title is none, so the host stays")
+check(PageTitle.extract(from: "<title>First</title><title>Second</title>") == "First", "the first title wins")
+let earlyTitle = Data("<html><head><title>Early</title></head><body>".utf8) + Data(repeating: UInt8(ascii: "x"), count: 70_000)
+check(PageTitle.title(in: earlyTitle) == "Early", "a title within the first 64 KB is read")
+let lateTitle = Data("<html><head>".utf8) + Data(repeating: UInt8(ascii: "x"), count: 70_000) + Data("<title>Late</title>".utf8)
+check(PageTitle.title(in: lateTitle) == nil, "a title past the first 64 KB is not read")
+let cutInside = Data("<title>Cut".utf8) + Data(repeating: UInt8(ascii: "x"), count: PageTitle.readLimit) + Data("</title>".utf8)
+check(PageTitle.title(in: cutInside) == nil, "a title cut off by the limit is not read")
+// The 64 KB cut lands inside a two-byte character after the title, which must not hide the title.
+let splitCharacter = Data("<title>Ok</title>".utf8) + Data(Array(repeating: [UInt8(0xC3), UInt8(0xA9)], count: 40_000).flatMap { $0 })
+check(PageTitle.title(in: splitCharacter) == "Ok", "a character cut by the limit does not hide the title")
+check(PageTitle.collapsingWhitespace("  a \t b\n\nc  ") == "a b c", "whitespace collapses and is trimmed")
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

@@ -419,6 +419,7 @@ final class LibraryStore: ObservableObject {
     /// Adds a suggestion to the library, with a soft sound, as Safari does for a bookmark.
     func add(_ suggestion: AddSuggestion) {
         perform("Add to Library") { $0.append(suggestion.node, to: nil) }
+        if let url = suggestion.node.link, suggestion.node.url != nil { SmartTitle.nameFromPage(suggestion.node.id, url: url) }
         NSSound(named: "Pop")?.play()
     }
 
@@ -443,6 +444,13 @@ final class LibraryStore: ObservableObject {
     func recordOpen(_ id: UUID) {
         openCounts[id.uuidString, default: 0] += 1
         UserDefaults.standard.set(openCounts, forKey: "openCounts")
+    }
+
+    /// Renames a bookmark to the title of its page, but only while it still has the host it was added with, so a
+    /// name the user has given it meanwhile is kept.
+    func nameBookmark(_ id: UUID, host: String, title: String) {
+        guard let node = nodes.node(withID: id), node.name == host, node.name != title else { return }
+        perform("Name Bookmark") { list in list.update(id) { $0.name = title } }
     }
 
     /// Opens the bookmarks menu from the menu shortcut.

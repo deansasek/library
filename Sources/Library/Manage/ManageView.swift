@@ -304,6 +304,7 @@ struct ManageView: View {
     /// Adds apps dragged from Finder and links dragged from a browser. Dropping a row from this window
     /// on empty space moves it to the top level instead.
     private func addDropped(_ urls: [URL]) {
+        var newLinks: [(id: UUID, url: URL)] = []
         store.perform("Add") { nodes in
             for url in urls {
                 if let existing = nodes.leaves.first(where: { $0.shareURL == url }) {
@@ -312,10 +313,13 @@ struct ManageView: View {
                 } else if url.isFileURL, url.pathExtension == "app" {
                     nodes.append(LibraryItem(name: appName(at: url.path), appPath: url.path))
                 } else if !url.isFileURL {
-                    nodes.append(LibraryItem(name: url.host ?? url.absoluteString, url: url.absoluteString))
+                    let node = LibraryItem(name: url.host ?? url.absoluteString, url: url.absoluteString)
+                    nodes.append(node)
+                    newLinks.append((node.id, url))
                 }
             }
         }
+        for link in newLinks { SmartTitle.nameFromPage(link.id, url: link.url) }
     }
 
     /// Applies the open sheet's form to the bookmarks.

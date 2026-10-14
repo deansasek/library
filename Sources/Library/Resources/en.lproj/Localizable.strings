@@ -177,3 +177,9 @@
 "Checked %lld links. %lld are broken, and %lld can’t be reached." = "Checked %lld links. %lld are broken, and %lld can’t be reached.";
 /* Footer under Check Links Periodically in Settings > General. */
 "Once a day while Library runs, Library requests each bookmark’s address with a HEAD request, which reads no page content. A server that refuses HEAD gets a GET request, which reads at most 64 KB. Each address is requested once per check, and one checked in the last 24 hours is skipped. Bookmarks whose page fails or can’t be reached get a warning in Edit Library. Off by default. Check Links in the File menu checks now." = "Once a day while Library runs, Library requests each bookmark’s address with a HEAD request, which reads no page content. A server that refuses HEAD gets a GET request, which reads at most 64 KB. Each address is requested once per check, and one checked in the last 24 hours is skipped. Bookmarks whose page fails or can’t be reached get a warning in Edit Library. Off by default. Check Links in the File menu checks now.";
+/* Settings toggle that names a new bookmark from the title of its page. Off by default. */
+"Name New Bookmarks from Their Pages" = "Name New Bookmarks from Their Pages";
+
+/* Settings footer under the toggle that names new bookmarks from their pages. */
+"Library requests each new bookmark's page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host." = "Library requests each new bookmark's page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.";
+

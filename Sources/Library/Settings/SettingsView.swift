@@ -16,6 +16,7 @@ struct SettingsView: View {
     @StateObject private var recording = RecordingState()
     @AppStorage(UpdateCheck.automaticKey) private var checksForUpdates = true
     @AppStorage(LinkChecker.enabledKey) private var checksLinks = false
+    @AppStorage(SmartTitle.key) private var namesFromPages = false
 
     var body: some View {
         TabView {
@@ -41,6 +42,13 @@ struct SettingsView: View {
                 ))
             } footer: {
                 Text("Library lives in the menu bar and opens its items from there.")
+            }
+            Section {
+                Toggle(isOn: $namesFromPages) {
+                    Text("Name New Bookmarks from Their Pages", bundle: L10n.bundle)
+                }
+            } footer: {
+                Text("Library requests each new bookmark's page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.", bundle: L10n.bundle)
             }
             Section {
                 Toggle("Keep Library in iCloud Drive", isOn: Binding(
