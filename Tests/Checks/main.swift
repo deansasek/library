@@ -1169,6 +1169,11 @@ let twoCopiesResult = Duplicates.merge(twoCopies)
 check(twoCopiesResult.nodes[0].shortcuts == [mergeCmdD] && twoCopiesResult.inheritedCount == 1 && twoCopiesResult.conflicts == ["⌘D (Docs c)"], "two copies with one key: the first wins, the second is listed")
 let plainCopies = [LibraryItem(name: "A", url: "https://a.example.com"), LibraryItem(name: "B", url: "https://a.example.com")]
 check(Duplicates.merge(plainCopies).summary == "Merged 2 items." && Duplicates.merge(plainCopies).nodes[0].shortcuts == nil, "no shortcuts to keep means a plain summary")
+// An app with other arguments, or a link in another browser, opens something else, so it is not a duplicate.
+let sameApp = [LibraryItem(name: "T1", appPath: "/Applications/Terminal.app", arguments: "-x"), LibraryItem(name: "T2", appPath: "/Applications/Terminal.app", arguments: "-x ")]
+check(Duplicates.groups(in: sameApp).count == 1, "apps with the same arguments are duplicates")
+check(Duplicates.groups(in: [LibraryItem(name: "T3", appPath: "/Applications/Terminal.app", arguments: "--new"), LibraryItem(name: "T4", appPath: "/Applications/Terminal.app")]).isEmpty, "apps with other arguments are not duplicates")
+check(Duplicates.groups(in: [LibraryItem(name: "Docs", url: "https://docs.example.com", browser: "com.apple.Safari"), LibraryItem(name: "Docs copy", url: "https://docs.example.com")]).isEmpty, "links in other browsers are not duplicates")
 
 // ---- bulk edit (pure) ----
 let bulkTree = [
