@@ -49,23 +49,12 @@ struct NodeRow: View {
         }
         .accessibilityElement(children: state.renamingID == node.id ? .contain : .combine)
         .accessibilityLabel(accessibilityName)
-        .onDrag {
-            // The ids move rows inside this window. A link or app file can also be dropped into other apps.
-            let provider = NSItemProvider()
-            provider.registerObject(dragPayload as NSString, visibility: .ownProcess)
-            if let url = node.shareURL {
-                provider.registerObject(url as NSURL, visibility: .all)
-            }
-            return provider
-        }
-        .dropDestination(for: String.self) { items, _ in
-            let moved = Set(items.flatMap(ids(in:)))
-            if node.isFolder {
-                store.move(moved, to: node.id)
-            } else if state.sortKey == nil {
-                // "Before" means nothing while the list is sorted, so only your own order accepts it.
-                store.move(moved, before: node.id)
-            }
+        .draggable(RowDrag(ids: dragIDs, link: node.shareURL))
+        .dropDestination(for: RowDrag.self) { drags, _ in
+            let moved = Set(drags.flatMap(\.ids))
+            let drop = rowDrop(moving: moved, onto: node.id, in: store.nodes, listSorted: state.sortKey != nil)
+            store.apply(drop, moving: moved)
+            // Always taken, so a drop on a row never falls through to the list's move-to-top-level.
             return true
         } isTargeted: { targeted in
             if targeted {
@@ -117,9 +106,8 @@ struct NodeRow: View {
     }
 
     /// Dragging a selected row carries the whole selection.
-    private var dragPayload: String {
-        let ids = state.selection.contains(node.id) ? state.selection : [node.id]
-        return ids.map(\.uuidString).joined(separator: ",")
+    private var dragIDs: [UUID] {
+        state.selection.contains(node.id) ? Array(state.selection) : [node.id]
     }
 }
 

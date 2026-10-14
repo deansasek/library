@@ -36,6 +36,12 @@ cat > "$app/Contents/Info.plist" <<PLIST
         <key>CFBundleURLName</key><string>com.deansasek.library</string>
         <key>CFBundleURLSchemes</key><array><string>library</string></array>
     </dict></array>
+    <key>UTExportedTypeDeclarations</key>
+    <array><dict>
+        <key>UTTypeIdentifier</key><string>com.deansasek.library.rows</string>
+        <key>UTTypeDescription</key><string>Library rows</string>
+        <key>UTTypeConformsTo</key><array><string>public.data</string></array>
+    </dict></array>
     <key>NSUserActivityTypes</key>
     <array><string>com.apple.corespotlightitem</string></array>
     <key>NSServices</key>
