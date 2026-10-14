@@ -47,7 +47,7 @@ enum ClipPreviewSource {
 
 /// Shows the selected clip in the system Quick Look panel. It keeps one temporary file at a time and deletes it
 /// when the panel closes or the next preview replaces it. The panel is ordered front without taking the key
-/// window, so Quick Open keeps the keyboard.
+/// window. The user can click into it, and Quick Open stays open meanwhile (see QuickOpenPanel).
 @MainActor
 final class ClipPreview: NSObject, QLPreviewPanelDataSource {
     static let shared = ClipPreview()
@@ -93,7 +93,7 @@ final class ClipPreview: NSObject, QLPreviewPanelDataSource {
 
         let panel = QLPreviewPanel.shared()!
         panel.dataSource = self
-        // Shown with orderFront, not makeKey: Quick Open must stay key, or its panel would close.
+        // Shown with orderFront, not makeKey, so opening a preview does not move the key away from Quick Open.
         panel.reloadData()
         panel.orderFront(nil)
         closeObserver = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: panel,

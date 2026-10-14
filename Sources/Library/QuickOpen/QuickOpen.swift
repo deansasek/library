@@ -1,3 +1,4 @@
+import Quartz
 import SwiftUI
 
 /// Spotlight-style floating search over everything in the library.
@@ -49,6 +50,7 @@ enum QuickOpen {
         }
         panel.watchForSpotlight()
         panel.closeAfterDrop(model)
+        panel.watchPreviewFocus()
         // No NSApp.activate: it would bring the Library window forward, which takes the key from the panel
         // and closes it. A non-activating panel takes the keyboard without it, as Spotlight does.
         panel.makeKeyAndOrderFront(nil)
@@ -61,6 +63,26 @@ enum QuickOpen {
             panel.makeFirstResponder(textField(in: content))
         }
         self.panel = panel
+    }
+}
+
+/// Which window has the key, as far as Quick Open's decisions go.
+enum QuickOpenKeyHolder {
+    case quickOpen, preview, other
+}
+
+/// When Quick Open closes as the key window moves. The Quick Look preview is part of Quick Open, so the user can
+/// click into it without Quick Open closing; any other window taking the key closes Quick Open.
+enum QuickOpenFocus {
+    /// - Parameters:
+    ///   - newKey: the window that has the key now, or nil when no window of the app has it.
+    ///   - previewOpen: whether the Quick Look preview is showing.
+    static func closes(whenKeyGoesTo newKey: QuickOpenKeyHolder?, previewOpen: Bool) -> Bool {
+        switch newKey {
+        case .quickOpen: return false
+        case .preview: return !previewOpen
+        case .other, nil: return true
+        }
     }
 }
 
@@ -101,7 +123,47 @@ private final class QuickOpenPanel: NSPanel {
 
     override func resignKey() {
         super.resignKey()
-        close()
+        // Clicking the preview makes it the key window, which is not a reason to close. The key window is read once
+        // it has settled, so the decision sees where the key went.
+        DispatchQueue.main.async { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.isOpen else { return }
+                if QuickOpenFocus.closes(whenKeyGoesTo: self.keyHolder, previewOpen: ClipPreview.shared.isOpen) {
+                    self.close()
+                }
+            }
+        }
+    }
+
+    /// The window that has the key now, as Quick Open's decisions see it.
+    private var keyHolder: QuickOpenKeyHolder? {
+        guard let key = NSApp.keyWindow else { return nil }
+        if key === self { return .quickOpen }
+        if key is QLPreviewPanel { return .preview }
+        return .other
+    }
+
+    /// Watches the Quick Look preview losing the key. If the preview is still open, Quick Open closes when the key went
+    /// to another window. If the preview has closed (Escape, or nothing to show for the selection), Quick Open takes the
+    /// keyboard back, so the next Escape closes it.
+    func watchPreviewFocus() {
+        let observer = NotificationCenter.default.addObserver(forName: NSWindow.didResignKeyNotification, object: nil,
+                                                              queue: .main) { [weak self] note in
+            guard note.object is QLPreviewPanel else { return }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.previewResignedKey() }
+            }
+        }
+        cleanup.append { NotificationCenter.default.removeObserver(observer) }
+    }
+
+    private func previewResignedKey() {
+        guard isOpen else { return }
+        if ClipPreview.shared.isOpen {
+            if QuickOpenFocus.closes(whenKeyGoesTo: keyHolder, previewOpen: true) { close() }
+        } else {
+            makeKeyAndOrderFront(nil)
+        }
     }
 
     private var isClosing = false
@@ -166,7 +228,7 @@ private final class QuickOpenPanel: NSPanel {
         }
         timer.tolerance = 0.2
         RunLoop.main.add(timer, forMode: .common)
-        cleanup = [{ center.removeObserver(observer) }, { timer.invalidate() }]
+        cleanup += [{ center.removeObserver(observer) }, { timer.invalidate() }]
     }
 
     // Arrows, Return, Tab, Escape, and Command-1 to Command-9 go to the list before the text field sees them.

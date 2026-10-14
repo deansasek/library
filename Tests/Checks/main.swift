@@ -532,5 +532,12 @@ let commandFiles: [(name: String, modified: Date)] = [
 ]
 check(staleCommandFiles(among: commandFiles, now: commandNow) == ["library-old.command"], "only old library command files are stale")
 
+// ---- Quick Open focus (pure; no windows) ----
+check(!QuickOpenFocus.closes(whenKeyGoesTo: .preview, previewOpen: true), "clicking the open preview keeps Quick Open")
+check(QuickOpenFocus.closes(whenKeyGoesTo: .preview, previewOpen: false), "a preview that is not open does not keep Quick Open")
+check(!QuickOpenFocus.closes(whenKeyGoesTo: .quickOpen, previewOpen: true) && !QuickOpenFocus.closes(whenKeyGoesTo: .quickOpen, previewOpen: false), "Quick Open keeping the key keeps it open")
+check(QuickOpenFocus.closes(whenKeyGoesTo: .other, previewOpen: true) && QuickOpenFocus.closes(whenKeyGoesTo: .other, previewOpen: false), "another window closes Quick Open, preview or not")
+check(QuickOpenFocus.closes(whenKeyGoesTo: nil, previewOpen: true) && QuickOpenFocus.closes(whenKeyGoesTo: nil, previewOpen: false), "no key window closes Quick Open")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
