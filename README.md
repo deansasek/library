@@ -10,6 +10,14 @@
 
 Library is a menu bar app for macOS. Keep your bookmarks, apps, folders, and terminal commands in one place, open any of them from the menu, a shortcut, or Spotlight, and find what you copied moments ago.
 
+<p align="center">
+  <img src="docs/media/quick_open.gif" width="640" alt="Quick Open finding a bookmark as you type">
+</p>
+
+<p align="center">
+  <img src="docs/media/menu_bar.gif" width="640" alt="The Library menu opening and closing from the menu bar">
+</p>
+
 ## Requirements
 
 - macOS 26 or later
