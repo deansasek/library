@@ -159,5 +159,42 @@ MainActor.assumeIsolated {
     _ = (target, pasteTarget, addTarget)
 }
 
+// ---- Quick Look sources ----
+func clip(_ kind: ClipItem.Kind, text: String? = nil, files: [URL] = [], reps: [[NSPasteboard.PasteboardType: Data]] = [],
+          link: URL? = nil, animated: Data? = nil) -> ClipItem {
+    ClipItem(representations: reps, digest: UUID().uuidString, kind: kind, title: "clip", plainText: text, link: link,
+             thumbnail: nil, gifURL: nil, fileURLs: files, byteCount: 0, animatedData: animated)
+}
+let previewDir = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-preview-\(UUID().uuidString)")
+let pixels = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
+                              hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+let png = pixels.representation(using: .png, properties: [:])!
+let tiff = pixels.tiffRepresentation!
+let gifBytes = Data("GIF89a".utf8)
+
+if let url = ClipPreviewSource.url(for: clip(.text, text: "hello there"), in: previewDir) {
+    check(url.pathExtension == "txt" && url.deletingLastPathComponent().path == previewDir.path, "text goes to a .txt in the folder")
+    check((try? String(contentsOf: url, encoding: .utf8)) == "hello there", "text written as is")
+} else { check(false, "text preview file") }
+if let url = ClipPreviewSource.url(for: clip(.link, text: "https://example.com", link: URL(string: "https://example.com")), in: previewDir) {
+    check(url.pathExtension == "txt" && (try? String(contentsOf: url, encoding: .utf8)) == "https://example.com", "link written as text")
+} else { check(false, "link preview file") }
+check(ClipPreviewSource.url(for: clip(.other), in: previewDir) == nil, "nothing to preview for other items")
+let filePath = URL(fileURLWithPath: "/Applications/Safari.app/Contents/Info.plist")
+check(ClipPreviewSource.url(for: clip(.file, files: [filePath, URL(fileURLWithPath: "/tmp/b.txt")]), in: previewDir) == filePath,
+      "file previews its first file in place")
+if let url = ClipPreviewSource.url(for: clip(.image, reps: [[.png: png]]), in: previewDir) {
+    check(url.pathExtension == "png" && (try? Data(contentsOf: url)) == png, "PNG picture written with a .png name")
+} else { check(false, "png preview file") }
+if let url = ClipPreviewSource.url(for: clip(.image, reps: [[.tiff: tiff]]), in: previewDir) {
+    check(url.pathExtension == "tiff" && (try? Data(contentsOf: url)) == tiff, "TIFF picture written with a .tiff name")
+} else { check(false, "tiff preview file") }
+let gifFile = URL(fileURLWithPath: "/tmp/party.gif")
+check(ClipPreviewSource.url(for: clip(.file, files: [gifFile]), in: previewDir) == gifFile, "GIF file previews in place")
+if let url = ClipPreviewSource.url(for: clip(.image, reps: [[ClipItem.gifType: gifBytes]]), in: previewDir) {
+    check(url.pathExtension == "gif" && (try? Data(contentsOf: url)) == gifBytes, "GIF data written with a .gif name")
+} else { check(false, "gif preview file") }
+try? FileManager.default.removeItem(at: previewDir)
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
