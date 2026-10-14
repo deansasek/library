@@ -420,5 +420,29 @@ check(IntentLogic.bookmark(from: "hello world") == nil, "text is not a bookmark"
 check(IntentLogic.app(atPath: "/Applications/Safari.app")?.appPath == "/Applications/Safari.app" && IntentLogic.app(atPath: "/Applications/Safari.app")?.name == "Safari", "app from a bundle")
 check(IntentLogic.app(atPath: "/tmp/notes.txt") == nil, "a non-app file is not an app")
 
+// ---- favicon limits and failure memory (pure; no network or defaults) ----
+check(Favicon.declaredLengthAllowed(Int64(Favicon.maxBytes)) && !Favicon.declaredLengthAllowed(Int64(Favicon.maxBytes) + 1), "declared length cap is 512 KB")
+check(Favicon.declaredLengthAllowed(-1), "unknown length is allowed, the streamed count decides")
+check(Favicon.byteCountAllowed(512 * 1024) && !Favicon.byteCountAllowed(512 * 1024 + 1), "streamed byte cap")
+let nowStamp: TimeInterval = 1_800_000_000
+let kept = Favicon.pruned([
+    "recent.example.com": nowStamp - 3600,
+    "old.example.com": nowStamp - Favicon.failureWindow - 1,
+    "future.example.com": nowStamp + 100,
+], now: nowStamp)
+check(Array(kept.keys) == ["recent.example.com"], "failures expire after 24 h and future stamps are dropped")
+check(Favicon.failureWindow == 24 * 60 * 60, "failure window is 24 h")
+
+// ---- stale Terminal command files (pure; no files touched) ----
+let commandNow = Date(timeIntervalSince1970: nowStamp)
+let commandFiles: [(name: String, modified: Date)] = [
+    ("library-old.command", commandNow.addingTimeInterval(-3601)),
+    ("library-fresh.command", commandNow.addingTimeInterval(-600)),
+    ("library-edge.command", commandNow.addingTimeInterval(-3600)),
+    ("other-old.command", commandNow.addingTimeInterval(-7200)),
+    ("library-old.txt", commandNow.addingTimeInterval(-7200)),
+]
+check(staleCommandFiles(among: commandFiles, now: commandNow) == ["library-old.command"], "only old library command files are stale")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
