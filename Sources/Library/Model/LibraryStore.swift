@@ -300,7 +300,8 @@ final class LibraryStore: ObservableObject {
                 NSColor.labelColor.set()
                 rect.fill(using: .sourceAtop)
             }
-            NSColor.white.withAlphaComponent(0.9).setFill()
+            // The ring matches the menu background, so it reads in light and dark menus.
+            NSColor.windowBackgroundColor.setFill()
             NSBezierPath(ovalIn: NSRect(x: 8, y: -1, width: 9, height: 9)).fill()
             tint.setFill()
             NSBezierPath(ovalIn: NSRect(x: 9, y: 0, width: 7, height: 7)).fill()
