@@ -127,7 +127,8 @@ private final class QuickOpenPanel: NSPanel {
         // it has settled, so the decision sees where the key went.
         DispatchQueue.main.async { [weak self] in
             MainActor.assumeIsolated {
-                guard let self, self.isOpen else { return }
+                // The system's Touch ID or password prompt takes the key, which is not a reason to close.
+                guard let self, self.isOpen, !ClipboardLock.shared.isPrompting else { return }
                 if QuickOpenFocus.closes(whenKeyGoesTo: self.keyHolder, previewOpen: ClipPreview.shared.isOpen) {
                     self.close()
                 }
@@ -210,8 +211,12 @@ private final class QuickOpenPanel: NSPanel {
         let observer = center.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil,
                                           queue: .main) { [weak self] note in
             let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            // The authentication prompt comes from another process, so it must not close Quick Open.
             if app?.bundleIdentifier != Bundle.main.bundleIdentifier {
-                MainActor.assumeIsolated { self?.close() }
+                MainActor.assumeIsolated {
+                    guard !ClipboardLock.shared.isPrompting else { return }
+                    self?.close()
+                }
             }
         }
         let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in

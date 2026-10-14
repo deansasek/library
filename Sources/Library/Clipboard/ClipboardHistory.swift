@@ -229,7 +229,8 @@ final class ClipboardHistory: ObservableObject {
     func search(_ query: String) -> [ClipItem] {
         let words = query.lowercased().split(separator: " ").map(String.init)
         // Built once for this search. Each item's text was capped at maxSearchableCharacters when it was copied.
-        let order = displayOrder
+        // A locked pinned item is left out, so a search cannot reveal its text before the user authenticates.
+        let order = displayOrder.filter { !ClipboardLock.shared.isHidden($0) }
         guard !words.isEmpty else { return order }
         return order.filter { item in words.allSatisfy(item.searchText.contains) }
     }

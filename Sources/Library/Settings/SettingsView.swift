@@ -12,6 +12,7 @@ struct SettingsView: View {
     @ObservedObject private var loginItem = LoginItem.shared
     @ObservedObject private var history = ClipboardHistory.shared
     @ObservedObject private var tracking = TrackingPreferences.shared
+    @ObservedObject private var clipLock = ClipboardLock.shared
     @StateObject private var recording = RecordingState()
     @AppStorage(UpdateCheck.automaticKey) private var checksForUpdates = true
 
@@ -123,6 +124,14 @@ struct SettingsView: View {
 
     var clipboard: some View {
         Form {
+            Section {
+                Toggle("Require Touch ID or password to show pinned items", isOn: Binding(
+                    get: { clipLock.isRequired },
+                    set: { clipLock.setRequired($0) }
+                ))
+            } footer: {
+                Text("Pinned items show as Pinned Item until you authenticate with Touch ID or your Mac password. They stay unlocked until you choose Lock Pinned Items in the Library menu, the Mac sleeps, or Library quits.")
+            }
             Section {
                 Toggle("Keep Clipboard History", isOn: $history.isEnabled)
                 Toggle("Paste Into Text Fields", isOn: $history.pastesIntoFields)
