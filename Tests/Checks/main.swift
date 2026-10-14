@@ -332,6 +332,23 @@ check(searchTree.matching("release").leaves.map(\.name) == ["Build"], "search by
 check(searchTree.matching("apps").isEmpty, "dividers do not match")
 check(searchTree.matching("work").leaves.map(\.name) == ["Jira", "Docs"], "folder name match keeps contents")
 check(searchTree.matching("zzz").isEmpty, "no match is empty")
+// ---- App Intents logic: no Shortcuts needed ----
+let intentNodes = [
+    LibraryItem(name: "Jira", url: "https://jira.example.com"),
+    LibraryItem(name: "Deploy", command: "./deploy.sh --prod"),
+    LibraryItem(name: "Blank", command: "   "),
+    LibraryItem(name: "Safari", appPath: "/Applications/Safari.app"),
+]
+check(IntentLogic.launchables(matching: "", in: intentNodes, counts: [:]).map(\.name) == ["Jira", "Safari"], "intents list bookmarks and apps, not commands")
+check(IntentLogic.launchables(matching: "deploy", in: intentNodes, counts: [:]).isEmpty, "a command is never found by search")
+check(IntentLogic.launchables(matching: "jira", in: intentNodes, counts: [:]).map(\.name) == ["Jira"], "search finds a bookmark")
+check(IntentLogic.commands(in: intentNodes).map(\.name) == ["Deploy"], "only commands with text are runnable")
+check(!IntentLogic.canRunCommand(intentNodes[0]) && !IntentLogic.canRunCommand(intentNodes[2]) && IntentLogic.canRunCommand(intentNodes[1]), "command rule")
+check(IntentLogic.confirmation(for: intentNodes[1]).contains("./deploy.sh --prod"), "confirmation names the command")
+check(IntentLogic.bookmark(from: "docs.example.com/a")?.url == "https://docs.example.com/a" && IntentLogic.bookmark(from: "docs.example.com/a")?.name == "docs.example.com", "bookmark from a link")
+check(IntentLogic.bookmark(from: "hello world") == nil, "text is not a bookmark")
+check(IntentLogic.app(atPath: "/Applications/Safari.app")?.appPath == "/Applications/Safari.app" && IntentLogic.app(atPath: "/Applications/Safari.app")?.name == "Safari", "app from a bundle")
+check(IntentLogic.app(atPath: "/tmp/notes.txt") == nil, "a non-app file is not an app")
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
