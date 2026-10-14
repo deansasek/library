@@ -4,6 +4,10 @@ import SwiftUI
 /// System-wide triggers. Keys use Carbon hotkeys and hot corners watch the pointer. Neither needs
 /// permission. Clicks, scrolls, and gestures use an event tap, which macOS only allows with
 /// Accessibility access, so the app can swallow the event.
+///
+/// All state lives on the main actor. Carbon and the event tap call back on the main run loop, and the
+/// callbacks check that with `MainActor.assumeIsolated`.
+@MainActor
 enum HotKeys {
     private typealias Entry = (shortcut: Shortcut, action: () -> Void)
 
@@ -32,7 +36,8 @@ enum HotKeys {
 
     /// Shows the system prompt that sends the user to the Accessibility pane.
     static func requestClickAccess() {
-        let prompt = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
+        // The value of kAXTrustedCheckOptionPrompt, which Swift 6 will not read as a global.
+        let prompt = "AXTrustedCheckOptionPrompt"
         AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
     }
 
@@ -134,12 +139,16 @@ enum HotKeys {
             guard hasClickAccess,
                   let port = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
                                                options: .defaultTap, eventsOfInterest: mask,
-                                               callback: { _, type, event, _ in HotKeys.handleTap(type, event) },
+                                               callback: { _, type, event, _ in
+                                                   var result: Unmanaged<CGEvent>?
+                                                   MainActor.assumeIsolated { result = HotKeys.handleTap(type, event) }
+                                                   return result
+                                               },
                                                userInfo: nil) else { return false }
             CFRunLoopAddSource(CFRunLoopGetMain(), CFMachPortCreateRunLoopSource(nil, port, 0), .commonModes)
             tap = port
             tapMask = mask
-            let timer = Timer(timeInterval: 10, repeats: true) { _ in HotKeys.checkTap() }
+            let timer = Timer(timeInterval: 10, repeats: true) { _ in MainActor.assumeIsolated { HotKeys.checkTap() } }
             timer.tolerance = 5
             RunLoop.main.add(timer, forMode: .common)
             watchdog = timer
@@ -173,7 +182,7 @@ enum HotKeys {
             tapEntries.first { $0.shortcut.eventFlags == flags && test($0.shortcut) }
         }
         func fire(_ entry: Entry) {
-            DispatchQueue.main.async { entry.action() }
+            DispatchQueue.main.async { MainActor.assumeIsolated { entry.action() } }
         }
         let button = event.getIntegerValueField(.mouseEventButtonNumber)
 
@@ -250,9 +259,11 @@ enum HotKeys {
             screenFrames = NSScreen.screens.map(\.frame)
             screenObserver = NotificationCenter.default.addObserver(
                 forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { _ in
-                screenFrames = NSScreen.screens.map(\.frame)
+                MainActor.assumeIsolated { screenFrames = NSScreen.screens.map(\.frame) }
             }
-            cornerMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { _ in checkCorner() }
+            cornerMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { _ in
+                MainActor.assumeIsolated { checkCorner() }
+            }
         }
     }
 
@@ -285,7 +296,7 @@ enum HotKeys {
             var id = EventHotKeyID()
             GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
                               nil, MemoryLayout<EventHotKeyID>.size, nil, &id)
-            DispatchQueue.main.async { HotKeys.actions[id.id]?() }
+            DispatchQueue.main.async { MainActor.assumeIsolated { HotKeys.actions[id.id]?() } }
             return noErr
         }, 1, &spec, nil, nil)
     }

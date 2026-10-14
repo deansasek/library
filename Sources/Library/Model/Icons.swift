@@ -1,14 +1,36 @@
 import SwiftUI
 
-/// Asking the system for an icon is slow, and lists ask on every redraw, so each one is kept.
-private var appIcons: [String: NSImage] = [:]
-
+/// Asking the system for an icon is slow, and lists ask on every redraw, so each one is kept. An app that is
+/// updated gets a new modification date, which replaces its cached icon.
 func appIcon(at path: String) -> NSImage {
-    if let cached = appIcons[path] { return cached }
-    let icon = (NSWorkspace.shared.icon(forFile: path).copy() as? NSImage) ?? NSImage()
-    icon.size = NSSize(width: 16, height: 16)
-    appIcons[path] = icon
-    return icon
+    let modified = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
+    return iconCache.icon(at: path, modified: modified) {
+        let icon = (NSWorkspace.shared.icon(forFile: path).copy() as? NSImage) ?? NSImage()
+        icon.size = NSSize(width: 16, height: 16)
+        return icon
+    }
+}
+
+private let iconCache = IconCache()
+
+/// Icons by path. A lock lets lists on any thread read it.
+private final class IconCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var icons: [String: (modified: Date?, icon: NSImage)] = [:]
+
+    func icon(at path: String, modified: Date?, make: () -> NSImage) -> NSImage {
+        lock.lock()
+        if let cached = icons[path], cached.modified == modified {
+            lock.unlock()
+            return cached.icon
+        }
+        lock.unlock()
+        let icon = make()
+        lock.lock()
+        icons[path] = (modified, icon)
+        lock.unlock()
+        return icon
+    }
 }
 
 /// The 16 pt image for a custom icon: an SF Symbol name or a single emoji. Nil when `text` is neither.

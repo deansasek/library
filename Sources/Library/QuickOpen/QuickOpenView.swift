@@ -4,6 +4,7 @@ struct QuickOpenView: View {
     static let previewWidth: CGFloat = 280
 
     @ObservedObject var model: QuickOpenModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let close: () -> Void
     @FocusState private var focused: Bool
 
@@ -50,8 +51,8 @@ struct QuickOpenView: View {
         .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
         // A short fade and grow, like Spotlight. Reduce Motion turns the movement off.
         .opacity(model.appeared ? 1 : 0)
-        .scaleEffect(model.appeared || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 1 : 0.95)
-        .animation(.spring(response: 0.16, dampingFraction: 0.64), value: model.appeared)
+        .scaleEffect(model.appeared || reduceMotion ? 1 : 0.95)
+        .animation(reduceMotion ? nil : .spring(response: 0.16, dampingFraction: 0.64), value: model.appeared)
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onAppear {

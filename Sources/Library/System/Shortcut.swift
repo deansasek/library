@@ -3,7 +3,7 @@ import SwiftUI
 
 /// A global trigger: a key combination, or with `button` a modified click, or with `gesture` a
 /// scroll, pinch, swipe, or hot corner. `modifiers` holds Carbon flags (`cmdKey`, `optionKey`, ...).
-struct Shortcut: Codable {
+struct Shortcut: Codable, Equatable {
     var keyCode: UInt32 = 0
     var modifiers: UInt32
     var key = ""

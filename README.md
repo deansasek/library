@@ -148,7 +148,7 @@ Library reloads `bookmarks.json` when another program changes it, such as an edi
 
 - **Spotlight:** Bookmarks, apps, and commands appear in Spotlight results.
 - **Services:** Select a link in any app, then choose **Services > Add to Library**.
-- **URL scheme:** Use `library://open?name=Jira&value=ABC-123` to open an item and fill in its template. Use `library://menu` to show the menu. Use `library://search` to open Quick Open.
+- **URL scheme:** Use `library://open?name=Jira&value=ABC-123` to open a bookmark or app and fill in its template. Terminal commands can't be opened this way, so a web page can't run one. Use `library://menu` to show the menu. Use `library://search` to open Quick Open.
 
 From Terminal, run `open "library://open?name=Jira&value=ABC-123"`.
 
@@ -166,7 +166,7 @@ The welcome tour opens the first time you launch Library. It explains the app an
 
 ## Privacy
 
-Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to download a GIF you copied from a web page so it can play (turn this off in **Settings > Clipboard**), and to search Google when you ask.
+Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play.
 
 Your data is stored in `~/.library/`:
 

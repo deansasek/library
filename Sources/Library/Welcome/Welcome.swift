@@ -1,5 +1,6 @@
 import SwiftUI
 
+@MainActor
 enum Welcome {
     private static var window: NSWindow?
 

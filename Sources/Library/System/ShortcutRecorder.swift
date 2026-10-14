@@ -18,6 +18,7 @@ struct ShortcutRecorder: NSViewRepresentable {
         view.onCancel = onCancel
     }
 
+    @MainActor
     final class RecorderView: NSView {
         var onRecord: ((Shortcut) -> Void)?
         var onCancel: (() -> Void)?
@@ -42,7 +43,7 @@ struct ShortcutRecorder: NSViewRepresentable {
             }
         }
 
-        deinit {
+        isolated deinit {
             if let monitor {
                 NSEvent.removeMonitor(monitor)
             }

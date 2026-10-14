@@ -16,7 +16,8 @@ final class LibraryStore: ObservableObject {
             if !undoSuppressed {
                 registerUndo(restoring: oldValue)
             }
-            scheduleSave()
+            // Changes read from disk are already saved, so writing them back would only reformat the file.
+            if !loadingFromDisk { scheduleSave() }
             scheduleIconFetch()
             registerHotKeys()
         }
@@ -69,12 +70,29 @@ final class LibraryStore: ObservableObject {
     private var watcher: DispatchSourceFileSystemObject?
     /// True when bookmarks.json existed but could not be read, so the app can say so.
     private(set) var hadUnreadableFile = false
+    /// True when bookmarks.json exists but cannot be read. Library does not write over it until it can be read.
+    private(set) var fileReadFailed = false
+    private var saveBlocked = false
+    private var saveFailureShown = false
     private var saveTask: Task<Void, Never>?
-    private var hotKeySignature = ""
+    private var hotKeyLayout: HotKeyLayout?
     private var failedIcons: Set<String> = []
     private var lastSavedData: Data?
+    /// Modification date and size of bookmarks.json when it was last read or written.
+    private var lastFileStamp: String?
     private var undoSuppressed = false
+    private var loadingFromDisk = false
     private var renameBase: [LibraryItem]?
+
+    /// The shortcuts that register: the extras, and each item's shortcuts with the item they open.
+    private struct HotKeyLayout: Equatable {
+        struct Binding: Equatable {
+            let node: UUID
+            let shortcut: Shortcut
+        }
+        let extras: [Shortcut?]
+        let bindings: [Binding]
+    }
 
     /// The manager window's undo manager. Edits made while it is nil are not undoable.
     var undoManager: UndoManager?
@@ -119,19 +137,23 @@ final class LibraryStore: ObservableObject {
         // The folder holds saved clipboard text, so only you can read it.
         try? FileManager.default.createDirectory(at: Self.dir, withIntermediateDirectories: true)
         try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: Self.dir.path)
-        if let data = try? Data(contentsOf: Self.file) {
-            if let decoded = try? JSONDecoder().decode([LibraryItem].self, from: data) {
-                nodes = decoded
-            } else {
-                hadUnreadableFile = true
-                // The next edit overwrites bookmarks.json, so keep the unreadable file.
-                let damaged = Self.dir.appendingPathComponent("bookmarks-damaged.json")
-                try? FileManager.default.removeItem(at: damaged)
-                try? FileManager.default.copyItem(at: Self.file, to: damaged)
-            }
-        } else {
+        switch BookmarkFile.load(from: Self.file) {
+        case .loaded(let items):
+            nodes = items
+            lastFileStamp = fileStamp()
+        case .missing:
             nodes = [LibraryItem(name: "GitHub", url: "https://github.com")]
             save()
+        case .unreadable:
+            // Nothing is written over a file that could not be read, so the next edit does not replace it.
+            fileReadFailed = true
+            saveBlocked = true
+        case .damaged:
+            hadUnreadableFile = true
+            // The next edit overwrites bookmarks.json, so keep the unreadable file.
+            let damaged = Self.dir.appendingPathComponent("bookmarks-damaged.json")
+            try? FileManager.default.removeItem(at: damaged)
+            try? FileManager.default.copyItem(at: Self.file, to: damaged)
         }
         HotKeys.onTapLost = { [weak self] in self?.registerHotKeys(force: true) }
         // Property observers do not run for assignments inside init.
@@ -147,7 +169,7 @@ final class LibraryStore: ObservableObject {
     }
 
     /// Reloads when bookmarks.json changes outside the app. The folder is watched because
-    /// editors and git replace the file instead of writing into it.
+    /// editors and git replace the file instead of writing into it. Other files in the folder are ignored.
     private func watchFile() {
         let descriptor = Darwin.open(Self.dir.path, O_EVTONLY)
         guard descriptor >= 0 else { return }
@@ -161,15 +183,28 @@ final class LibraryStore: ObservableObject {
     }
 
     private func reloadIfChanged() {
-        // The app's own saves match lastSavedData and are skipped. A change waiting to be saved wins.
-        guard saveTask == nil, let data = try? Data(contentsOf: Self.file), data != lastSavedData,
+        // Most events are for other files in the folder, so the file's stamp is checked before its contents.
+        let stamp = fileStamp()
+        guard saveTask == nil, stamp != lastFileStamp, let data = try? Data(contentsOf: Self.file), data != lastSavedData,
               let decoded = try? JSONDecoder().decode([LibraryItem].self, from: data) else { return }
+        lastFileStamp = stamp
         lastSavedData = data
+        fileReadFailed = false
+        hadUnreadableFile = false
+        saveBlocked = false
+        saveFailureShown = false
         undoSuppressed = true
+        loadingFromDisk = true
         nodes = decoded
+        loadingFromDisk = false
         undoSuppressed = false
         // Old undo steps would restore the file from before the outside change.
         undoManager?.removeAllActions()
+    }
+
+    private func fileStamp() -> String? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: Self.file.path) else { return nil }
+        return "\(attributes[.modificationDate] ?? "")|\(attributes[.size] ?? "")"
     }
 
     /// The web link on the clipboard, if there is one.
@@ -226,11 +261,11 @@ final class LibraryStore: ObservableObject {
 
     /// Registers again only when a shortcut changed, unless `force` is set. Registering touches the system.
     private func registerHotKeys(force: Bool = false) {
-        let signature = "\(extraHotkeys)" + nodes.leaves.flatMap { node in
-            (node.shortcuts ?? []).map { "\(node.id)\($0)" }
-        }.joined()
-        guard force || signature != hotKeySignature else { return }
-        hotKeySignature = signature
+        let layout = HotKeyLayout(extras: extraHotkeys, bindings: nodes.leaves.flatMap { node in
+            (node.shortcuts ?? []).map { HotKeyLayout.Binding(node: node.id, shortcut: $0) }
+        })
+        guard force || layout != hotKeyLayout else { return }
+        hotKeyLayout = layout
         let result = HotKeys.register(nodes.leaves, extras: extraHotkeys) { [weak self] index in
             switch index {
             case 0: self?.showMenu()
@@ -357,14 +392,41 @@ final class LibraryStore: ObservableObject {
     }
 
     private func save() {
+        guard !saveBlocked else {
+            return reportSaveFailure("bookmarks.json can’t be read, so your changes aren’t saved. Check the file’s permissions. Library saves again once the file can be read.")
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        guard let data = try? encoder.encode(nodes) else { return }
+        guard let data = try? encoder.encode(nodes) else {
+            return reportSaveFailure("Library couldn’t prepare your library for saving.")
+        }
+        do {
+            try data.write(to: Self.file, options: .atomic)
+        } catch {
+            return reportSaveFailure(error.localizedDescription)
+        }
         lastSavedData = data
-        try? data.write(to: Self.file, options: .atomic)
+        lastFileStamp = fileStamp()
+        saveFailureShown = false
     }
 
-    /// Debounced so editing a URL does not fetch an icon per keystroke.
+    /// Shows a save failure once, until a save works again, so a failing disk does not open an alert per edit.
+    private func reportSaveFailure(_ reason: String) {
+        NSLog("Library could not save bookmarks.json: \(reason)")
+        guard !saveFailureShown else { return }
+        saveFailureShown = true
+        // Shown on the next pass of the run loop, so the alert does not open in the middle of a save.
+        DispatchQueue.main.async {
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Library Couldn’t Save Your Changes"
+            alert.informativeText = reason
+            alert.runModal()
+        }
+    }
+
+    /// Debounced so editing a URL does not fetch an icon per keystroke. Up to `iconConcurrency` sites are fetched at once.
     private func scheduleIconFetch() {
         fetchTask?.cancel()
         fetchTask = Task {
@@ -374,18 +436,34 @@ final class LibraryStore: ObservableObject {
             indexInSpotlight(leaves)
             // Icons are collected and published once, since every publish redraws the menu. A site with no
             // icon is not asked again until the app restarts.
+            var seen = Set<String>()
+            let pending = leaves.compactMap { node -> (url: String, link: URL)? in
+                guard let url = node.url, icons[url] == nil, !failedIcons.contains(url), let link = node.link,
+                      seen.insert(url).inserted else { return nil }
+                return (url, link)
+            }
             var found: [String: NSImage] = [:]
-            for node in leaves where !Task.isCancelled {
-                guard let url = node.url, icons[url] == nil, !failedIcons.contains(url), let link = node.link else { continue }
-                if let icon = await Favicon.load(for: link) {
-                    found[url] = icon
-                } else {
-                    failedIcons.insert(url)
+            await withTaskGroup(of: (String, NSImage?).self) { group in
+                var next = pending.makeIterator()
+                func startNext() {
+                    guard !Task.isCancelled, let item = next.next() else { return }
+                    group.addTask { (item.url, await Favicon.load(for: item.link)) }
+                }
+                for _ in 0..<Self.iconConcurrency { startNext() }
+                for await (url, icon) in group {
+                    if let icon {
+                        found[url] = icon
+                    } else if !Task.isCancelled {
+                        failedIcons.insert(url)
+                    }
+                    startNext()
                 }
             }
             if !found.isEmpty { icons.merge(found) { $1 } }
         }
     }
+
+    private static let iconConcurrency = 4
 
     /// Updates Spotlight only when what it shows changed, including since the last launch.
     private func indexInSpotlight(_ leaves: [LibraryItem]) {

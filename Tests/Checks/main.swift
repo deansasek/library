@@ -2,7 +2,7 @@ import AppKit
 import Carbon
 
 var failures = 0
-func check(_ ok: Bool, _ what: String, line: Int = #line) { if !ok { failures += 1; print("FAIL line \(line): \(what)") } }
+@MainActor func check(_ ok: Bool, _ what: String, line: Int = #line) { if !ok { failures += 1; print("FAIL line \(line): \(what)") } }
 func answer(_ q: String) -> String? { QuickAnswers.answer(for: q)?.value }
 
 func tree() -> [LibraryItem] {
@@ -70,11 +70,45 @@ check(answer("5/0") == nil && answer("42") == nil && answer("2+") == nil && answ
 check(answer("5 km in miles")?.hasPrefix("3.10685") == true && answer("72 f to c")?.hasPrefix("22.2222") == true, "conversions")
 check(answer("5 km in kg") == nil, "mismatched units")
 
+// ---- a shortcut is equal to the same shortcut ----
+check(Shortcut(modifiers: UInt32(controlKey), button: 1) == Shortcut(modifiers: UInt32(controlKey), button: 1), "shortcut equality")
+check(Shortcut(modifiers: UInt32(controlKey), button: 1) != Shortcut(modifiers: UInt32(cmdKey), button: 1), "shortcut inequality")
+
+// ---- a web page cannot run a terminal command through library://open ----
+MainActor.assumeIsolated {
+    let items = [
+        LibraryItem(name: "Jira", url: "https://jira.example.com"),
+        LibraryItem(name: "Deploy", command: "rm -rf ~/important"),
+    ]
+    check(AppDelegate.item(named: "jira", in: items)?.name == "Jira", "open a bookmark by name")
+    check(AppDelegate.item(named: "Deploy", in: items) == nil, "a command is never opened by name")
+}
+
+// ---- bookmarks.json: missing, unreadable, damaged, and readable files ----
+let folder = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-\(UUID().uuidString)")
+try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+let bookmarks = folder.appendingPathComponent("bookmarks.json")
+if case .missing = BookmarkFile.load(from: bookmarks) {} else { check(false, "a missing file is missing") }
+try? Data("not json".utf8).write(to: bookmarks)
+if case .damaged = BookmarkFile.load(from: bookmarks) {} else { check(false, "a file that is not a library is damaged") }
+try? JSONEncoder().encode(tree()).write(to: bookmarks)
+if case .loaded(let loaded) = BookmarkFile.load(from: bookmarks) { check(loaded.count == 3, "a readable file loads") } else { check(false, "a readable file loads") }
+try? FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: bookmarks.path)
+if case .unreadable = BookmarkFile.load(from: bookmarks) {} else { check(false, "an unreadable file is reported, not replaced") }
+try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: bookmarks.path)
+try? FileManager.default.removeItem(at: folder)
+
 // ---- clipboard history and menu, on a private pasteboard ----
 MainActor.assumeIsolated {
     let board = NSPasteboard(name: NSPasteboard.Name("library-checks-\(UUID().uuidString)"))
     let saveFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-\(UUID().uuidString).json")
     let history = ClipboardHistory(pasteboard: board, file: saveFile)
+
+    // Copies are built in the background, so a check waits until the history has added them.
+    @MainActor func settle() {
+        let deadline = Date().addingTimeInterval(5)
+        while history.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
 
     @MainActor func copy(_ text: String, extra: [String: Data] = [:]) {
         board.clearContents()
@@ -83,6 +117,7 @@ MainActor.assumeIsolated {
         extra.forEach { item.setData($1, forType: NSPasteboard.PasteboardType($0)) }
         board.writeObjects([item])
         history.poll()
+        settle()
     }
 
     copy("first copy"); copy("https://example.com/page"); copy("line one\n   line  two")
@@ -98,6 +133,8 @@ MainActor.assumeIsolated {
     copy("secret", extra: ["org.nspasteboard.ConcealedType": Data()])
     check(!history.items.contains { $0.title == "secret" }, "private copies skipped")
     check(history.search("example").count == 1, "search")
+    check(history.search("example line").isEmpty && history.search("line two").count == 1, "search needs every word")
+    check(history.items.first { $0.kind == .link }?.searchText == "https://example.com/page https://example.com/page", "search text is lowercased title and text")
     copy("web image", extra: ["public.html": Data(#"<img src="https://media.example.com/clips/party.gif?w=2">"#.utf8)])
     check(history.items[0].gifURL?.path == "/clips/party.gif", "GIF address in HTML")
     copy("web", extra: ["public.html": Data(#"<img src="file:///tmp/secret.gif">"#.utf8)])

@@ -120,7 +120,8 @@ private final class QuickOpenPanel: NSPanel {
             context.duration = 0.06
             animator().alphaValue = 0
         }, completionHandler: { [weak self] in
-            self?.orderOut(nil)
+            // The completion runs on the main thread, which the panel's main-actor methods need.
+            MainActor.assumeIsolated { self?.orderOut(nil) }
         })
     }
 

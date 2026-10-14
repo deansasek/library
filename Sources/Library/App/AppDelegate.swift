@@ -18,6 +18,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Library was just moved to Applications. Show the last page of the tour, with its check mark.
             UserDefaults.standard.removeObject(forKey: "resumeWelcomeAfterMove")
             Welcome.show(store: LibraryStore.shared, page: WelcomeModel.pageCount - 1)
+        } else if LibraryStore.shared.fileReadFailed {
+            DispatchQueue.main.async { Self.reportReadFailure() }
         } else if LibraryStore.shared.hadUnreadableFile {
             DispatchQueue.main.async { Self.reportUnreadableFile() }
         } else {
@@ -58,6 +60,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Says that bookmarks.json exists but cannot be read. Library leaves the file as it is.
+    private static func reportReadFailure() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Library Can’t Read bookmarks.json"
+        alert.informativeText = "The file is there, but Library can’t open it, usually because of its permissions. Library won’t change it. Fix the file’s permissions, then open Library again."
+        alert.addButton(withTitle: "Show in Finder")
+        alert.addButton(withTitle: "OK")
+        if alert.runModal() == .alertFirstButtonReturn {
+            NSWorkspace.shared.activateFileViewerSelecting([LibraryStore.file])
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         LibraryStore.shared.flushSave()
     }
@@ -78,10 +94,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
             func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
             if url.host == "open", let name = value("name"),
-               let node = store.nodes.leaves.first(where: { $0.name.caseInsensitiveCompare(name) == .orderedSame }) {
+               let node = Self.item(named: name, in: store.nodes) {
                 open(node, value: value("value"))
             }
         }
+    }
+
+    /// The bookmark or app a `library://open` link names. Terminal commands are left out: a web page can send a
+    /// link, so a link must never run a command.
+    static func item(named name: String, in nodes: [LibraryItem]) -> LibraryItem? {
+        nodes.leaves.first { $0.command == nil && $0.name.caseInsensitiveCompare(name) == .orderedSame }
     }
 
     /// Opens the item behind a Spotlight result.
