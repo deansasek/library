@@ -118,10 +118,6 @@ Library checks GitHub for a new release every hour while it runs, and when it st
 
 ## Install
 
-<p align="center">
-  <img src="docs/media/settings_general.png" width="640" alt="Settings, General tab, with storage, updates, backup, and tracking options">
-</p>
-
 ### Download the source
 
 1. Download the latest `Library-x.y.z.zip` from [Releases](https://github.com/deansasek/library/releases). It holds the source, not a built app.
@@ -148,6 +144,14 @@ To build without installing, run `./build.sh`. The app is written to `build/Libr
 2. Click the bookmark icon in the menu bar, or press Control-Space.
 3. Choose **Edit Library…** to add items.
 4. Turn on **Open at Login** in **Settings > General** to start Library when you log in.
+
+## Settings
+
+Press ⌘, to open Settings. General holds startup, iCloud Drive, updates, backup and restore, and link cleaning. Shortcuts sets the global keys. Clipboard controls history, pasting, GIFs, and the lock.
+
+<p align="center">
+  <img src="docs/media/settings_general.png" width="640" alt="Settings, General tab, with storage, updates, backup, and tracking options">
+</p>
 
 ## Privacy
 
