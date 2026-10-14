@@ -532,6 +532,7 @@ struct TreeFingerprint: Equatable {
         let icon: String?
         let browser: String?
         let promptLabel: String?
+        let templateFields: [String]?
         let isDivider: Bool?
         let openNew: Bool?
         let openAtLogin: Bool?
@@ -549,6 +550,7 @@ struct TreeFingerprint: Equatable {
             icon = node.icon
             browser = node.browser
             promptLabel = node.promptLabel
+            templateFields = node.templateFields
             isDivider = node.isDivider
             openNew = node.openNew
             openAtLogin = node.openAtLogin

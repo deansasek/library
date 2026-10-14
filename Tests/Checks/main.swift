@@ -24,26 +24,45 @@ check(jira.isTemplate && jira.link(filling: "ABC-123")?.absoluteString == "https
 check(jira.link(filling: "a b/c")?.absoluteString == "https://x.example.com/browse/a%20b%2Fc", "template encodes")
 
 // ---- URL templates with named fields ----
-check(templateFields(in: "x.example.com/{}") == [TemplateField(name: "", label: nil)], "bare placeholder is one unnamed field")
-check(templateFields(in: "a/{}/{}") == [TemplateField(name: "", label: nil)], "repeated bare placeholder is one field")
-check(templateFields(in: "a/{ticket:Ticket number}/{user}/{ticket}") == [
+check(templateFieldList(in: "x.example.com/{}") == [TemplateField(name: "", label: nil)], "bare placeholder is one unnamed field")
+check(templateFieldList(in: "a/{}/{}") == [TemplateField(name: "", label: nil)], "repeated bare placeholder is one field")
+check(templateFieldList(in: "a/{ticket:Ticket number}/{user}/{ticket}", declared: ["ticket", "user"]) == [
     TemplateField(name: "ticket", label: "Ticket number"), TemplateField(name: "user", label: nil),
-], "named fields share a name and keep the first label")
-check(templateFields(in: "a/{ticket}/{ticket:Later}").first?.label == "Later", "a label given later fills in a bare name")
-check(templateFields(in: "a/{:Only label}").first == TemplateField(name: "", label: "Only label"), "a label without a name")
-check(templateFields(in: "a/{ticket:}").first == TemplateField(name: "ticket", label: nil), "empty label is no label")
-check(templateFields(in: "a/{open").isEmpty && templateFields(in: "a/{x{}").map(\.name) == [""], "unclosed braces are text")
-check(!LibraryItem(name: "Plain", url: "a.example.com/{open").isTemplate && LibraryItem(name: "N", url: "a/{id}").isTemplate, "isTemplate for named fields")
-
-let bug = LibraryItem(name: "Bug", url: "bugs.example.com/{project}/{id:Issue}?q={project}")
+], "declared fields share a name and keep the first label")
+check(templateFieldList(in: "a/{ticket}/{ticket:Later}", declared: ["ticket"]).first?.label == "Later", "a label given later fills in a bare name")
+check(templateFieldList(in: "a/{:Only label}").first == TemplateField(name: "", label: "Only label"), "a label without a name")
+check(templateFieldList(in: "a/{ticket:}", declared: ["ticket"]).first == TemplateField(name: "ticket", label: nil), "empty label is no label")
+check(templateFieldList(in: "a/{open", declared: ["open"]).isEmpty && templateFieldList(in: "a/{x{}").map(\.name) == [""], "unclosed braces are text")
+check(!LibraryItem(name: "Plain", url: "a.example.com/{open").isTemplate && !LibraryItem(name: "N", url: "a/{id}").isTemplate, "undeclared named braces are plain text")
+let oldJSON = Data(#"{"id":"6F1C3E2A-1B2C-4D5E-8F90-123456789ABC","name":"Jira","url":"x.example.com/{}"}"#.utf8)
+let oldItem = try? JSONDecoder().decode(LibraryItem.self, from: oldJSON)
+check(oldItem?.templateFields == nil && oldItem?.isTemplate == true, "a file without templateFields loads, and {} still asks")
+if let declared = oldItem.map({ var item = $0; item.templateFields = ["q:Query"]; return item }),
+   let data = try? JSONEncoder().encode(declared), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.templateFields == ["q:Query"], "declared fields round-trip through the file")
+} else {
+    check(false, "declared fields round-trip through the file")
+}
+check(LibraryItem(name: "N", url: "a/{id}").placeholders.isEmpty && templatePreview("a/{id}") == "a/{id}" && withoutPlaceholders("a/{id}") == "a/{id}", "undeclared braces are not a template, preview or removal")
+check(LibraryItem(name: "N", url: "a/{id}", templateFields: ["id"]).isTemplate, "declared named field is a template")
+check(templateFieldList(in: "a/{id}/{x}", declared: ["id"]).map(\.name) == ["id"] && templateFieldList(in: "a/{id}/{x}", declared: ["id"]).count == 1, "undeclared names in a template stay text")
+check(parseTemplateFields("query:Search terms, sort , ,:NoName, query:Again, ,") == ["query:Search terms", "sort"], "Fields text: names, labels, blanks and repeats")
+check(parseTemplateFields("  ") == nil && parseTemplateFields("a{b, c}d, e") == ["e"] && parseTemplateFields("x:") == ["x"], "Fields text: empty and braces dropped")
+let declaredBug = LibraryItem(name: "Declared", url: "a.example.com/{q}?x={q:Other}", templateFields: parseTemplateFields("q:Search"))
+check(declaredBug.placeholders == [TemplateField(name: "q", label: "Search")], "declared label beats the URL label")
+check(declaredBug.link(values: ["q": "a b&c"])?.absoluteString == "https://a.example.com/a%20b%26c?x=a%20b%26c", "declared fields fill and encode as before")
+check(declaredBug.link(values: [:]) == nil, "declared values are required")
+check(fillTemplate("a/{q}", values: ["q": "x"]) == "a/{q}" && fillTemplate("a/{q}/{}", values: ["": "x"]) == "a/{q}/x", "undeclared braces are untouched by a fill")
+let bug = LibraryItem(name: "Bug", url: "bugs.example.com/{project}/{id:Issue}?q={project}", templateFields: ["project", "id"])
 check(bug.placeholders.map(\.name) == ["project", "id"], "two fields, project shared")
 check(bug.link(values: ["project": "WEB", "id": "12 3"])?.absoluteString == "https://bugs.example.com/WEB/12%203?q=WEB", "several values fill every placeholder")
 check(bug.link(values: ["project": "WEB"]) == nil && bug.link(values: [:]) == nil, "a missing value is rejected")
 check(bug.link(values: ["project": "a b/c", "id": "1"])?.absoluteString == "https://bugs.example.com/a%20b%2Fc/1?q=a%20b%2Fc", "named values encode the same way")
 check(jira.link(values: ["": "ABC-123"])?.absoluteString == "https://x.example.com/browse/ABC-123", "bare value by its empty name")
 check(bug.link(values: ["project": "", "id": ""])?.absoluteString == "https://bugs.example.com//?q=", "empty values still fill, the caller rejects them")
-check(templatePreview("a/{id:Issue}/{}/{id}/{user}") == "a/‹Issue›/‹value›/‹Issue›/‹user›", "preview labels")
-check(withoutPlaceholders("a/{}/{x:Y}/b") == "a///b", "placeholders removed")
+check(templatePreview("a/{id:Issue}/{}/{id}/{user}", declared: ["id", "user"]) == "a/‹Issue›/‹value›/‹Issue›/‹user›", "preview labels")
+check(templatePreview("a/{id:Issue}/{}/{id}/{user}") == "a/{id:Issue}/‹value›/{id}/{user}", "preview leaves undeclared braces")
+check(withoutPlaceholders("a/{}/{x:Y}/b", declared: ["x"]) == "a///b" && withoutPlaceholders("a/{}/{x:Y}/b") == "a//{x:Y}/b", "placeholders removed, undeclared kept")
 check(LibraryItem(name: "Plain", url: "x.example.com/a").placeholders.isEmpty, "no placeholders for a plain URL")
 
 // ---- Open All selection ----
@@ -995,14 +1014,51 @@ let dupGroups = Duplicates.groups(in: dupTree)
 check(dupGroups.count == 2 && dupGroups[0].items.map(\.name) == ["Docs", "Docs copy"] && dupGroups[1].isApp, "groups by link and by app path, in library order")
 check(Duplicates.groups(in: [LibraryItem(name: "A", url: "https://a.com"), LibraryItem(name: "B", url: "https://b.com")]).isEmpty, "no duplicates means no groups")
 check(Duplicates.folderTitle(of: dupTree[1].children![0].id, in: dupTree) == "Work" && Duplicates.folderTitle(of: dupTree[0].id, in: dupTree) == "Top level", "folder titles")
-let merged = Duplicates.merged(dupTree)
+let merged = Duplicates.merge(dupTree).nodes
 check(merged.leaves.map(\.name) == ["Docs", "Other", "Safari", "Commands", "Divider"], "the first item of each group is kept by default")
 check(merged.leaves.first { $0.name == "Docs" }?.keywords == "wiki handbook" && merged.leaves.first { $0.name == "Safari" }?.keywords == "browser web", "keywords join unique words, first spelling wins")
 check(merged.node(withID: dupTree[1].children![0].id) == nil, "removed item is gone")
-let chosen = Duplicates.merged(dupTree, keeping: [dupGroups[0].id: dupTree[1].children![0].id])
+let chosen = Duplicates.merge(dupTree, keeping: [dupGroups[0].id: dupTree[1].children![0].id]).nodes
 check(chosen.leaves.map(\.name) == ["Docs copy", "Other", "Safari", "Commands", "Divider"] && chosen.folders().map(\.title) == ["Work"], "a chosen item is kept, in its own folder")
 check(chosen.leaves.first { $0.name == "Docs copy" }?.shortcuts?.isEmpty == false, "the kept item keeps its shortcuts")
 check(Duplicates.joinKeywords([nil, "a B", "b c", " "]) == "a B c" && Duplicates.joinKeywords([nil]) == nil, "keyword join")
+
+// ---- merging keeps the shortcuts of the copies (pure) ----
+let mergeCmdD = Shortcut(keyCode: 2, modifiers: UInt32(cmdKey), key: "D")
+let mergeCmdE = Shortcut(keyCode: 14, modifiers: UInt32(cmdKey), key: "E")
+let inheritTree = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs old", url: "https://docs.example.com/"),
+]
+let inherit = Duplicates.merge(inheritTree)
+check(inherit.nodes.map(\.name) == ["Docs"] && inherit.nodes[0].shortcuts == [mergeCmdD], "the kept item inherits a shortcut from a copy")
+check(inherit.summary == "Merged 3 items. 1 shortcut was kept from another copy." && inherit.conflicts.isEmpty, "summary after inheriting one shortcut")
+let chosenCopy = Duplicates.merge(inheritTree, keeping: [Duplicates.groups(in: inheritTree)[0].id: inheritTree[1].id])
+check(chosenCopy.nodes.map(\.name) == ["Docs copy"] && chosenCopy.inheritedCount == 0 && chosenCopy.summary == "Merged 3 items.", "a chosen copy keeps its own shortcut and inherits nothing it already has")
+let clashTree = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [Shortcut(keyCode: 2, modifiers: UInt32(cmdKey), key: "d"), mergeCmdE]),
+]
+let clash = Duplicates.merge(clashTree)
+check(clash.nodes[0].shortcuts == [mergeCmdD, mergeCmdE], "a clashing copy shortcut is dropped, the other is inherited")
+check(clash.conflicts == ["⌘d (Docs copy)"] && clash.summary == "Merged 2 items. 1 shortcut was kept from another copy. Not kept, because the key is already used: ⌘d (Docs copy).", "a clash is listed in the summary")
+let elsewhere = [
+    LibraryItem(name: "Mail", url: "https://mail.example.com", shortcuts: [mergeCmdE]),
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [mergeCmdE]),
+]
+let elsewhereResult = Duplicates.merge(elsewhere)
+check(elsewhereResult.nodes.first { $0.name == "Docs" }?.shortcuts == nil && elsewhereResult.summary == "Merged 2 items. Not kept, because the key is already used: ⌘E (Docs copy).", "a key used by another item is a clash")
+let twoCopies = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs b", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs c", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+]
+let twoCopiesResult = Duplicates.merge(twoCopies)
+check(twoCopiesResult.nodes[0].shortcuts == [mergeCmdD] && twoCopiesResult.inheritedCount == 1 && twoCopiesResult.conflicts == ["⌘D (Docs c)"], "two copies with one key: the first wins, the second is listed")
+let plainCopies = [LibraryItem(name: "A", url: "https://a.example.com"), LibraryItem(name: "B", url: "https://a.example.com")]
+check(Duplicates.merge(plainCopies).summary == "Merged 2 items." && Duplicates.merge(plainCopies).nodes[0].shortcuts == nil, "no shortcuts to keep means a plain summary")
 
 // ---- bulk edit (pure) ----
 let bulkTree = [
@@ -1064,9 +1120,9 @@ check(backupError(Data(#"{"format":"library-backup","items":[]}"#.utf8)) == .uns
 check(backupError(Data("not json".utf8)) == .malformed && backupError(Data()) == .malformed, "garbage is rejected")
 check(backupError(Data(#"{"format":"library-backup","version":1,"items":"oops"}"#.utf8)) == .malformed, "bad items are rejected")
 let twin = LibraryItem(name: "Twin", url: "https://twin.example.com")
-var clash = LibraryItem(name: "Other", url: "https://other.example.com")
-clash.id = twin.id
-if let dupes = try? LibraryBackup.encode([twin, clash]) {
+var backupClash = LibraryItem(name: "Other", url: "https://other.example.com")
+backupClash.id = twin.id
+if let dupes = try? LibraryBackup.encode([twin, backupClash]) {
     check(backupError(dupes) == .duplicateIDs, "repeated ids are rejected")
 }
 check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")

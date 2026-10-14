@@ -217,6 +217,14 @@ struct ManageView: View {
                 AddSheet(store: store, state: state) { commit(sheet) }
             }
         }
+        .alert("Duplicates Merged", isPresented: Binding(
+            get: { state.mergeSummary != nil },
+            set: { if !$0 { state.mergeSummary = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(state.mergeSummary ?? "")
+        }
     }
 
     /// Adds apps dragged from Finder and links dragged from a browser. Dropping a row from this window
