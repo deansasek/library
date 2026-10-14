@@ -36,7 +36,7 @@ Library remembers what you copy, including text, links, images, and files, in ev
 - When a text field has the keyboard, choosing an item pastes it. Otherwise it copies. Turn this off with **Paste Into Text Fields** in **Settings > Clipboard**. Pasting needs Accessibility access.
 - Select an item in Quick Open and press Space to preview it in Quick Look.
 - Copy a link and Library removes tracking codes, such as `utm_source`, `fbclid`, and `gclid`, so the link you paste is clean. Turn this off in **Settings > General**. The link in your history isn't changed.
-- Copy as lower or upper case, trimmed, or with its lines joined. Copy a bookmark as a Markdown link. Both are in Quick Open, under Tab.
+- Copy as lower or upper case, trimmed, with its lines joined, or with smart punctuation. Copy a bookmark as a Markdown link. All are in Quick Open, under Tab.
 - Text with an address, a phone number, or a date gets Open in Maps, Copy Phone Number, or Add to Calendar in Quick Open, under Tab. Detection happens on this Mac.
 - Type `from Safari` in Quick Open to see only what you copied in Safari.
 - Build a paste queue. Add several items, then paste them one at a time, in order.

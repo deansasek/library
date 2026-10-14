@@ -91,6 +91,9 @@
 /* Copy as menu item that turns each line break into a space. */
 "Joined Lines" = "Joined Lines";
 
+/* Copy as menu item that turns straight quotes into curly quotes, dashes and ellipses. */
+"Smart Punctuation" = "Smart Punctuation";
+
 /* Quick Open action, shown for a text clip with an address, that opens the address in Apple Maps. */
 "Open in Maps" = "Open in Maps";
 

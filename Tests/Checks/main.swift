@@ -631,11 +631,25 @@ let transformTable: [(ClipTransform, String, String)] = [
     (.joinedLines, "a\n\nb", "a  b"),
     (.joinedLines, "single", "single"),
     (.joinedLines, "trailing\n", "trailing "),
+    (.smartPunctuation, "\"Hi\" there", "“Hi” there"),
+    (.smartPunctuation, "He said \"don't\"", "He said “don’t”"),
+    (.smartPunctuation, "don't stop", "don’t stop"),
+    (.smartPunctuation, "The dogs' bowls", "The dogs’ bowls"),
+    (.smartPunctuation, "'quoted' word", "‘quoted’ word"),
+    (.smartPunctuation, "'90s music", "’90s music"),
+    (.smartPunctuation, "wait -- what", "wait — what"),
+    (.smartPunctuation, "one... two", "one… two"),
+    (.smartPunctuation, "wait....", "wait…."),
+    (.smartPunctuation, "5\" screen", "5” screen"),
+    (.smartPunctuation, "(\"parens\")\n\"next line\"", "(“parens”)\n“next line”"),
+    (.smartPunctuation, "plain text, nothing: 1 < 2 & 3 > 2.", "plain text, nothing: 1 < 2 & 3 > 2."),
+    (.smartPunctuation, "already “curly” and ‘too’ — …", "already “curly” and ‘too’ — …"),
+    (.smartPunctuation, "", ""),
 ]
 for (transform, input, expected) in transformTable {
     check(transform.apply(input) == expected, "\(transform) of \(input.debugDescription) gives \(expected.debugDescription)")
 }
-check(ClipTransform.allCases.map(\.title).allSatisfy { !$0.isEmpty } && ClipTransform.allCases.count == 5, "five named transforms")
+check(ClipTransform.allCases.map(\.title).allSatisfy { !$0.isEmpty } && ClipTransform.allCases.count == 6, "six named transforms")
 
 // ---- smart text: address, phone, and date in a text clip (on-device detection) ----
 let smartTable: [(text: String, address: Bool, phone: String?, date: Bool)] = [
