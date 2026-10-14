@@ -163,9 +163,6 @@ struct QuickOpenView: View {
             if !folder.isEmpty {
                 Text("In \(folder)").font(.caption).foregroundStyle(.secondary)
             }
-        case .answer(let value, let detail)?:
-            Text(value).font(.largeTitle.weight(.light))
-            Text(detail).font(.callout).foregroundStyle(.secondary)
         case .snippet(let snippet)?:
             Text(snippet.name).font(.title3.weight(.semibold))
             Text(String(snippet.text.prefix(4000)))

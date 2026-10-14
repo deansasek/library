@@ -4,7 +4,6 @@ import Carbon
 
 var failures = 0
 @MainActor func check(_ ok: Bool, _ what: String, line: Int = #line) { if !ok { failures += 1; print("FAIL line \(line): \(what)") } }
-func answer(_ q: String) -> String? { QuickAnswers.answer(for: q)?.value }
 
 func tree() -> [LibraryItem] {
     [
@@ -268,12 +267,6 @@ check(sel?.source == .selection && sel?.node.name == "swift.org", "a selected li
 check(AddSuggestion.make(selection: "just some words", clipboard: nil, in: tree()) == nil, "plain selected text is not")
 check(AddSuggestion.make(selection: "https://docs.example.com", clipboard: nil, in: tree()) == nil, "a link already in the library is not")
 check(AddSuggestion.make(selection: nil, clipboard: nil, in: tree()) == nil, "nothing to suggest")
-
-// ---- quick answers ----
-check(answer("12*8") == "96" && answer("(2+3)*4") == "20" && answer("2^10") == "1024" && answer("10/4") == "2.5", "arithmetic")
-check(answer("5/0") == nil && answer("42") == nil && answer("2+") == nil && answer("jira") == nil, "not answers")
-check(answer("5 km in miles")?.hasPrefix("3.10685") == true && answer("72 f to c")?.hasPrefix("22.2222") == true, "conversions")
-check(answer("5 km in kg") == nil, "mismatched units")
 
 // ---- tracking parameters: a table of links and their cleaned copies ----
 let trackingTable: [(link: String, clean: String)] = [
@@ -972,8 +965,6 @@ if let written = ClipPreviewSource.write(Data("secret".utf8), extension: "txt", 
     ClipPreviewSource.removeLeftovers(in: previewChecks)
     check(!FileManager.default.fileExists(atPath: written.path), "preview files left by an earlier run are removed")
 } else { check(false, "the preview file is written") }
-check(answer(String(repeating: "(", count: 100_000) + "1") == nil, "a huge pasted line gets no answer and does not crash")
-check(answer("(((1+2)))") == "3", "brackets still calculate")
 let boundedIcons = IconCache(capacity: 10)
 for index in 0..<25 { _ = boundedIcons.icon(at: "/copied/\(index)", modified: nil) { NSImage() } }
 check(boundedIcons.count <= 10, "the icon cache is bounded")
