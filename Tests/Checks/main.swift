@@ -1117,7 +1117,11 @@ let searchKey = SymmetricKey(size: .bits256)
 let searchPins = [PinnedFile.Clip(source: "Notes", date: Date(), representations: [["public.utf8-plain-text": Data("unlisted search words".utf8)]])]
 try? JSONEncoder().encode(searchPins).write(to: searchFile)
 let searchHistory = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-s-\(UUID().uuidString)")), file: searchFile, key: { searchKey })
-check(searchHistory.items.first?.pinned == true, "the pinned search fixture loads")
+// Pinned items load in the background, so wait for the load to finish before checking them. The main run loop is
+// pumped meanwhile, since the load publishes its result on the main actor.
+let searchLoadDeadline = Date().addingTimeInterval(10)
+while !searchHistory.pinnedLoaded && Date() < searchLoadDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+check(searchHistory.pinnedLoaded && searchHistory.items.first?.pinned == true, "the pinned search fixture loads")
 check(searchHistory.search("unlisted").isEmpty, "a locked pinned item is not found by search")
 sharedLock.isRequired = false
 check(searchHistory.search("unlisted").count == 1 && !sharedLock.isHidden(pinnedCopy), "with the setting off, the pinned item is found and shown")
