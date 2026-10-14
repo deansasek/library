@@ -309,15 +309,23 @@ do {
 // ---- clipboard history and menu, on a private pasteboard ----
 MainActor.assumeIsolated {
     let testKey = SymmetricKey(size: .bits256)
+    // The pinned file is read in the background, so a check waits until the history has published its pins.
+    @MainActor func waitForLoad(_ loading: ClipboardHistory) {
+        let deadline = Date().addingTimeInterval(5)
+        while !loading.pinnedLoaded, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
     let board = NSPasteboard(name: NSPasteboard.Name("library-checks-\(UUID().uuidString)"))
     let saveFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-\(UUID().uuidString).json")
     let history = ClipboardHistory(pasteboard: board, file: saveFile, key: { testKey })
+    waitForLoad(history)
 
     // A plain-text pinned file from before encryption is migrated on load, leaving no plain text behind.
     let legacyFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-legacy-\(UUID().uuidString).json")
     let legacy = [PinnedFile.Clip(source: "Notes", date: Date(), representations: [["public.utf8-plain-text": Data("legacy pin".utf8)]])]
     try? JSONEncoder().encode(legacy).write(to: legacyFile)
     let migrated = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-m-\(UUID().uuidString)")), file: legacyFile, key: { testKey })
+    waitForLoad(migrated)
+    ClipboardHistory.waitForSaves()
     check(migrated.items.map(\.title) == ["legacy pin"] && migrated.items.first?.pinned == true, "a plain-text file loads its pins")
     let migratedBytes = (try? Data(contentsOf: legacyFile)) ?? Data()
     check(migratedBytes.range(of: Data("legacy pin".utf8)) == nil, "a migrated file hides the text")
@@ -331,6 +339,7 @@ MainActor.assumeIsolated {
     try? Data(repeating: 0x42, count: 80).write(to: damagedFile)
     let damagedHistory = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-d-\(UUID().uuidString)")), file: damagedFile, key: { testKey })
     let movedAside = damagedFile.deletingLastPathComponent().appendingPathComponent("clipboard-damaged.bin")
+    waitForLoad(damagedHistory)
     check(damagedHistory.items.isEmpty && !FileManager.default.fileExists(atPath: damagedFile.path) && FileManager.default.fileExists(atPath: movedAside.path), "a damaged file is kept aside")
     try? FileManager.default.removeItem(at: movedAside)
 
@@ -339,6 +348,7 @@ MainActor.assumeIsolated {
     let sealedBytes = (try? PinnedFile.encode(legacy, key: testKey)) ?? Data()
     try? sealedBytes.write(to: lockedFile)
     let locked = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-l-\(UUID().uuidString)")), file: lockedFile, key: { throw ClipboardKey.KeychainError(status: -1) })
+    waitForLoad(locked)
     check(locked.items.isEmpty && (try? Data(contentsOf: lockedFile)) == sealedBytes, "no key leaves the sealed file untouched")
     try? FileManager.default.removeItem(at: lockedFile)
 
@@ -347,6 +357,50 @@ MainActor.assumeIsolated {
         let deadline = Date().addingTimeInterval(5)
         while history.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     }
+
+    // A copy made while the pinned file is still loading is kept. The loaded pins merge in after the newer copies,
+    // a pin whose copy was made again is not added twice, and nothing is written over the file until it has loaded.
+    let mergeFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-merge-\(UUID().uuidString).json")
+    let seedBoard = NSPasteboard(name: NSPasteboard.Name("library-checks-seed-\(UUID().uuidString)"))
+    let seed = ClipboardHistory(pasteboard: seedBoard, file: mergeFile, key: { testKey })
+    waitForLoad(seed)
+    @MainActor func copyText(_ text: String, on pasteboard: NSPasteboard, into target: ClipboardHistory) {
+        pasteboard.clearContents()
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        pasteboard.writeObjects([item])
+        target.poll()
+        let deadline = Date().addingTimeInterval(5)
+        while target.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+    copyText("pinned one", on: seedBoard, into: seed)
+    copyText("pinned two", on: seedBoard, into: seed)
+    seed.togglePin(seed.items[0])
+    seed.togglePin(seed.items[1])
+    ClipboardHistory.waitForSaves()
+    let gate = DispatchSemaphore(value: 0)
+    let mergeBoard = NSPasteboard(name: NSPasteboard.Name("library-checks-merge-\(UUID().uuidString)"))
+    // The first caller waits for the gate, then the gate is opened again for later callers, as the Keychain key would be.
+    let merging = ClipboardHistory(pasteboard: mergeBoard, file: mergeFile, key: { gate.wait(); gate.signal(); return testKey })
+    check(!merging.pinnedLoaded, "the pinned file waits for its key")
+    copyText("pinned two", on: mergeBoard, into: merging)
+    copyText("fresh copy", on: mergeBoard, into: merging)
+    check(merging.items.map(\.title) == ["fresh copy", "pinned two"] && merging.items.allSatisfy { !$0.pinned }, "copies made during the load are kept")
+    let beforeLoad = (try? Data(contentsOf: mergeFile)) ?? Data()
+    merging.togglePin(merging.items[0])
+    ClipboardHistory.waitForSaves()
+    check((try? Data(contentsOf: mergeFile)) == beforeLoad, "nothing is written before the pinned file has loaded")
+    gate.signal()
+    waitForLoad(merging)
+    check(merging.items.map(\.title) == ["fresh copy", "pinned two", "pinned one"], "loaded pins follow the newer copies, a repeat is merged")
+    check(merging.items.allSatisfy(\.pinned), "pins are kept after the merge")
+    check(zip(merging.items, merging.items.dropFirst()).allSatisfy { $0.date >= $1.date }, "merged order is newest first")
+    check(Set(merging.items.map(\.digest)).count == merging.items.count, "no item appears twice")
+    ClipboardHistory.waitForSaves()
+    if case .clips(let saved, _) = PinnedFile.read((try? Data(contentsOf: mergeFile)) ?? Data(), key: testKey) {
+        check(saved.count == 3, "the merged pins are saved")
+    } else { check(false, "the merged pins are saved") }
+    try? FileManager.default.removeItem(at: mergeFile)
 
     @MainActor func copy(_ text: String, extra: [String: Data] = [:]) {
         board.clearContents()
@@ -364,6 +418,7 @@ MainActor.assumeIsolated {
     copy("first copy")
     check(history.items.count == 3 && history.items[0].title == "first copy", "a repeat moves to the top")
     history.togglePin(history.items[2])
+    ClipboardHistory.waitForSaves()
     check(FileManager.default.fileExists(atPath: saveFile.path), "pinning saves the file")
     check(((try? FileManager.default.attributesOfItem(atPath: saveFile.path))?[.posixPermissions] as? Int) == 0o600, "private file")
     let pinnedBytes = (try? Data(contentsOf: saveFile)) ?? Data()
@@ -372,6 +427,7 @@ MainActor.assumeIsolated {
         check(pinnedBytes.range(of: Data(pinnedText.utf8)) == nil, "the pinned file hides the pinned text")
     } else { check(false, "an item is pinned") }
     let reloaded = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-2-\(UUID().uuidString)")), file: saveFile, key: { testKey })
+    waitForLoad(reloaded)
     check(reloaded.items.count == history.items.filter(\.pinned).count, "pinned items reload")
     copy("secret", extra: ["org.nspasteboard.ConcealedType": Data()])
     check(!history.items.contains { $0.title == "secret" }, "private copies skipped")
@@ -387,6 +443,7 @@ MainActor.assumeIsolated {
     history.clear()
     check(history.items.allSatisfy(\.pinned), "clear keeps pins")
     history.remove(history.items[0])
+    ClipboardHistory.waitForSaves()
     check(history.items.isEmpty && !FileManager.default.fileExists(atPath: saveFile.path), "removing the last pin removes the file")
 
     for index in 1...12 { copy("menu copy \(index)") }
@@ -623,6 +680,7 @@ let commandFiles: [(name: String, modified: Date)] = [
 check(staleCommandFiles(among: commandFiles, now: commandNow) == ["library-old.command"], "only old library command files are stale")
 runBenchmark()
 QuickOpenBench.main()
+ClipboardBench.main()
 
 // ---- Quick Open focus (pure; no windows) ----
 check(!QuickOpenFocus.closes(whenKeyGoesTo: .preview, previewOpen: true), "clicking the open preview keeps Quick Open")

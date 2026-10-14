@@ -1,16 +1,31 @@
 import CryptoKit
 import Foundation
+import os
 import Security
 
 /// The key that encrypts pinned clipboard items. It is made once, the first time it is needed, and kept in the
-/// login Keychain, where only this app can read it on this Mac.
+/// login Keychain, where only this app can read it on this Mac. It is read from the Keychain once per launch and
+/// kept in memory after that, so later callers never touch the Keychain again.
 enum ClipboardKey {
     private static let service = "com.deansasek.library"
     private static let account = "clipboard-key"
 
+    /// The key once it has been read or made. Held under the lock for the whole Keychain call, so concurrent
+    /// first callers (the launch load and a pin on the main actor) share one Keychain lookup.
+    private static let cache = OSAllocatedUnfairLock<SymmetricKey?>(initialState: nil)
+
     /// Returns the stored key, or makes and stores a new one. Throws when the Keychain refuses, so callers never
-    /// fall back to saving plain text.
+    /// fall back to saving plain text. A failure is not cached, so a later call tries the Keychain again.
     static func key() throws -> SymmetricKey {
+        try cache.withLock { cached in
+            if let cached { return cached }
+            let key = try loadOrCreate()
+            cached = key
+            return key
+        }
+    }
+
+    private static func loadOrCreate() throws -> SymmetricKey {
         if let existing = try read() { return existing }
         let fresh = SymmetricKey(size: .bits256)
         var attributes = query()

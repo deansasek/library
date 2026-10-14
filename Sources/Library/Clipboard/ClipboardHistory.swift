@@ -52,9 +52,16 @@ final class ClipboardHistory: ObservableObject {
     private let pasteboard: NSPasteboard
     private let file: URL?
     /// Supplies the key that encrypts pinned items. Tests pass their own, so they never touch the Keychain.
-    private let loadKey: () throws -> SymmetricKey
+    private let loadKey: @Sendable () throws -> SymmetricKey
     /// True when clipboard.json exists but could not be opened because the key was unavailable.
     private var leavesPinnedFile = false
+    /// False until clipboard.json has been read in the background. Until then nothing is written, so a save can
+    /// never replace the pinned items that are still loading.
+    private(set) var pinnedLoaded = false
+    /// A pin or unpin that happened before the load finished. It is written once the load is merged.
+    private var savesAfterLoad = false
+    /// Every write of clipboard.json runs here, one at a time and in the order they were queued.
+    private static let writeQueue = DispatchQueue(label: "com.deansasek.library.clipboard-save")
     private var timer: Timer?
     private var lastChange: Int
     /// Counts copies, so an older copy that finishes building late does not take over `current`.
@@ -65,7 +72,7 @@ final class ClipboardHistory: ObservableObject {
     /// `pasteboard` is the system clipboard, or another one for checking the history without touching it.
     /// `file` is where pinned items are saved. Nil saves nothing. `key` encrypts that file.
     init(pasteboard: NSPasteboard = .general, file: URL? = ClipboardHistory.defaultFile,
-         key: @escaping () throws -> SymmetricKey = ClipboardKey.key) {
+         key: @escaping @Sendable () throws -> SymmetricKey = ClipboardKey.key) {
         self.pasteboard = pasteboard
         self.file = file
         self.loadKey = key
@@ -77,11 +84,35 @@ final class ClipboardHistory: ObservableObject {
         if isEnabled { start() }
     }
 
+    /// The pinned items read from clipboard.json, built off the main actor and then published on it.
+    private struct PinnedLoad: Sendable {
+        var items: [ClipItem]
+        /// The file was plain JSON from before encryption, so it must be saved again.
+        var migrated: Bool
+        /// The file exists but could not be opened with the key, so nothing may be written over it.
+        var leavesFile: Bool
+    }
+
+    /// Reads clipboard.json in the background: the file, the Keychain key, decryption, decoding, and building every
+    /// item with its thumbnail. The main actor is not used until the result is published.
     private func loadPinned() {
-        guard let file, FileManager.default.fileExists(atPath: file.path) else { return }
+        guard let file else {
+            pinnedLoaded = true
+            return
+        }
+        let loadKey = self.loadKey
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let load = ClipboardHistory.readPinned(file: file, key: loadKey)
+            await self?.finishLoading(load)
+        }
+    }
+
+    /// Nil when there is no file. Runs off the main actor.
+    nonisolated private static func readPinned(file: URL, key loadKey: @Sendable () throws -> SymmetricKey) -> PinnedLoad? {
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
         guard let data = try? Data(contentsOf: file) else {
             NSLog("Library: could not read clipboard.json, so pinned items were not loaded")
-            return
+            return PinnedLoad(items: [], migrated: false, leavesFile: true)
         }
         let key: SymmetricKey?
         do {
@@ -90,36 +121,53 @@ final class ClipboardHistory: ObservableObject {
             NSLog("Library: pinned clipboard key unavailable, so pinned items were not loaded: \(error)")
             key = nil
         }
-        // Without a key, the file was not verified, so nothing may overwrite or delete it until a later launch.
-        leavesPinnedFile = key == nil
         switch PinnedFile.read(data, key: key) {
         case .clips(let clips, let migrated):
-            items = clips.compactMap { clip in
+            let items: [ClipItem] = clips.compactMap { clip in
                 let representations = clip.representations.map { representation in
                     Dictionary(uniqueKeysWithValues: representation.map { (NSPasteboard.PasteboardType($0.key), $0.value) })
                 }
                 let bytes = representations.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } }
-                guard var item = Self.makeItem(representations: representations, bytes: bytes, date: clip.date) else { return nil }
+                guard var item = makeItem(representations: representations, bytes: bytes, date: clip.date) else { return nil }
                 item.pinned = true
                 item.sourceApp = clip.source
                 return item
             }
-            // A plain-text file from before encryption is saved again, which replaces it with the sealed copy.
-            if migrated {
-                NSLog("Library: encrypting pinned clipboard items saved before encryption")
-                savePinned()
-            }
+            // Without a key, the file was not verified, so nothing may overwrite or delete it until a later launch.
+            return PinnedLoad(items: items, migrated: migrated, leavesFile: key == nil)
         case .unreadable:
             // With no key, the file may be fine, so it is left alone. With a key, it is damaged: keep it for
             // inspection and start with no pins.
-            guard key != nil else { return }
+            guard key != nil else { return PinnedLoad(items: [], migrated: false, leavesFile: true) }
             NSLog("Library: clipboard.json could not be read, so it was moved to clipboard-damaged.bin")
             quarantine(file)
+            return PinnedLoad(items: [], migrated: false, leavesFile: false)
+        }
+    }
+
+    /// Publishes the loaded pins. Copies made while the file was loading stay first. A pin whose copy was made
+    /// again during the load is marked pinned instead of added twice. The rest go in by copy time, as a copy does.
+    private func finishLoading(_ load: PinnedLoad?) {
+        pinnedLoaded = true
+        if let load {
+            leavesPinnedFile = load.leavesFile
+            for pin in load.items {
+                if let index = items.firstIndex(where: { $0.digest == pin.digest }) {
+                    items[index].pinned = true
+                } else {
+                    items.insert(pin, at: items.firstIndex { $0.date < pin.date } ?? items.count)
+                }
+            }
+            trim()
+        }
+        if load?.migrated == true || savesAfterLoad {
+            savesAfterLoad = false
+            savePinned()
         }
     }
 
     /// Moves a damaged clipboard.json aside, replacing any earlier copy of it.
-    private func quarantine(_ file: URL) {
+    nonisolated private static func quarantine(_ file: URL) {
         let damaged = file.deletingLastPathComponent().appendingPathComponent("clipboard-damaged.bin")
         try? FileManager.default.removeItem(at: damaged)
         do {
@@ -129,9 +177,19 @@ final class ClipboardHistory: ObservableObject {
         }
     }
 
+    /// Waits until every write queued so far has finished. Used by the checks, which read the file right after a save.
+    static func waitForSaves() {
+        writeQueue.sync {}
+    }
+
     /// Writes the pinned items to clipboard.json, sealed with the Keychain key, or removes the file when none are
-    /// left. If the key is unavailable, nothing is written, so no plain text is ever saved.
+    /// left. If the key is unavailable, nothing is written, so no plain text is ever saved. The items are sealed
+    /// here, and the bytes are written on `writeQueue`, so the file is never touched on the main actor.
     private func savePinned() {
+        guard pinnedLoaded else {
+            savesAfterLoad = true
+            return
+        }
         guard let file else { return }
         guard !leavesPinnedFile else {
             NSLog("Library: pinned clipboard items were not saved, because clipboard.json was not opened this launch")
@@ -143,7 +201,7 @@ final class ClipboardHistory: ObservableObject {
             })
         }
         guard !clips.isEmpty else {
-            try? FileManager.default.removeItem(at: file)
+            Self.writeQueue.async { try? FileManager.default.removeItem(at: file) }
             return
         }
         let data: Data
@@ -156,8 +214,10 @@ final class ClipboardHistory: ObservableObject {
         // The temporary file is private from the moment it is created, then renamed over the old one, so the
         // text is never readable by anyone else, not even briefly.
         let temporary = file.deletingLastPathComponent().appendingPathComponent(".clipboard-\(UUID().uuidString).tmp")
-        guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return }
-        if rename(temporary.path, file.path) != 0 { try? FileManager.default.removeItem(at: temporary) }
+        Self.writeQueue.async {
+            guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return }
+            if rename(temporary.path, file.path) != 0 { try? FileManager.default.removeItem(at: temporary) }
+        }
     }
 
     /// Pinned items first, then the rest, newest first in each group.
