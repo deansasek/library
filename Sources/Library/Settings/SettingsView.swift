@@ -66,7 +66,7 @@ struct SettingsView: View {
                 }
                 .onChange(of: checksLinks) { _, _ in LinkChecker.startSchedule(store: store) }
             } footer: {
-                Text("Once a day while Library runs, Library requests each bookmark’s address with a HEAD request, which reads no page content. Each address is requested once per check, and one checked in the last 24 hours is skipped. Bookmarks whose page fails or can’t be reached get a warning in Edit Library. Off by default. Check Links in the File menu checks now.", bundle: L10n.bundle)
+                Text("Once a day while Library runs, Library requests each bookmark’s address with a HEAD request, which reads no page content. A server that refuses HEAD gets a GET request, which reads at most 64 KB. Each address is requested once per check, and one checked in the last 24 hours is skipped. Bookmarks whose page fails or can’t be reached get a warning in Edit Library. Off by default. Check Links in the File menu checks now.", bundle: L10n.bundle)
             }
             Section {
                 LabeledContent("Library") {
