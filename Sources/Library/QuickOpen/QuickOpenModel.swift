@@ -150,10 +150,6 @@ final class QuickOpenModel: ObservableObject {
             list.insert(QuickOpenResult(kind: .openLink(link), id: "open"), at: 0)
             list.append(QuickOpenResult(kind: .addLink(link), id: "add"))
         }
-        list.append(QuickOpenResult(kind: .webSearch(text), id: "web"))
-        if let answer = QuickAnswers.answer(for: text) {
-            list.insert(QuickOpenResult(kind: .answer(value: answer.value, detail: answer.detail), id: "answer"), at: 0)
-        }
         // Headers as Spotlight has them: the first result is the Top Hit, and each kind of result after it
         // gets its own header the first time it appears.
         var shown = Set<String>()
@@ -162,7 +158,6 @@ final class QuickOpenModel: ObservableObject {
             switch list[index].kind {
             case .item: group = "Library"
             case .clip: group = "Clipboard"
-            case .answer: group = "Answer"
             case .snippet: group = "Snippets"
             default: group = "Suggestions"
             }
@@ -192,14 +187,12 @@ final class QuickOpenModel: ObservableObject {
 
     func icon(for result: QuickOpenResult) -> NSImage {
         switch result.kind {
-        case .answer: return symbol("equal.circle")
         case .addSuggestion: return symbol("plus.circle")
         case .clip(let item): return item.icon
         case .item(let node, _): return store.icon(for: node)
         case .openLink: return symbol("safari")
         case .snippet: return symbol("text.quote")
         case .addLink: return symbol("plus.circle")
-        case .webSearch: return symbol("magnifyingglass")
         }
     }
 
@@ -220,8 +213,6 @@ final class QuickOpenModel: ObservableObject {
             if let url = node.shareURL { provider.registerObject(url as NSURL, visibility: .all) }
         case .openLink(let url), .addLink(let url):
             provider.registerObject(url as NSURL, visibility: .all)
-        case .answer(let value, _):
-            provider.registerObject(value as NSString, visibility: .all)
         case .snippet(let snippet):
             provider.registerObject(snippet.text as NSString, visibility: .all)
         default:
@@ -377,8 +368,6 @@ final class QuickOpenModel: ObservableObject {
         }
         guard let result = selected else { return }
         switch result.kind {
-        case .answer(let value, _):
-            Self.copyText(value)
         case .snippet(let snippet):
             Self.copyText(snippet.text)
         case .addSuggestion(let suggestion):
@@ -393,11 +382,6 @@ final class QuickOpenModel: ObservableObject {
         case .addLink(let url):
             store.perform("Add Bookmark") {
                 $0.append(LibraryItem(name: url.host ?? url.absoluteString, url: url.absoluteString), to: nil)
-            }
-        case .webSearch(let query):
-            let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-            if let url = URL(string: "https://www.google.com/search?q=\(encoded)") {
-                NSWorkspace.shared.open(url)
             }
         }
     }

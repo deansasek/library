@@ -147,7 +147,7 @@ func run() {
     settle { !actions.results.isEmpty }
     actions.selection = actions.results.first?.id
 
-    // Quick Open with a query that matches nothing: only the web search suggestion is left.
+    // Quick Open with a query that matches nothing.
     let none = QuickOpenModel(store: store, selectedText: nil, pastes: false)
     none.appeared = true
     none.query = "zzqxv"

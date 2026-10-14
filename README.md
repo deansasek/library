@@ -63,8 +63,7 @@ Each item shows its URL, command, or path when you hover over it.
 Press Control-Space to open a search field over every item.
 
 - Type words from a name, keyword, URL, or folder. Press ↑ or ↓ to choose a result, then press Return.
-- Type or paste a web address to open it or add it to your library. Type anything else to search Google.
-- Type a calculation, such as `12*8`, or a conversion, such as `5 km in miles` or `72 f to c`. Press Return to copy the answer.
+- Type or paste a web address to open it or add it to your library.
 - Press Tab, or right-click a result, to open it the other way, copy its link, path, or command, or show an app in Finder.
 - Press ⌘1 through ⌘9 to open the first nine results.
 
@@ -195,7 +194,7 @@ The welcome tour opens the first time you launch Library. It explains the app an
 
 ## Privacy
 
-Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play. It contacts `api.github.com` only to check for a new release: when you choose **Check for Updates…** in the menu, and, unless you turn off **Check for Updates Automatically** in **Settings > General** (on by default), once an hour while Library runs and when it starts if the last check was an hour or more ago. The only request is to `https://api.github.com/repos/deansasek/library/releases/latest`. It names only the app's version, in its User-Agent header. It also sends the ETag GitHub gave on the last answer, so GitHub can reply that nothing changed. No account or other data is sent. When a newer version exists, the menu shows it at the top, and nothing pops up.
+Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play. It contacts `api.github.com` only to check for a new release: when you choose **Check for Updates…** in the menu, and, unless you turn off **Check for Updates Automatically** in **Settings > General** (on by default), once an hour while Library runs and when it starts if the last check was an hour or more ago. The only request is to `https://api.github.com/repos/deansasek/library/releases/latest`. It names only the app's version, in its User-Agent header. It also sends the ETag GitHub gave on the last answer, so GitHub can reply that nothing changed. No account or other data is sent. When a newer version exists, the menu shows it at the top, and nothing pops up.
 
 Your data is stored in `~/.library/`:
 
