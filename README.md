@@ -65,12 +65,13 @@ Library remembers what you copy, including text, links, images, and files, in ev
 - Open the **Library** menu or Quick Open to see your latest copies. Choose one to copy it again.
 - Pin an item to keep it after you quit Library.
 - Press Control-Command-V to open the clipboard menu at the pointer. Press 1 through 9 to copy an item. Hold Option to copy it as plain text.
+- Choose an item in the clipboard menu or Quick Open while a text field has the keyboard, and Library pastes it there. Otherwise it copies the item. Menu headers say "Paste" when it will paste. Turn this off with **Paste Into Text Fields** in **Settings > Clipboard**. Pasting needs Accessibility access.
 - Library skips anything a password manager marks as private.
 - Copies over 25 MB are skipped.
 
 ### Add from the clipboard
 
-When you copy a link or an app that isn't in your library, the Library menu and Quick Open offer to add it.
+When you select a link in the app in front, or copy a link or an app that isn't in your library, the Library menu, the clipboard menu, and Quick Open offer to add it. A selected link comes first. Reading a selection needs Accessibility access.
 
 ### Organize your library
 
@@ -150,12 +151,12 @@ The welcome tour opens the first time you launch Library. It explains the app an
 **Settings** (⌘,) has three tabs.
 
 - **General:** Open at Login, the welcome screen, and the app version.
-- **Shortcuts:** Global shortcuts for the menu, Quick Open, and the clipboard menu.
-- **Clipboard:** Turn clipboard history on or off, and clear it.
+- **Shortcuts:** One list of shortcuts: Show Library Menu, Show Quick Open, Show Clipboard Menu, and Open Copied Link. A picker sets whether the Library menu opens at the pointer or from the menu bar.
+- **Clipboard:** Turn clipboard history, pasting into text fields, and copied GIFs on or off, and clear the history.
 
 ## Privacy
 
-Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites and to search Google when you ask.
+Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to download a GIF you copied from a web page so it can play (turn this off in **Settings > Clipboard**), and to search Google when you ask.
 
 Your data is stored in `~/.library/`:
 
@@ -172,7 +173,7 @@ Updates don't change this data.
 ## Permissions
 
 - **Keyboard shortcuts** and **hot corners** don't need any permission.
-- **Click, scroll, pinch, and swipe shortcuts** need Accessibility access. Turn it on in **System Settings > Privacy & Security > Accessibility**.
+- **Click, scroll, pinch, and swipe shortcuts** and **suggesting a selected link** need Accessibility access. Turn it on in **System Settings > Privacy & Security > Accessibility**. Library reads your selection only when you open one of its menus, looks for a link in it, and doesn't keep it.
 
 ## Troubleshooting
 

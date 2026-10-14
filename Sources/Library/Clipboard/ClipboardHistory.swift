@@ -10,6 +10,14 @@ final class ClipboardHistory: ObservableObject {
     /// What is on the clipboard now, if history recorded it. Nil after a copy that was skipped as private.
     @Published private(set) var current: ClipItem?
     /// Whether copied web GIFs are downloaded so they can play.
+    /// Whether choosing an item pastes it when a text field has the keyboard. Otherwise it only copies.
+    @Published var pastesIntoFields: Bool {
+        didSet { UserDefaults.standard.set(pastesIntoFields, forKey: "clipboardPastesIntoFields") }
+    }
+
+    /// True when choosing an item should paste it now: the switch is on and a text field has the keyboard.
+    var shouldPaste: Bool { pastesIntoFields && FrontApp.isTextInputFocused() }
+
     @Published var playsGIFs: Bool {
         didSet { UserDefaults.standard.set(playsGIFs, forKey: "clipboardPlaysGIFs") }
     }
@@ -57,6 +65,7 @@ final class ClipboardHistory: ObservableObject {
         lastChange = pasteboard.changeCount
         isEnabled = UserDefaults.standard.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
         playsGIFs = UserDefaults.standard.object(forKey: "clipboardPlaysGIFs") as? Bool ?? true
+        pastesIntoFields = UserDefaults.standard.object(forKey: "clipboardPastesIntoFields") as? Bool ?? true
         loadPinned()
         if isEnabled { start() }
     }

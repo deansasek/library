@@ -22,7 +22,7 @@ enum PopupMenu {
     }
 
     /// Shows the menu at the mouse pointer, like a context menu.
-    static func show(store: LibraryStore) {
+    static func show(store: LibraryStore, selection: String? = nil) {
         let target = Target(store: store)
         let menu = NSMenu()
         if !store.frequent.isEmpty {
@@ -30,21 +30,18 @@ enum PopupMenu {
             store.frequent.forEach { menu.addItem(item(for: $0, target: target)) }
         }
         fill(menu, with: store.nodes, target: target)
-        if let candidate = store.addCandidate, let node = candidate.libraryNode {
+        if let suggestion = store.suggestion(selection: selection) {
             menu.addItem(.separator())
-            let add = NSMenuItem(title: "Add “\(node.name)” to Library", action: #selector(Target.addCopied(_:)), keyEquivalent: "")
-            add.target = target
-            add.representedObject = candidate.id
-            add.image = NSImage(systemSymbolName: "plus.circle", accessibilityDescription: nil)
-            menu.addItem(add)
+            menu.addItem(suggestionItem(suggestion, action: #selector(Target.addSuggested(_:)), target: target))
         }
         NSApp.activate(ignoringOtherApps: true)
         menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 
     /// Shows the clipboard history at the mouse pointer. Choosing an item copies it back.
-    static func showClipboard() {
-        let (menu, target) = makeClipboardMenu(history: .shared, candidate: LibraryStore.shared.addCandidate)
+    static func showClipboard(selection: String? = nil, pastes: Bool = false) {
+        let (menu, target) = makeClipboardMenu(history: .shared, suggestion: LibraryStore.shared.suggestion(selection: selection),
+                                               pastes: pastes)
         NSApp.activate(ignoringOtherApps: true)
         withExtendedLifetime(target) {
             _ = menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
@@ -53,17 +50,14 @@ enum PopupMenu {
 
     /// The clipboard history as a menu. The first nine items answer to the keys 1 to 9, and Option with the key
     /// picks Copy as Plain Text. The target receives the choices and must stay alive while the menu is open.
-    static func makeClipboardMenu(history: ClipboardHistory, candidate: ClipItem?) -> (menu: NSMenu, target: NSObject) {
-        let target = ClipTarget()
+    static func makeClipboardMenu(history: ClipboardHistory, suggestion: AddSuggestion?,
+                                  pastes: Bool) -> (menu: NSMenu, target: NSObject) {
+        let target = ClipTarget(pastes: pastes)
         let menu = NSMenu()
         let items = history.displayOrder
         var number = 0
-        if let candidate, let node = candidate.libraryNode {
-            let add = NSMenuItem(title: "Add “\(node.name)” to Library", action: #selector(ClipTarget.add(_:)), keyEquivalent: "")
-            add.target = target
-            add.representedObject = candidate.id
-            add.image = NSImage(systemSymbolName: "plus.circle", accessibilityDescription: nil)
-            menu.addItem(add)
+        if let suggestion {
+            menu.addItem(suggestionItem(suggestion, action: #selector(ClipTarget.addSuggested(_:)), target: target))
             menu.addItem(.separator())
         }
         if items.isEmpty {
@@ -71,7 +65,9 @@ enum PopupMenu {
             empty.isEnabled = false
             menu.addItem(empty)
         }
-        for (title, group) in [("Pinned", items.filter(\.pinned)), ("Recent", Array(items.filter { !$0.pinned }.prefix(20)))]
+        // The headers say what choosing an item does: paste into the text field, or copy.
+        let verb = pastes ? "Paste " : ""
+        for (title, group) in [("\(verb)Pinned", items.filter(\.pinned)), ("\(verb)Recent", Array(items.filter { !$0.pinned }.prefix(20)))]
         where !group.isEmpty {
             if !menu.items.isEmpty { menu.addItem(.separator()) }
             menu.addItem(NSMenuItem.sectionHeader(title: title))
@@ -99,6 +95,16 @@ enum PopupMenu {
             menu.addItem(clear)
         }
         return (menu, target)
+    }
+
+    /// The menu item that adds a suggestion. It carries the suggestion itself.
+    private static func suggestionItem(_ suggestion: AddSuggestion, action: Selector, target: AnyObject) -> NSMenuItem {
+        let item = NSMenuItem(title: suggestion.title, action: action, keyEquivalent: "")
+        item.target = target
+        item.representedObject = suggestion
+        item.image = NSImage(systemSymbolName: "plus.circle", accessibilityDescription: nil)
+        item.toolTip = suggestion.subtitle
+        return item
     }
 
     private static func alternate(_ title: String, _ action: Selector, _ clip: ClipItem, _ target: ClipTarget,
@@ -152,16 +158,29 @@ enum PopupMenu {
 
     @MainActor
     private final class ClipTarget: NSObject {
+        /// True when a text field had the keyboard, so choosing an item pastes it.
+        let pastes: Bool
+
+        init(pastes: Bool) {
+            self.pastes = pastes
+        }
+
         @objc func copy(_ sender: NSMenuItem) {
-            if let item = clip(sender) { ClipboardHistory.shared.copy(item) }
+            if let item = clip(sender) {
+                ClipboardHistory.shared.copy(item)
+                if pastes { FrontApp.pasteSoon() }
+            }
         }
 
         @objc func copyPlain(_ sender: NSMenuItem) {
-            if let item = clip(sender) { ClipboardHistory.shared.copyPlainText(item) }
+            if let item = clip(sender) {
+                ClipboardHistory.shared.copyPlainText(item)
+                if pastes { FrontApp.pasteSoon() }
+            }
         }
 
-        @objc func add(_ sender: NSMenuItem) {
-            if let item = clip(sender) { LibraryStore.shared.addToLibrary(item) }
+        @objc func addSuggested(_ sender: NSMenuItem) {
+            if let suggestion = sender.representedObject as? AddSuggestion { LibraryStore.shared.add(suggestion) }
         }
 
         @objc func clear(_ sender: NSMenuItem) {
@@ -182,9 +201,8 @@ enum PopupMenu {
             self.store = store
         }
 
-        @objc func addCopied(_ sender: NSMenuItem) {
-            let id = sender.representedObject as? UUID
-            if let item = ClipboardHistory.shared.items.first(where: { $0.id == id }) { store.addToLibrary(item) }
+        @objc func addSuggested(_ sender: NSMenuItem) {
+            if let suggestion = sender.representedObject as? AddSuggestion { store.add(suggestion) }
         }
 
         @objc func choose(_ sender: NSMenuItem) {

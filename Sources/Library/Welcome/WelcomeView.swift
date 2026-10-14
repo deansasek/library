@@ -179,7 +179,7 @@ struct WelcomeView: View {
             icon(granted ? "checkmark.circle.fill" : "hand.raised.circle", granted ? .green : .accentColor)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Accessibility").font(.headline)
-                Text("Lets Library see Control and right click, scrolls, and gestures. Everything else works without it.")
+                Text("Lets Library see Control and right click, scrolls, and gestures, and read a link you select so it can suggest adding it. Everything else works without it.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }

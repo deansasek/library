@@ -11,7 +11,9 @@ enum QuickOpen {
             open.close()
             return
         }
-        let model = QuickOpenModel(store: store)
+        // Read before the panel opens, while the app in front still has the keyboard.
+        let model = QuickOpenModel(store: store, selectedText: FrontApp.selectedText(),
+                                   pastes: ClipboardHistory.shared.shouldPaste)
         let panel = QuickOpenPanel()
         let controller = NSHostingController(rootView: QuickOpenView(model: model) { [weak panel] in panel?.close() })
         controller.sizingOptions = []
