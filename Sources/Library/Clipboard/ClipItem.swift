@@ -26,6 +26,8 @@ struct ClipItem: Identifiable {
     var animatedData: Data?
     /// The app that was in front when it was copied.
     var sourceApp: String?
+    /// Lowercased title and text, built once when the copy is captured, so searching does not rebuild it.
+    var searchText = ""
 
     /// The icon in lists and menus: a thumbnail for a picture, the file's icon for a file, else a symbol.
     var icon: NSImage {
@@ -83,14 +85,14 @@ struct ClipItem: Identifiable {
         kind == .text && (representations.first?.count ?? 0) > 1
     }
 
-    private static let times: RelativeDateTimeFormatter = {
+    @MainActor private static let times: RelativeDateTimeFormatter = {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter
     }()
 
     /// How long ago it was copied, and what it is.
-    var subtitle: String {
+    @MainActor var subtitle: String {
         let name: String
         switch kind {
         case .text: name = "Text"
