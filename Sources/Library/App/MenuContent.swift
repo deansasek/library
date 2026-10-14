@@ -33,9 +33,9 @@ struct MenuContent: View {
             Label("Clipboard", systemImage: "doc.on.clipboard")
         }
         // Shown only while the clipboard holds a link or application that is not in the library.
-        if let item = store.addCandidate, let node = item.libraryNode {
-            Button { store.addToLibrary(item) } label: {
-                Label("Add “\(node.name)” to Library", systemImage: "plus.circle")
+        if let suggestion = store.suggestion() {
+            Button { store.add(suggestion) } label: {
+                Label(suggestion.title, systemImage: "plus.circle")
             }
         }
         Button {

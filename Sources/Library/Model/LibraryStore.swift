@@ -183,19 +183,21 @@ final class LibraryStore: ObservableObject {
         NSWorkspace.shared.open(link)
     }
 
-    /// The item on the clipboard now, when it is a link or application that is not in the library yet.
-    /// The menus offer to add it, so adding needs no hidden step.
-    var addCandidate: ClipItem? {
-        guard let item = ClipboardHistory.shared.current, let node = item.libraryNode,
-              !nodes.leaves.contains(where: { $0.shareURL == node.shareURL }) else { return nil }
-        return item
+    /// What the menus offer to add: the link selected in the front app, else what is on the clipboard.
+    func suggestion(selection: String? = nil) -> AddSuggestion? {
+        AddSuggestion.make(selection: selection, clipboard: ClipboardHistory.shared.current, in: nodes)
     }
 
-    /// Adds what a clipboard item holds to the library, with a soft sound, as Safari does for a bookmark.
+    /// Adds a suggestion to the library, with a soft sound, as Safari does for a bookmark.
+    func add(_ suggestion: AddSuggestion) {
+        perform("Add to Library") { $0.append(suggestion.node, to: nil) }
+        NSSound(named: "Pop")?.play()
+    }
+
+    /// Adds what a clipboard item holds to the library.
     func addToLibrary(_ item: ClipItem) {
         guard let node = item.libraryNode else { return NSSound.beep() }
-        perform("Add to Library") { $0.append(node, to: nil) }
-        NSSound(named: "Pop")?.play()
+        add(AddSuggestion(node: node, source: .clipboard))
     }
 
     func showQuickOpen() {
@@ -218,7 +220,8 @@ final class LibraryStore: ObservableObject {
     /// Opens the bookmarks menu from the menu shortcut.
     func showMenu() {
         if menuMode == .menuBar, PopupMenu.clickStatusItem() { return }
-        PopupMenu.show(store: self)
+        // The selection is read now, while the app in front still has the keyboard.
+        PopupMenu.show(store: self, selection: FrontApp.selectedText())
     }
 
     /// Registers again only when a shortcut changed, unless `force` is set. Registering touches the system.
@@ -233,7 +236,7 @@ final class LibraryStore: ObservableObject {
             case 0: self?.showMenu()
             case 1: self?.showQuickOpen()
             case 2: self?.openClipboardLink()
-            default: PopupMenu.showClipboard()
+            default: PopupMenu.showClipboard(selection: FrontApp.selectedText(), pastes: ClipboardHistory.shared.shouldPaste)
             }
         }
         failedShortcuts = result.nodes

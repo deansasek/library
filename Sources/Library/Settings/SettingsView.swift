@@ -52,47 +52,36 @@ struct SettingsView: View {
         return build.isEmpty ? short : "\(short) (\(build))"
     }
 
+    /// One list of actions, each named with a verb, as Keyboard Shortcuts in System Settings lists them.
     private var shortcuts: some View {
         Form {
             Section {
-                LabeledContent("Shortcut") { field(0, $store.extraHotkeys[0]) }
-                Picker("Show menu", selection: $store.menuMode) {
-                    Text("At mouse pointer").tag(MenuMode.cursor)
-                    Text("In menu bar").tag(MenuMode.menuBar)
+                LabeledContent("Show Library Menu") { field(0, $store.extraHotkeys[0]) }
+                LabeledContent("Show Quick Open") { field(1, $store.extraHotkeys[1]) }
+                LabeledContent("Show Clipboard Menu") { field(3, $store.extraHotkeys[3]) }
+                LabeledContent("Open Copied Link") { field(2, $store.extraHotkeys[2]) }
+            } footer: {
+                Text("These work in every app. Quick Open searches your library and your clipboard history. Open Copied Link opens the web link you last copied. A beep means the clipboard has no link.")
+            }
+            Section {
+                Picker("Library Menu Opens", selection: $store.menuMode) {
+                    Text("At the Pointer").tag(MenuMode.cursor)
+                    Text("From the Menu Bar").tag(MenuMode.menuBar)
                 }
-            } header: {
-                Text("Library Menu")
-            } footer: {
-                Text("Opens your library from any app.")
-            }
-            Section {
-                LabeledContent("Shortcut") { field(1, $store.extraHotkeys[1]) }
-            } header: {
-                Text("Quick Open")
-            } footer: {
-                Text("A search field over everything in your library and your clipboard history. Press Return to open the top result.")
-            }
-            Section {
-                LabeledContent("Open Link") { field(2, $store.extraHotkeys[2]) }
-                LabeledContent("Clipboard Menu") { field(3, $store.extraHotkeys[3]) }
-            } header: {
-                Text("Clipboard")
-            } footer: {
-                Text("Open Link opens the web link you last copied. A beep means the clipboard has no link. The menu shows what you copied, at the pointer. To add a copied link to your library, choose Add to Library in Quick Open.")
             }
             if store.clickAccessMissing {
                 Section {
-                    LabeledContent("Clicks, scrolls, and gestures") {
-                        Button("Grant Access…") { HotKeys.requestClickAccess() }
+                    LabeledContent("Accessibility") {
+                        Button("Allow…") { HotKeys.requestClickAccess() }
                     }
                 } footer: {
-                    Text("macOS needs Accessibility access to intercept clicks, scrolls, pinches, and swipes.")
+                    Text("Clicks, scrolls, pinches, and swipes need Accessibility access. So does suggesting a link you selected.")
                 }
             }
             Section {
                 Button("Restore Defaults") { store.restoreDefaultHotkeys() }
             } footer: {
-                Text("Control and right click opens the Library menu. Control-Space opens Quick Open. Control-Command-V opens the clipboard history menu. macOS may use Control-Space to switch input sources.")
+                Text("The defaults are Control and right click for the Library menu, Control-Space for Quick Open, and Control-Command-V for the clipboard menu. macOS may use Control-Space to switch input sources.")
             }
         }
         .formStyle(.grouped)
@@ -103,11 +92,12 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle("Keep Clipboard History", isOn: $history.isEnabled)
+                Toggle("Paste Into Text Fields", isOn: $history.pastesIntoFields)
                 Toggle("Play Copied GIFs", isOn: $history.playsGIFs)
                 Button("Clear History") { history.clear() }
                     .disabled(history.items.allSatisfy(\.pinned))
             } footer: {
-                Text("History stays in memory and is gone when Library quits. Browsers copy a still picture of a GIF, so Library downloads the original GIF from the page to play it. Turn off Play Copied GIFs to skip those downloads. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps.")
+                Text("History stays in memory and is gone when Library quits. With Paste Into Text Fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF, so Library downloads the original GIF from the page to play it. Turn off Play Copied GIFs to skip those downloads. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps.")
             }
         }
         .formStyle(.grouped)

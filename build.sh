@@ -16,7 +16,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleIdentifier</key><string>com.missionlane.bookmarks</string>
+    <key>CFBundleIdentifier</key><string>com.deansasek.library</string>
     <key>CFBundleName</key><string>Library</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleExecutable</key><string>Library</string>
@@ -27,7 +27,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
     <key>LSUIElement</key><true/>
     <key>CFBundleURLTypes</key>
     <array><dict>
-        <key>CFBundleURLName</key><string>com.missionlane.bookmarks</string>
+        <key>CFBundleURLName</key><string>com.deansasek.library</string>
         <key>CFBundleURLSchemes</key><array><string>library</string></array>
     </dict></array>
     <key>NSUserActivityTypes</key>
@@ -44,6 +44,6 @@ cat > "$app/Contents/Info.plist" <<PLIST
 PLIST
 # A fixed requirement keeps macOS permissions (Accessibility) valid across rebuilds. A plain ad-hoc
 # signature changes on every build, which silently revokes them.
-codesign --force --sign - --identifier com.missionlane.bookmarks \
-    -r='designated => identifier "com.missionlane.bookmarks"' "$app"
+codesign --force --sign - --identifier com.deansasek.library \
+    -r='designated => identifier "com.deansasek.library"' "$app"
 echo "Built $app"

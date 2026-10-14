@@ -39,8 +39,16 @@ final class QuickOpenModel: ObservableObject {
 
     private var historyObserver: AnyCancellable?
 
-    init(store: LibraryStore) {
+    /// The text selected in the app that was in front when Quick Open opened. It can suggest adding a link.
+    private let selectedText: String?
+
+    /// True when a text field had the keyboard when Quick Open opened. Choosing a clipboard item pastes it then.
+    private let pastes: Bool
+
+    init(store: LibraryStore, selectedText: String?, pastes: Bool) {
         self.store = store
+        self.selectedText = selectedText
+        self.pastes = pastes
         results = computeResults()
         // A copied GIF finishing its download updates the open panel.
         historyObserver = ClipboardHistory.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] in
@@ -101,8 +109,8 @@ final class QuickOpenModel: ObservableObject {
 
     /// A row that adds the copied link or application to the library, when there is one to add.
     private func suggestion(section: String?) -> [QuickOpenResult] {
-        guard let item = store.addCandidate else { return [] }
-        return [QuickOpenResult(kind: .addCopied(item), id: "add-copied", section: section)]
+        guard let suggestion = store.suggestion(selection: selectedText) else { return [] }
+        return [QuickOpenResult(kind: .addSuggestion(suggestion), id: "add-suggestion", section: section)]
     }
 
     /// Clipboard history rows, under a Clipboard header.
@@ -115,7 +123,7 @@ final class QuickOpenModel: ObservableObject {
     func icon(for result: QuickOpenResult) -> NSImage {
         switch result.kind {
         case .answer: return symbol("equal.circle")
-        case .addCopied: return symbol("plus.circle")
+        case .addSuggestion: return symbol("plus.circle")
         case .clip(let item): return item.icon
         case .item(let node, _): return store.icon(for: node)
         case .openLink: return symbol("safari")
@@ -237,9 +245,19 @@ final class QuickOpenModel: ObservableObject {
 
     private func clipActions(for item: ClipItem) -> [QuickOpenAction] {
         let history = ClipboardHistory.shared
-        var list = [QuickOpenAction(id: "copy", title: "Copy") { history.copy(item) }]
+        let verb = pastes ? "Paste" : "Copy"
+        var list = [QuickOpenAction(id: "copy", title: verb) { [pastes] in
+            history.copy(item)
+            if pastes { FrontApp.pasteSoon() }
+        }]
+        if pastes {
+            list.append(QuickOpenAction(id: "copy-only", title: "Copy") { history.copy(item) })
+        }
         if item.plainText != nil {
-            list.append(QuickOpenAction(id: "plain", title: "Copy as Plain Text") { history.copyPlainText(item) })
+            list.append(QuickOpenAction(id: "plain", title: "\(verb) as Plain Text") { [pastes] in
+                history.copyPlainText(item)
+                if pastes { FrontApp.pasteSoon() }
+            })
         }
         list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })
         if item.libraryNode != nil {
@@ -261,10 +279,11 @@ final class QuickOpenModel: ObservableObject {
         case .answer(let value, _):
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(value, forType: .string)
-        case .addCopied(let item):
-            store.addToLibrary(item)
+        case .addSuggestion(let suggestion):
+            store.add(suggestion)
         case .clip(let item):
             ClipboardHistory.shared.copy(item)
+            if pastes { FrontApp.pasteSoon() }
         case .item(let node, _):
             open(node, forceNew: flip ? node.openNew != true : nil)
         case .openLink(let url):

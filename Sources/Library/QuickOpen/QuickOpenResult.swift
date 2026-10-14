@@ -9,7 +9,7 @@ struct QuickOpenResult: Identifiable {
         case webSearch(String)
         case clip(ClipItem)
         /// The link or application on the clipboard, offered as an addition to the library.
-        case addCopied(ClipItem)
+        case addSuggestion(AddSuggestion)
         /// An arithmetic or unit answer. Return copies the value.
         case answer(value: String, detail: String)
     }
@@ -40,7 +40,7 @@ struct QuickOpenResult: Identifiable {
     var title: String {
         switch kind {
         case .answer(let value, _): return value
-        case .addCopied(let item): return "Add “\(item.libraryNode?.name ?? item.title)” to Library"
+        case .addSuggestion(let suggestion): return suggestion.title
         case .clip(let item): return item.title
         case .item(let node, _): return node.name
         case .openLink(let url): return "Open \(url.host ?? url.absoluteString)"
@@ -53,7 +53,7 @@ struct QuickOpenResult: Identifiable {
     var subtitle: String {
         switch kind {
         case .answer(_, let detail): return "\(detail) · Return copies the answer"
-        case .addCopied(let item): return "From your clipboard · \(item.link?.absoluteString ?? item.title)"
+        case .addSuggestion(let suggestion): return suggestion.subtitle
         case .clip(let item): return item.subtitle
         case .item(let node, let folder):
             let detail = node.url ?? node.command ?? node.appPath ?? ""
