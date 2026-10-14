@@ -1,0 +1,42 @@
+name: Release
+
+# Pushing a tag such as v1.2.0 builds the app and publishes it. Running the workflow by hand with a version does the
+# same and creates the tag.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, such as 1.2.0
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Work out the version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Run the checks
+        run: ./test.sh
+      - name: Build
+        run: ./build.sh
+      # The zip holds the app and nothing else: no source, no tests, no scripts.
+      - name: Zip the app
+        run: ditto -c -k --keepParent --norsrc --noextattr --noqtn build/Library.app "Library-$VERSION.zip"
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v$VERSION" "Library-$VERSION.zip" --title "Library $VERSION" --generate-notes --target "$GITHUB_SHA"
