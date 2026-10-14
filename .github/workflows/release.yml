@@ -29,6 +29,15 @@ jobs:
             version="${GITHUB_REF_NAME#v}"
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
+      # Reuses SwiftPM's .build between runs. The key changes with the manifest, the lockfile, or any source file. A
+      # partial match falls back to the same manifest, and swift build then compiles only what changed.
+      - name: Cache the SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.swift') }}-${{ hashFiles('Package.resolved') }}-${{ hashFiles('Sources/**/*.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-${{ hashFiles('Package.swift') }}-
       # Do not publish a version that does not build or pass its checks.
       - name: Build
         run: ./build.sh
@@ -37,7 +46,27 @@ jobs:
       # .gitattributes leaves out everything the app does not need to build: tests, workflows, docs, and scripts.
       - name: Zip the source
         run: git archive --format=zip --prefix="Library-$VERSION/" -o "Library-$VERSION.zip" HEAD
+      # GitHub's API can return a 500 after it has made part of the release. Each attempt first checks for the release,
+      # so a retry after a partial publish never creates a second one. Four attempts, waiting 15, 30, and 60 seconds.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "v$VERSION" "Library-$VERSION.zip" --title "Library $VERSION" --generate-notes --target "$GITHUB_SHA"
+        run: |
+          tag="v$VERSION"
+          delays=(15 30 60)
+          for attempt in 1 2 3 4; do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "Release $tag already exists, so there is nothing to create."
+              exit 0
+            fi
+            if gh release create "$tag" "Library-$VERSION.zip" --title "Library $VERSION" --generate-notes --target "$GITHUB_SHA"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              delay=${delays[$((attempt - 1))]}
+              echo "Attempt $attempt to publish $tag failed. Retrying in $delay seconds."
+              sleep "$delay"
+            fi
+          done
+          echo "Could not publish $tag after 4 attempts." >&2
+          exit 1

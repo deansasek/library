@@ -13,6 +13,15 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      # Reuses SwiftPM's .build between runs. The key changes with the manifest, the lockfile, or any source file. A
+      # partial match falls back to the same manifest, and swift build then compiles only what changed.
+      - name: Cache the SwiftPM build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.swift') }}-${{ hashFiles('Package.resolved') }}-${{ hashFiles('Sources/**/*.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-${{ hashFiles('Package.swift') }}-
       - name: Build
         run: ./build.sh
       - name: Run the checks

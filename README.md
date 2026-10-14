@@ -230,3 +230,5 @@ git push origin v1.2.0
 ```
 
 You can also run the **Release** workflow by hand and give it a version. Either way, GitHub Actions builds the app and runs the checks, to be sure the version is sound, then publishes `Library-1.2.0.zip`. The zip is the source, not a built app. It holds only what is needed to build: `Sources/`, `Resources/`, `Package.swift`, `build.sh`, `install.sh`, and this README. The tests, workflows, docs, and icon script are left out. `.gitattributes` sets that list, and GitHub's own source archives follow it too.
+
+If publishing fails with a server error, the workflow retries up to four times. Re-running it is safe: if the release already exists, it skips creating it.
