@@ -621,6 +621,86 @@ let commandFiles: [(name: String, modified: Date)] = [
     ("library-old.txt", commandNow.addingTimeInterval(-7200)),
 ]
 check(staleCommandFiles(among: commandFiles, now: commandNow) == ["library-old.command"], "only old library command files are stale")
+// ---- SF Symbols: every name the app asks for resolves ----
+// The scan reads the app's Swift files, so a symbol added or renamed in source is checked without editing this file.
+// Names the code builds at runtime (no string literal in the argument) are listed below with the reason they are safe.
+let runtimeSymbolUses: [(file: String, expression: String, reason: String)] = [
+    ("Model/Icons.swift", "text", "a custom icon the user typed; customIcon returns nil for an unknown name"),
+    ("Model/LibraryStore.swift", "name", "private symbol(_:) helper; its literal callers are read by the symbol(\"...\") rule"),
+    ("QuickOpen/QuickOpenModel.swift", "name", "private symbol(_:) helper; its literal callers are read by the symbol(\"...\") rule"),
+    ("Manage/ManageState.swift", "$0", "the saved icon of an item, only tested to choose the picker tab"),
+    ("Manage/IconPicker.swift", "$0", "filters the symbols list below, so only names that resolve are shown"),
+    ("Manage/IconPicker.swift", "name", "a name from the symbols list below, which the list's own filter has already checked"),
+    ("Welcome/WelcomeView.swift", "symbol", "passed in from icon, feature and shortcutRow calls; their literals are read by the Welcome rule"),
+]
+let swiftRoot = "Sources/Library/"
+let swiftFiles = (FileManager.default.enumerator(atPath: swiftRoot)?.compactMap { $0 as? String } ?? [])
+    .filter { $0.hasSuffix(".swift") }.sorted()
+check(swiftFiles.count > 20, "finds the app's Swift files (run from the repository root)")
+
+func symbolRegex(_ pattern: String) -> NSRegularExpression { try! NSRegularExpression(pattern: pattern) }
+let symbolLiteral = symbolRegex(#""([^"\\\n]*)""#)
+let symbolLabelled = symbolRegex(#"(?:systemName|systemImage|systemSymbolName|systemImageName):\s*([^,)\n]+)"#)
+let symbolHelperCall = symbolRegex(#"\bsymbol\(\s*("[^"\n]*")\s*\)"#)
+let symbolIconField = symbolRegex(#"icon:\s*("[^"\n]*")"#)
+let symbolReturn = symbolRegex(#"return\s+("[^"\n]*")"#)
+let symbolPickerList = symbolRegex(#"symbols = \[([\s\S]*?)\]\.filter"#)
+let symbolWelcomeCall = symbolRegex(#"(?:icon|feature|shortcutRow)\([^\n]*"#)
+let symbolShaped = symbolRegex(#"^[a-z][a-z0-9.]*$"#)
+
+/// The string literals inside `text`, without their quotes.
+func literals(in text: String, matching pattern: NSRegularExpression? = nil) -> [String] {
+    let ns = text as NSString
+    return symbolLiteral.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { ns.substring(with: $0.range(at: 1)) }
+        .filter { pattern == nil || pattern!.firstMatch(in: $0, range: NSRange(location: 0, length: ($0 as NSString).length)) != nil }
+}
+/// Every match of `regex` in `text`, as (1-based line, first capture group).
+func captures(_ regex: NSRegularExpression, in text: String) -> [(line: Int, text: String)] {
+    let ns = text as NSString
+    return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).map { match in
+        let range = match.numberOfRanges > 1 ? match.range(at: 1) : match.range
+        let before = ns.substring(to: match.range.location)
+        return (before.filter { $0 == "\n" }.count + 1, ns.substring(with: range))
+    }
+}
+
+var symbolNames: [(file: String, line: Int, name: String)] = []
+var runtimeUsed = Set<String>()
+var symbolAllowlistMisses: [String] = []
+for path in swiftFiles {
+    let text = (try? String(contentsOfFile: swiftRoot + path, encoding: .utf8)) ?? ""
+    func record(_ names: [String], _ line: Int) { for name in names { symbolNames.append((path, line, name)) } }
+    for (line, raw) in captures(symbolLabelled, in: text) {
+        let value = raw.trimmingCharacters(in: .whitespaces)
+        let names = literals(in: value)
+        if names.isEmpty {
+            let key = "\(path)|\(value)"
+            let listed = runtimeSymbolUses.contains { "\($0.file)|\($0.expression)" == key }
+            if listed { runtimeUsed.insert(key) } else { symbolAllowlistMisses.append("\(path):\(line) builds \(value) at runtime") }
+        }
+        record(names, line)
+    }
+    for (line, literal) in captures(symbolHelperCall, in: text) { record(literals(in: literal), line) }
+    for (line, literal) in captures(symbolIconField, in: text) { record(literals(in: literal, matching: symbolShaped), line) }
+    for (line, literal) in captures(symbolReturn, in: text) where path.hasSuffix("Clipboard/ClipItem.swift") {
+        record(literals(in: literal, matching: symbolShaped), line)
+    }
+    for (_, list) in captures(symbolPickerList, in: text) where path.hasSuffix("Manage/IconPicker.swift") {
+        record(literals(in: list), 0)
+    }
+    for (line, call) in captures(symbolWelcomeCall, in: text) where path.hasSuffix("Welcome/WelcomeView.swift") {
+        record(literals(in: call, matching: symbolShaped), line)
+    }
+}
+check(symbolNames.count > 40, "the scan finds the symbol names (\(symbolNames.count) found)")
+check(symbolAllowlistMisses.isEmpty, "every runtime symbol is in the allowlist: \(symbolAllowlistMisses)")
+let unusedRuntime = runtimeSymbolUses.filter { !runtimeUsed.contains("\($0.file)|\($0.expression)") }
+check(unusedRuntime.isEmpty, "every runtime allowlist entry still matches the code: \(unusedRuntime.map { "\($0.file) \($0.expression)" })")
+for use in symbolNames {
+    let resolves = NSImage(systemSymbolName: use.name, accessibilityDescription: nil) != nil
+    check(resolves, "SF Symbol \"\(use.name)\" does not resolve (\(use.file):\(use.line))")
+}
+
 runBenchmark()
 QuickOpenBench.main()
 

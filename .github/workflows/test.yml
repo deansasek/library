@@ -26,3 +26,14 @@ jobs:
         run: ./build.sh
       - name: Run the checks
         run: ./test.sh
+      # Draws every screen in light and dark appearance and checks text contrast. Any failure stops the run. The PNGs are
+      # uploaded even when a check fails, so a reviewer can look at them.
+      - name: Render the screens
+        run: Tests/render.sh "$RUNNER_TEMP/renders"
+      - name: Upload the renders
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renders
+          path: ${{ runner.temp }}/renders
+          if-no-files-found: warn
