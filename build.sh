@@ -38,6 +38,12 @@ cat > "$app/Contents/Info.plist" <<PLIST
         <key>NSMessage</key><string>addBookmark</string>
         <key>NSPortName</key><string>Library</string>
         <key>NSSendTypes</key><array><string>public.utf8-plain-text</string><string>NSStringPboardType</string></array>
+    </dict><dict>
+        <key>NSMenuItem</key><dict><key>default</key><string>Add to Library</string></dict>
+        <key>NSMessage</key><string>addFiles</string>
+        <key>NSPortName</key><string>Library</string>
+        <key>NSSendFileTypes</key><array><string>com.apple.application-bundle</string><string>public.folder</string></array>
+        <key>NSSendTypes</key><array><string>public.file-url</string></array>
     </dict></array>
 </dict>
 </plist>

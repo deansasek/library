@@ -128,4 +128,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             $0.append(LibraryItem(name: host, url: text), to: nil)
         }
     }
+
+    /// Services menu item "Add to Library" for files: adds applications and folders selected in Finder.
+    @objc func addFiles(_ pasteboard: NSPasteboard, userData: String,
+                        error: AutoreleasingUnsafeMutablePointer<NSString>) {
+        let urls = pasteboard.readObjects(forClasses: [NSURL.self],
+                                          options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? []
+        let (nodes, _) = Self.fileNodes(from: urls, existing: LibraryStore.shared.nodes)
+        guard !nodes.isEmpty else {
+            error.pointee = "Only applications and folders that aren't already in your library can be added."
+            return
+        }
+        LibraryStore.shared.perform("Add to Library") { list in
+            for node in nodes { list.append(node, to: nil) }
+        }
+    }
+
+    /// Turns file URLs into library nodes: an app for each `.app` bundle, an empty folder for each other directory.
+    /// Skips apps already in `existing` (by path), folders already in `existing` (by name, since folder items
+    /// store no path), and repeats within `urls`. Files that are neither are returned as `rejected`.
+    static func fileNodes(from urls: [URL], existing: [LibraryItem]) -> (nodes: [LibraryItem], rejected: [URL]) {
+        func folderNames(_ items: [LibraryItem]) -> [String] {
+            items.flatMap { item -> [String] in
+                guard let children = item.children else { return [] }
+                return [item.name.lowercased()] + folderNames(children)
+            }
+        }
+        var knownApps = Set(existing.leaves.compactMap(\.appPath))
+        var knownFolders = Set(folderNames(existing))
+        var nodes: [LibraryItem] = []
+        var rejected: [URL] = []
+        for url in urls {
+            let path = url.path
+            if !url.isFileURL {
+                rejected.append(url)
+            } else if url.pathExtension == "app" {
+                guard knownApps.insert(path).inserted else { continue }
+                nodes.append(LibraryItem(name: appName(at: path), appPath: path))
+            } else if (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                let name = url.lastPathComponent
+                guard knownFolders.insert(name.lowercased()).inserted else { continue }
+                nodes.append(LibraryItem(name: name, children: []))
+            } else {
+                rejected.append(url)
+            }
+        }
+        return (nodes, rejected)
+    }
 }

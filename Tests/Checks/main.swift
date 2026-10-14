@@ -84,6 +84,37 @@ MainActor.assumeIsolated {
     check(AppDelegate.item(named: "Deploy", in: items) == nil, "a command is never opened by name")
 }
 
+// ---- Services: apps and folders dropped from Finder ----
+MainActor.assumeIsolated {
+    let base = FileManager.default.temporaryDirectory.appendingPathComponent("library-services-\(UUID().uuidString)")
+    let fm = FileManager.default
+    try? fm.createDirectory(at: base.appendingPathComponent("Notes"), withIntermediateDirectories: true)
+    try? fm.createDirectory(at: base.appendingPathComponent("Fake.app"), withIntermediateDirectories: true)
+    try? fm.createDirectory(at: base.appendingPathComponent("projects"), withIntermediateDirectories: true)
+    try? Data().write(to: base.appendingPathComponent("readme.txt"))
+    let notes = base.appendingPathComponent("Notes")
+    let fake = base.appendingPathComponent("Fake.app")
+    let text = base.appendingPathComponent("readme.txt")
+    let web = URL(string: "https://example.com")!
+    let existing = [
+        LibraryItem(name: "Safari", appPath: "/Applications/Safari.app"),
+        LibraryItem(name: "Work", children: [LibraryItem(name: "Projects", children: [])]),
+    ]
+    let (added, rejected) = AppDelegate.fileNodes(from: [
+        URL(fileURLWithPath: "/Applications/Safari.app"),   // already in library
+        fake,                                                // new app
+        fake,                                                // repeated in the same drop
+        notes,                                               // new folder
+        base.appendingPathComponent("projects"),             // folder name already in library, different case
+        text, web,                                           // unsupported
+    ], existing: existing)
+    check(added.map(\.name) == ["Fake", "Notes"], "apps and folders added, duplicates skipped")
+    check(added[0].appPath == fake.path && added[1].isFolder && added[1].children?.isEmpty == true, "app and folder shapes")
+    check(rejected == [text, web], "files and links rejected")
+    check(AppDelegate.fileNodes(from: [], existing: []).nodes.isEmpty, "nothing dropped, nothing added")
+    try? fm.removeItem(at: base)
+}
+
 // ---- bookmarks.json: missing, unreadable, damaged, and readable files ----
 let folder = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-\(UUID().uuidString)")
 try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
