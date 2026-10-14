@@ -27,3 +27,6 @@
 
 /* Settings tab for keyboard shortcuts. */
 "Shortcuts" = "Shortcuts";
+
+/* Menu item that checks GitHub for a newer version of Library. */
+"Check for Updates…" = "Check for Updates…";

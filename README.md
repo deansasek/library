@@ -37,7 +37,7 @@ cd library
 
 To build without installing, run `./build.sh`. The app is written to `build/Library.app`.
 
-To update, run `git pull`, then `./install.sh` again. Your data is not affected.
+To update, run `./update.sh`. It stops if you have uncommitted changes or are not on `main`. Otherwise it fast-forwards `main` from `origin` (it never resets or force-pushes), prints the version before and after, and runs `./install.sh`. Your data is not affected. `DRY_RUN=1 ./update.sh` prints the commands without running them.
 
 ## Getting started
 
@@ -184,7 +184,7 @@ The welcome tour opens the first time you launch Library. It explains the app an
 
 ## Privacy
 
-Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play.
+Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play. It contacts `api.github.com` only when you choose **Check for Updates…** in the menu, or when you turn on **Check for updates automatically** in **Settings > General** (off by default; it checks at most once a day, when Library starts). The request names only the app's version, in its User-Agent header, and sends no account or other data.
 
 Your data is stored in `~/.library/`:
 

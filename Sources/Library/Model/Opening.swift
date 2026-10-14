@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Runs `command` in a new Terminal window, then leaves a shell open.
 /// A throwaway `.command` file avoids the Automation permission that AppleScript needs.
-private func runInTerminal(_ command: String) {
+func runInTerminal(_ command: String) {
     removeStaleCommandFiles()
     let file = FileManager.default.temporaryDirectory
         .appendingPathComponent("library-\(UUID().uuidString).command")

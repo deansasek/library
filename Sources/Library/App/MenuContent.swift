@@ -61,6 +61,11 @@ struct MenuContent: View {
             Text("Open at Login", bundle: L10n.bundle)
         }
         Button {
+            UpdateCheck.checkNow()
+        } label: {
+            Text("Check for Updates…", bundle: L10n.bundle)
+        }
+        Button {
             NSApp.activate(ignoringOtherApps: true)
             NSApp.orderFrontStandardAboutPanel(options: [
                 .credits: NSAttributedString(

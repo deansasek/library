@@ -700,6 +700,28 @@ for use in symbolNames {
     let resolves = NSImage(systemSymbolName: use.name, accessibilityDescription: nil) != nil
     check(resolves, "SF Symbol \"\(use.name)\" does not resolve (\(use.file):\(use.line))")
 }
+// ---- update check (pure; no network) ----
+check(UpdateRules.isNewer("v1.10.0", than: "1.9.0") == true, "1.10.0 is newer than 1.9.0")
+check(UpdateRules.isNewer("1.9.0", than: "1.10.0") == false, "1.9.0 is not newer than 1.10.0")
+check(UpdateRules.isNewer("1.9.0", than: "1.9.0") == false, "equal versions are not newer")
+check(UpdateRules.isNewer("v1.9.0", than: "1.9.0") == false && UpdateRules.isNewer("1.9.0", than: "v1.9.0") == false, "leading v is ignored")
+check(UpdateRules.isNewer("1.9", than: "1.9.0") == false && UpdateRules.isNewer("1.9.0", than: "1.9") == false, "missing parts count as 0")
+check(UpdateRules.isNewer("1.9.1", than: "1.9") == true && UpdateRules.isNewer("1.9", than: "1.9.1") == false, "a missing patch part is older than 1")
+check(UpdateRules.isNewer("2", than: "1.99.99") == true, "a single part compares by its number")
+check(UpdateRules.isNewer("latest", than: "1.0") == nil && UpdateRules.isNewer("1.x", than: "1.0") == nil, "words are not versions")
+check(UpdateRules.isNewer("1..2", than: "1.0") == nil && UpdateRules.isNewer("", than: "1.0") == nil && UpdateRules.isNewer("v", than: "1.0") == nil, "empty parts are not versions")
+check(UpdateRules.isNewer("+1.0", than: "1.0") == nil && UpdateRules.isNewer("-1.0", than: "1.0") == nil, "signs are not versions")
+check(UpdateRules.isNewer("1.0.0-beta", than: "1.0.0") == nil && UpdateRules.isNewer("2.0", than: "1.0-rc1") == nil, "pre-release suffixes are not versions")
+check(UpdateRules.isNewer("99999999999999999999999", than: "1.0") == nil, "numbers too large to read are not versions")
+check(UpdateRules.isNewer("2.0", than: "") == nil, "an invalid current version gives nil")
+check(UpdateRules.tag(inReleaseJSON: Data(#"{"tag_name":"v1.5.0","name":"Release"}"#.utf8)) == "v1.5.0", "tag_name is read from the release")
+check(UpdateRules.tag(inReleaseJSON: Data(#"{"message":"Not Found"}"#.utf8)) == nil && UpdateRules.tag(inReleaseJSON: Data("oops".utf8)) == nil, "a response without a tag gives nil")
+let updateNow = Date(timeIntervalSince1970: nowStamp)
+check(UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: nil), "a first automatic check is due")
+check(!UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(-3600)), "an hour after a check is not due")
+check(!UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(-86399)), "just under a day after a check is not due")
+check(UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(-86400)), "a day after a check is due")
+check(UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(7200)), "a check in the future (clock set back) is due")
 
 runBenchmark()
 QuickOpenBench.main()

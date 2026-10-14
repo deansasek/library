@@ -13,4 +13,7 @@ while pgrep -x Library >/dev/null; do sleep 0.2; done
 rm -rf /Applications/Library.app
 cp -R build/Library.app /Applications/Library.app
 open /Applications/Library.app
+# Remember this clone, so Check for Updates can run ./update.sh here. The release zip has no update.sh, and the app
+# then sends the user to the release page instead. Written only after the install succeeds.
+defaults write com.deansasek.library sourcePath "$PWD"
 echo "Installed /Applications/Library.app"
