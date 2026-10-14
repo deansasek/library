@@ -15,6 +15,7 @@ final class QuickOpenModel: ObservableObject {
     /// Counts changes to the library, so cached lists that depend on it are rebuilt.
     private var nodesVersion = 0
     private var nodesObserver: AnyCancellable?
+    private var snippetsObserver: AnyCancellable?
     /// The most opened items, kept until the open counts or the library change.
     private var frequentCache: (counts: [String: Int], version: Int, items: [LibraryItem])?
     @Published private(set) var results: [QuickOpenResult] = []
@@ -66,6 +67,10 @@ final class QuickOpenModel: ObservableObject {
             self?.index = nil
             self?.nodesVersion += 1
         }
+        // Snippets are part of the search index, so a change to them rebuilds it too.
+        snippetsObserver = SnippetStore.shared.$snippets.dropFirst().sink { [weak self] _ in
+            self?.index = nil
+        }
         results = computeResults()
         // A copied GIF finishing its download updates the open panel.
         historyObserver = ClipboardHistory.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] in
@@ -111,7 +116,7 @@ final class QuickOpenModel: ObservableObject {
     /// The library's index, built on first use after the library changed.
     private func searchIndex() -> QuickOpenIndex {
         if let index { return index }
-        let built = QuickOpenIndex(nodes: store.nodes)
+        let built = QuickOpenIndex(nodes: store.nodes, snippets: SnippetStore.shared.snippets)
         index = built
         return built
     }
@@ -158,6 +163,7 @@ final class QuickOpenModel: ObservableObject {
             case .item: group = "Library"
             case .clip: group = "Clipboard"
             case .answer: group = "Answer"
+            case .snippet: group = "Snippets"
             default: group = "Suggestions"
             }
             if index == 0 {
@@ -191,6 +197,7 @@ final class QuickOpenModel: ObservableObject {
         case .clip(let item): return item.icon
         case .item(let node, _): return store.icon(for: node)
         case .openLink: return symbol("safari")
+        case .snippet: return symbol("text.quote")
         case .addLink: return symbol("plus.circle")
         case .webSearch: return symbol("magnifyingglass")
         }
@@ -215,6 +222,8 @@ final class QuickOpenModel: ObservableObject {
             provider.registerObject(url as NSURL, visibility: .all)
         case .answer(let value, _):
             provider.registerObject(value as NSString, visibility: .all)
+        case .snippet(let snippet):
+            provider.registerObject(snippet.text as NSString, visibility: .all)
         default:
             break
         }
@@ -284,6 +293,7 @@ final class QuickOpenModel: ObservableObject {
     /// Actions for a result: open it, open it the other way, or copy what it points to.
     func actions(for result: QuickOpenResult) -> [QuickOpenAction] {
         if case .clip(let item) = result.kind { return clipActions(for: item) }
+        if case .snippet(let snippet) = result.kind { return snippetActions(for: snippet) }
         guard let node = result.node else { return [] }
         var list = [QuickOpenAction(id: "open", title: "Open") { open(node) }]
         if let labels = node.modeLabels {
@@ -305,6 +315,19 @@ final class QuickOpenModel: ObservableObject {
             })
         }
         return list
+    }
+
+    private func snippetActions(for snippet: Snippet) -> [QuickOpenAction] {
+        [
+            QuickOpenAction(id: "copy", title: "Copy") { Self.copyText(snippet.text) },
+            QuickOpenAction(id: "edit", title: "Edit") { SnippetEditorWindow.show(snippet) },
+        ]
+    }
+
+    /// Puts plain text on the clipboard. Clipboard history records it like any other copy.
+    private static func copyText(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     private func clipActions(for item: ClipItem) -> [QuickOpenAction] {
@@ -342,8 +365,9 @@ final class QuickOpenModel: ObservableObject {
         guard let result = selected else { return }
         switch result.kind {
         case .answer(let value, _):
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(value, forType: .string)
+            Self.copyText(value)
+        case .snippet(let snippet):
+            Self.copyText(snippet.text)
         case .addSuggestion(let suggestion):
             store.add(suggestion)
         case .clip(let item):

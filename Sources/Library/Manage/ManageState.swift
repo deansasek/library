@@ -10,7 +10,7 @@ enum IconTab: String, CaseIterable {
 @MainActor
 final class ManageState: ObservableObject {
     enum Sheet: Identifiable, Hashable {
-        case bookmark, terminal, folder, divider, application, edit(UUID), bulkEdit, duplicates
+        case bookmark, terminal, folder, divider, application, edit(UUID), bulkEdit, duplicates, snippets
         var id: Self { self }
     }
 
@@ -67,6 +67,7 @@ final class ManageState: ObservableObject {
         case .application: return appSelection != nil
         case .bulkEdit: return !bulkEdit.changesNothing
         case .duplicates: return true
+        case .snippets: return false
         case .edit:
             guard filled(draft.name) else { return false }
             if draft.url != nil { return filled(draft.url) }

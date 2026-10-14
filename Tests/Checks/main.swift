@@ -256,6 +256,39 @@ check(answer("5/0") == nil && answer("42") == nil && answer("2+") == nil && answ
 check(answer("5 km in miles")?.hasPrefix("3.10685") == true && answer("72 f to c")?.hasPrefix("22.2222") == true, "conversions")
 check(answer("5 km in kg") == nil, "mismatched units")
 
+// ---- snippets ----
+let snippetList = [Snippet(name: "Home address", text: "1 Main St\nSpringfield", keywords: "street mailing")]
+let snippetIndex = QuickOpenIndex(nodes: pt, snippets: snippetList)
+check(snippetIndex.search("home", counts: [:]).map(\.title) == ["Home address"], "a snippet is found by name")
+check(snippetIndex.search("mailing", counts: [:]).map(\.title) == ["Home address"], "a snippet is found by keyword")
+check(snippetIndex.search("springfield", counts: [:]).isEmpty, "snippet text is not searched")
+check(!snippetIndex.search("", counts: [:]).contains { $0.title == "Home address" }, "snippets are not in the browse list")
+check(QuickOpenIndex(nodes: pt).search("home", counts: [:]).isEmpty, "without snippets, no snippet results")
+if let found = snippetIndex.search("home", counts: [:]).first, case .snippet(let saved) = found.kind {
+    check(saved.text.contains("Springfield"), "a snippet result carries its text")
+} else { check(false, "a snippet result has the snippet kind") }
+let snippetDir = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-snippets-\(UUID().uuidString)")
+try? FileManager.default.createDirectory(at: snippetDir, withIntermediateDirectories: true)
+let snippetFile = snippetDir.appendingPathComponent("snippets.json")
+let savedSnippets = SnippetStore(file: snippetFile)
+savedSnippets.add(Snippet(name: "Sig", text: "Thanks,\nDean"))
+let reopenedSnippets = SnippetStore(file: snippetFile)
+check(reopenedSnippets.snippets.map(\.name) == ["Sig"] && reopenedSnippets.snippets.first?.text == "Thanks,\nDean", "snippets reload from snippets.json")
+check((try? Data(contentsOf: snippetFile))?.range(of: Data("Dean".utf8)) != nil, "snippets are plain text in snippets.json, not encrypted")
+var renamedSnippet = savedSnippets.snippets[0]
+renamedSnippet.name = "Signature"
+savedSnippets.update(renamedSnippet)
+check(SnippetStore(file: snippetFile).snippets.first?.name == "Signature", "an edit is saved")
+savedSnippets.remove([renamedSnippet.id])
+check(SnippetStore(file: snippetFile).snippets.isEmpty, "a delete is saved")
+let damagedSnippetFile = snippetDir.appendingPathComponent("damaged-snippets.json")
+try? Data("not a list".utf8).write(to: damagedSnippetFile)
+let movedSnippets = SnippetStore(file: damagedSnippetFile)
+check(movedSnippets.snippets.isEmpty && !FileManager.default.fileExists(atPath: damagedSnippetFile.path)
+      && FileManager.default.fileExists(atPath: snippetDir.appendingPathComponent("snippets-damaged.json").path),
+      "a damaged snippets file is moved aside, not read as snippets")
+try? FileManager.default.removeItem(at: snippetDir)
+
 // ---- a shortcut is equal to the same shortcut ----
 check(Shortcut(modifiers: UInt32(controlKey), button: 1) == Shortcut(modifiers: UInt32(controlKey), button: 1), "shortcut equality")
 check(Shortcut(modifiers: UInt32(controlKey), button: 1) != Shortcut(modifiers: UInt32(cmdKey), button: 1), "shortcut inequality")

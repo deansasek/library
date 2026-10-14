@@ -25,6 +25,7 @@ struct ManageCommands: Commands {
             Button("New Folder…") { state?.present(.folder) }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("New Divider…") { state?.present(.divider) }
+            Button("New Snippet…") { SnippetEditorWindow.show(nil) }
             Divider()
             Button("Import Bookmarks…") { BookmarkImporter.run(into: store) }
             Button("Find Duplicates…") { state?.present(.duplicates) }
