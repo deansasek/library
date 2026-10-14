@@ -1037,9 +1037,9 @@ check(backupError(Data(#"{"format":"library-backup","items":[]}"#.utf8)) == .uns
 check(backupError(Data("not json".utf8)) == .malformed && backupError(Data()) == .malformed, "garbage is rejected")
 check(backupError(Data(#"{"format":"library-backup","version":1,"items":"oops"}"#.utf8)) == .malformed, "bad items are rejected")
 let twin = LibraryItem(name: "Twin", url: "https://twin.example.com")
-var clash = LibraryItem(name: "Other", url: "https://other.example.com")
-clash.id = twin.id
-if let dupes = try? LibraryBackup.encode([twin, clash]) {
+var backupClash = LibraryItem(name: "Other", url: "https://other.example.com")
+backupClash.id = twin.id
+if let dupes = try? LibraryBackup.encode([twin, backupClash]) {
     check(backupError(dupes) == .duplicateIDs, "repeated ids are rejected")
 }
 check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")
