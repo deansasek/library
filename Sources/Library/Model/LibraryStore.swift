@@ -142,7 +142,8 @@ final class LibraryStore: ObservableObject {
             nodes = items
             lastFileStamp = fileStamp()
         case .missing:
-            nodes = [LibraryItem(name: "GitHub", url: "https://github.com")]
+            // A new install starts with the project's page, so the library shows how a bookmark looks and works.
+            nodes = [LibraryItem(name: "Library on GitHub", url: "https://github.com/deansasek/library", keywords: "library help")]
             save()
         case .unreadable:
             // Nothing is written over a file that could not be read, so the next edit does not replace it.
