@@ -418,6 +418,7 @@ final class QuickOpenModel: ObservableObject {
             }
             list.append(QuickOpenAction(id: "copy-as", title: String(localized: "Copy as…", bundle: L10n.bundle),
                                         children: transforms) {})
+            list += smartActions(for: item, text: text)
         }
         if item.kind == .link, let link = item.link {
             list.append(QuickOpenAction(id: "markdown", title: String(localized: "Copy as Markdown Link", bundle: L10n.bundle)) { [pastes] in
@@ -438,6 +439,37 @@ final class QuickOpenModel: ObservableObject {
             })
         }
         list.append(QuickOpenAction(id: "delete", title: "Delete") { history.remove(item) })
+        return list
+    }
+
+    /// Actions for an address, a phone number, or a date in a text clip. Each appears only when the text has one.
+    private func smartActions(for item: ClipItem, text: String) -> [QuickOpenAction] {
+        let history = ClipboardHistory.shared
+        let lock = ClipboardLock.shared
+        let found = SmartText.detect(text)
+        var list: [QuickOpenAction] = []
+        if let address = found.address, let url = SmartText.mapsURL(for: address) {
+            list.append(QuickOpenAction(id: "maps", title: String(localized: "Open in Maps", bundle: L10n.bundle),
+                                        icon: "mappin.and.ellipse") {
+                lock.perform(item, for: .show) { NSWorkspace.shared.open(url) }
+            })
+        }
+        if let phone = found.phone {
+            let digits = SmartText.phoneDigits(phone)
+            list.append(QuickOpenAction(id: "phone", title: String(localized: "Copy Phone Number", bundle: L10n.bundle),
+                                        icon: "phone") { [pastes] in
+                lock.perform(item, for: .copy) {
+                    history.copyText(digits)
+                    if pastes { FrontApp.pasteSoon() }
+                }
+            })
+        }
+        if let date = found.date {
+            list.append(QuickOpenAction(id: "calendar", title: String(localized: "Add to Calendar", bundle: L10n.bundle),
+                                        icon: "calendar.badge.plus") {
+                lock.perform(item, for: .show) { SmartText.openInCalendar(text: text, date: date) }
+            })
+        }
         return list
     }
 

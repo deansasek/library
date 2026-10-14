@@ -91,6 +91,15 @@
 /* Copy as menu item that turns each line break into a space. */
 "Joined Lines" = "Joined Lines";
 
+/* Quick Open action, shown for a text clip with an address, that opens the address in Apple Maps. */
+"Open in Maps" = "Open in Maps";
+
+/* Quick Open action, shown for a text clip with a phone number, that copies the number with its digits and plus sign only. */
+"Copy Phone Number" = "Copy Phone Number";
+
+/* Quick Open action, shown for a text clip with a date or time, that opens the event in Calendar's add-event sheet. */
+"Add to Calendar" = "Add to Calendar";
+
 /* Quick Open action that copies a bookmark or link as a Markdown link, [Title](url). */
 "Copy as Markdown Link" = "Copy as Markdown Link";
 

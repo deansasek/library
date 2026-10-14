@@ -302,6 +302,8 @@ final class QuickOpenIndex {
 struct QuickOpenAction: Identifiable {
     let id: String
     let title: String
+    /// The SF Symbol shown beside the title in the actions list and the context menu. Nil for none.
+    var icon: String?
     /// A submenu. When it is not empty, choosing the action lists these instead of running `run`.
     var children: [QuickOpenAction] = []
     let run: @MainActor () -> Void
