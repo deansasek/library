@@ -1,0 +1,29 @@
+/* Menu item that opens the About panel. */
+"About Library" = "About Library";
+
+/* Clipboard menu item that empties the clipboard history. */
+"Clear History" = "Clear History";
+
+/* Clipboard submenu title and the Clipboard settings tab. */
+"Clipboard" = "Clipboard";
+
+/* Menu item that opens the window for editing the library. */
+"Edit Library…" = "Edit Library…";
+
+/* Settings tab for general options. */
+"General" = "General";
+
+/* Disabled menu item shown when the clipboard history is empty. */
+"No Clipboard History" = "No Clipboard History";
+
+/* Toggle that starts Library when the user logs in. */
+"Open at Login" = "Open at Login";
+
+/* Menu item that quits the app. */
+"Quit Library" = "Quit Library";
+
+/* Menu item that opens the Settings window. */
+"Settings…" = "Settings…";
+
+/* Settings tab for keyboard shortcuts. */
+"Shortcuts" = "Shortcuts";

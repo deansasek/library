@@ -12,7 +12,9 @@ struct MenuContent: View {
         Divider()
         Menu {
             if history.items.isEmpty {
-                Button("No Clipboard History") {}
+                Button {} label: {
+                    Text("No Clipboard History", bundle: L10n.bundle)
+                }
                     .disabled(true)
             } else {
                 ForEach(history.displayOrder.prefix(10)) { item in
@@ -27,10 +29,10 @@ struct MenuContent: View {
                     }
                 }
                 Divider()
-                Button("Clear History") { history.clear() }
+                Button { history.clear() } label: { Text("Clear History", bundle: L10n.bundle) }
             }
         } label: {
-            Label("Clipboard", systemImage: "doc.on.clipboard")
+            Label { Text("Clipboard", bundle: L10n.bundle) } icon: { Image(systemName: "doc.on.clipboard") }
         }
         // Shown only while the clipboard holds a link or application that is not in the library.
         if let suggestion = store.suggestion() {
@@ -42,21 +44,23 @@ struct MenuContent: View {
             openWindow(id: "manage")
             NSApp.activate(ignoringOtherApps: true)
         } label: {
-            Label("Edit Library…", systemImage: "books.vertical")
+            Label { Text("Edit Library…", bundle: L10n.bundle) } icon: { Image(systemName: "books.vertical") }
         }
         Button {
             NSApp.activate(ignoringOtherApps: true)
             openSettings()
         } label: {
-            Label("Settings…", systemImage: "gearshape")
+            Label { Text("Settings…", bundle: L10n.bundle) } icon: { Image(systemName: "gearshape") }
         }
         .keyboardShortcut(",")
         Divider()
-        Toggle("Open at Login", isOn: Binding(
+        Toggle(isOn: Binding(
             get: { loginItem.isEnabled },
             set: { loginItem.set($0) }
-        ))
-        Button("About Library") {
+        )) {
+            Text("Open at Login", bundle: L10n.bundle)
+        }
+        Button {
             NSApp.activate(ignoringOtherApps: true)
             NSApp.orderFrontStandardAboutPanel(options: [
                 .credits: NSAttributedString(
@@ -64,9 +68,13 @@ struct MenuContent: View {
                     attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
                                  .foregroundColor: NSColor.secondaryLabelColor]),
             ])
+        } label: {
+            Text("About Library", bundle: L10n.bundle)
         }
-        Button("Quit Library") {
+        Button {
             NSApp.terminate(nil)
+        } label: {
+            Text("Quit Library", bundle: L10n.bundle)
         }
         .keyboardShortcut("q")
     }
