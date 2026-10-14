@@ -247,6 +247,13 @@ struct QuickOpenView: View {
             VStack(alignment: .leading, spacing: 1) {
                 Text(result.title)
                     .lineLimit(1)
+                if let note = result.noteLine {
+                    Text(note)
+                        .font(.caption)
+                        .foregroundStyle(selected ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor)) : AnyShapeStyle(.secondary))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
                 Text(result.subtitle)
                     .font(.caption)
                     // System secondary colors adapt to light, dark, and Increase Contrast; selected rows keep the selected text color.

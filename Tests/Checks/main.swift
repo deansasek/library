@@ -1446,6 +1446,51 @@ do {
     check(rowDrop(moving: [other.id], onto: inner.id, in: rows, listSorted: false) == .moveBefore(inner.id), "a row dropped on a folder's child goes before the child")
     check(rowDrop(moving: [other.id], onto: UUID(), in: rows, listSorted: false) == .ignore, "a target that is not in the library is ignored")
 }
+// ---- notes ----
+check(LibraryItem(name: "N", url: "x.example.com").note == nil, "a new item has no note")
+let noteOldJSON = Data(#"{"id":"6F1C3E2A-1B2C-4D5E-8F90-123456789ABC","name":"Jira","url":"x.example.com"}"#.utf8)
+check((try? JSONDecoder().decode(LibraryItem.self, from: noteOldJSON))?.note == nil, "a file without a note loads")
+check(LibraryItem.cleanNote("  first line\nsecond  \n") == "first line\nsecond", "a note is trimmed, keeping its inner lines")
+check(LibraryItem.cleanNote(" \n\t ") == nil && LibraryItem.cleanNote(nil) == nil, "a blank note is no note")
+var noted = LibraryItem(name: "Docs", url: "https://docs.example.com")
+noted.note = "  Read section 3\nthen the FAQ "
+check(noted.noteText == "Read section 3\nthen the FAQ", "noteText trims the note")
+check(noted.spotlightDescription == "https://docs.example.com\nRead section 3\nthen the FAQ", "Spotlight shows the note after the target")
+noted.note = "   "
+check(noted.noteText == nil && noted.spotlightDescription == "https://docs.example.com", "a blank note is left out of Spotlight")
+check(LibraryItem(name: "Ask", command: "make").spotlightDescription == "make", "a command's Spotlight description is its command")
+check(LibraryItem(name: "Folder", children: []).spotlightDescription == nil, "no target and no note gives no Spotlight description")
+var notedTrip = LibraryItem(name: "Docs", url: "https://docs.example.com", note: "a\nb")
+if let data = try? JSONEncoder().encode(notedTrip), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.note == "a\nb" && back == notedTrip, "a note round-trips through the file")
+} else { check(false, "a note round-trips through the file") }
+notedTrip.note = nil
+check(notedTrip.noteText == nil, "clearing the note clears it")
+let noteSearch = [LibraryItem(name: "Docs", url: "https://docs.example.com", note: "Read section 3\nthen the FAQ")]
+check(QuickOpenResult.search("docs", in: noteSearch, counts: [:]).first?.noteLine == "Read section 3 then the FAQ", "Quick Open shows the note on one line")
+check(QuickOpenResult.search("docs", in: [LibraryItem(name: "Docs", url: "https://docs.example.com")], counts: [:]).first?.noteLine == nil, "Quick Open shows no note line without a note")
+check(QuickOpenResult.search("", in: noteSearch, counts: [:]).first?.noteLine != nil, "a note shows in the browse list too")
+
+// ---- Reading List ----
+let readA = LibraryItem(name: "A", url: "https://a.example.com", readLater: .read)
+let readB = LibraryItem(name: "B", url: "https://b.example.com")
+let readC = LibraryItem(name: "C", url: "https://c.example.com", readLater: .unread)
+let readD = LibraryItem(name: "D", url: "https://d.example.com", readLater: .read)
+let readE = LibraryItem(name: "E", url: "https://e.example.com", readLater: .unread)
+check(ReadingList.ordered([readA, readB, readC, readD, readE]).map(\.name) == ["C", "E", "A", "D"], "Reading List: unread first, then read, each in tree order")
+check(ReadingList.ordered([readB]).isEmpty && ReadingList.ordered([]).isEmpty, "Reading List: items not in the list are left out")
+check(ReadingList.state(after: .add, from: nil) == .unread && ReadingList.state(after: .add, from: .read) == .read, "adding gives unread, and keeps a state already there")
+check(ReadingList.state(after: .markRead, from: .unread) == .read && ReadingList.state(after: .markUnread, from: .read) == .unread, "marking read and unread changes an item in the list")
+check(ReadingList.state(after: .markRead, from: nil) == nil && ReadingList.state(after: .markUnread, from: nil) == nil, "marking never adds an item to the list")
+check(ReadingList.state(after: .remove, from: .unread) == nil && ReadingList.state(after: .remove, from: .read) == nil, "removing clears the state")
+check(readB.canReadLater && !LibraryItem(name: "Folder", children: []).canReadLater, "only bookmarks can be listed")
+check(LibraryItem(name: "T", url: "x.example.com/{}").canReadLater == false && LibraryItem(name: "App", appPath: "/Applications/Safari.app").canReadLater == false, "templates and apps cannot be listed")
+check(ReadingList.Action.add.title == "Add to Reading List" && ReadingList.Action.remove.title == "Remove from Reading List", "Reading List action names")
+let readOldJSON = Data(#"{"id":"6F1C3E2A-1B2C-4D5E-8F90-123456789ABC","name":"Jira","url":"x.example.com"}"#.utf8)
+check((try? JSONDecoder().decode(LibraryItem.self, from: readOldJSON))?.readLater == nil, "a file without a Reading List state loads as not listed")
+if let data = try? JSONEncoder().encode(readA), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.readLater == .read && back == readA, "a Reading List state round-trips through the file")
+} else { check(false, "a Reading List state round-trips through the file") }
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

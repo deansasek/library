@@ -97,9 +97,22 @@ struct ManageView: View {
         .onAppear { store.refreshSyncState() }
     }
 
-    /// The library rows, then Recently Deleted when it has items.
+    /// The Reading List when it has items, then the library rows, then Recently Deleted when it has items.
     @ViewBuilder
-    private func rows(_ library: [LibraryItem], trashed: [LibraryItem], pathWidth: CGFloat) -> some View {
+    private func rows(_ library: [LibraryItem], reading: [LibraryItem], trashed: [LibraryItem], pathWidth: CGFloat) -> some View {
+        if !reading.isEmpty {
+            Section {
+                // The same items as the library rows below, so each row gets its own identity.
+                ForEach(reading.map(ReadingRow.init)) { row in
+                    NodeRow(pathWidth: pathWidth, node: row.node, store: store, state: state)
+                        .tag(row.node.id)
+                }
+            } header: {
+                Text("Reading List", bundle: L10n.bundle)
+            } footer: {
+                Text("Unread items are listed first. Removing an item from the Reading List leaves it in the library.", bundle: L10n.bundle)
+            }
+        }
         OutlineGroup(library, children: \.children) { node in
             NodeRow(pathWidth: pathWidth, node: node, store: store, state: state)
         }
@@ -133,9 +146,10 @@ struct ManageView: View {
         // The search runs once per change to the query or the library, not on every redraw.
         let found = state.searches.result(for: state.query, revision: store.revision, in: store.nodes)
         let trashed = store.deleted.matching(state.query)
+        let reading = ReadingList.ordered(found.tree.leaves)
         let shown = found.count
         return List(selection: $state.selection) {
-            rows(displayed(found.tree), trashed: trashed, pathWidth: pathWidth)
+            rows(displayed(found.tree), reading: reading, trashed: trashed, pathWidth: pathWidth)
         }
         .listStyle(.inset(alternatesRowBackgrounds: true))
         .navigationSubtitle("\(shown) \(shown == 1 ? "item" : "items")")
@@ -336,6 +350,7 @@ struct ManageView: View {
             node.url = node.url.map { $0.trimmingCharacters(in: .whitespaces) }
             node.arguments = clean(node.arguments)
             node.keywords = clean(node.keywords)
+            node.note = LibraryItem.cleanNote(node.note)
             node.command = node.appPath == nil ? node.command.map { $0.trimmingCharacters(in: .whitespaces) } : clean(node.command)
             node.promptLabel = node.isTemplate ? clean(node.promptLabel) : nil
             store.perform("Edit") { $0.update(id) { $0 = node } }
@@ -372,6 +387,7 @@ struct ManageView: View {
             Button("Edit…") { state.editMany(ids) }
             Divider()
         }
+        readingListMenu(for: ids)
         if !ids.isEmpty {
             Menu("Move to") {
                 Button("Top level") { store.move(ids, to: nil) }
@@ -387,6 +403,32 @@ struct ManageView: View {
         }
     }
 
+    /// Adds bookmarks to the Reading List, and marks or removes the ones already in it. Only the choices that apply
+    /// to the selection are listed.
+    @ViewBuilder
+    private func readingListMenu(for ids: Set<UUID>) -> some View {
+        let items = ids.compactMap { store.nodes.node(withID: $0) }
+        let addable = Set(items.filter { $0.canReadLater && $0.readLater == nil }.map(\.id))
+        let listed = Set(items.filter { $0.readLater != nil }.map(\.id))
+        let unread = Set(items.filter { $0.readLater == .unread }.map(\.id))
+        let read = Set(items.filter { $0.readLater == .read }.map(\.id))
+        if !addable.isEmpty || !listed.isEmpty {
+            if !addable.isEmpty {
+                Button(ReadingList.Action.add.title) { store.changeReadingList(addable, .add) }
+            }
+            if !unread.isEmpty {
+                Button(ReadingList.Action.markRead.title) { store.changeReadingList(unread, .markRead) }
+            }
+            if !read.isEmpty {
+                Button(ReadingList.Action.markUnread.title) { store.changeReadingList(read, .markUnread) }
+            }
+            if !listed.isEmpty {
+                Button(ReadingList.Action.remove.title) { store.changeReadingList(listed, .remove) }
+            }
+            Divider()
+        }
+    }
+
     /// Live items go to Recently Deleted. Items already there are removed for good, after the user confirms.
     private func delete(_ ids: Set<UUID>) {
         let live = ids.filter { store.nodes.node(withID: $0) != nil }
@@ -395,6 +437,12 @@ struct ManageView: View {
         if !gone.isEmpty { state.pendingPurge = gone }
         state.selection.subtract(ids)
     }
+}
+
+/// A row of the Reading List section. The item is also a library row, so the section's row needs its own id.
+private struct ReadingRow: Identifiable {
+    let node: LibraryItem
+    var id: String { "reading-\(node.id.uuidString)" }
 }
 
 /// Trims `text` and returns nil when nothing is left.

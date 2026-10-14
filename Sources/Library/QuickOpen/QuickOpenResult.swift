@@ -28,6 +28,11 @@ struct QuickOpenResult: Identifiable {
         return nil
     }
 
+    /// The item's note on one line, shown under its name. Nil when the item has no note.
+    var noteLine: String? {
+        node?.noteText.map { $0.split(whereSeparator: \.isNewline).joined(separator: " ") }
+    }
+
     /// Library items and clipboard items have actions on Tab and right-click.
     var hasActions: Bool {
         switch kind {

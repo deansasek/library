@@ -46,6 +46,19 @@ struct EditSheet: View {
                         Text("Keywords find this item in Quick Open and Spotlight, such as “tix” for Jira. Items that open at login need Open at Login turned on in Settings.")
                     }
                 }
+                if node.isOpenable {
+                    Section {
+                        LabeledContent(String(localized: "Notes", bundle: L10n.bundle)) {
+                            TextEditor(text: Binding(
+                                get: { node.note ?? "" },
+                                set: { state.draft.note = $0 }
+                            ))
+                            .frame(minHeight: 72)
+                        }
+                    } footer: {
+                        Text("Notes appear under the name in Quick Open and in Spotlight.", bundle: L10n.bundle)
+                    }
+                }
                 details
                 if node.isOpenable {
                     shortcuts

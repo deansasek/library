@@ -34,6 +34,10 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     /// The named fields a URL template declares in Get Info, each "name" or "name:Label". Only declared names are
     /// placeholders, so `{name}` is plain text in a URL without them. Nil for templates that use only `{}`.
     var templateFields: [String]?
+    /// A note about the item, in plain text, which may span lines. Quick Open and Spotlight show it. Nil when empty.
+    var note: String?
+    /// Whether a bookmark is in the Reading List, and read or unread there. Nil when it is not in the list.
+    var readLater: ReadLaterState?
 
     var isFolder: Bool { children != nil }
 
@@ -56,6 +60,25 @@ struct LibraryItem: Codable, Identifiable, Equatable {
         if let path = appPath { return URL(fileURLWithPath: path) }
         return isTemplate ? nil : link
     }
+
+    /// The note with surrounding whitespace removed. Nil when there is no note.
+    var noteText: String? { Self.cleanNote(note) }
+
+    /// Trims a note and returns nil when nothing is left, so an empty note is stored as no note.
+    static func cleanNote(_ text: String?) -> String? {
+        let trimmed = (text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    /// What Spotlight shows as the description: the target, then the note on the next line.
+    var spotlightDescription: String? {
+        let target = url ?? command ?? appPath
+        let parts = [target, noteText].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: "\n")
+    }
+
+    /// Only bookmarks with a fixed link can be in the Reading List. A template would ask for a value each time.
+    var canReadLater: Bool { url != nil && !isTemplate }
 
     /// True for items that open something, so they can have a shortcut.
     var isOpenable: Bool { url != nil || appPath != nil || command != nil }

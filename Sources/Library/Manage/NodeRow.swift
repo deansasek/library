@@ -26,6 +26,13 @@ struct NodeRow: View {
                         .fontWeight(node.isDivider == true ? .semibold : .regular)
                         .lineLimit(1)
                 }
+                if let readLater = node.readLater {
+                    // A book for unread, a check for read: the Reading List state, shown beside the name.
+                    Image(systemName: readLater == .read ? "checkmark.circle" : "book")
+                        .foregroundStyle(.secondary)
+                        .help(readLater == .read ? String(localized: "Read", bundle: L10n.bundle) : String(localized: "Unread", bundle: L10n.bundle))
+                        .accessibilityHidden(true)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             HStack(spacing: 6) {
@@ -78,6 +85,9 @@ struct NodeRow: View {
     /// The name and kind, as VoiceOver reads a row. Adds a warning when a shortcut is in use elsewhere.
     private var accessibilityName: String {
         var label = "\(node.name), \(kindName)"
+        if let readLater = node.readLater {
+            label += readLater == .read ? ", in Reading List, read" : ", in Reading List, unread"
+        }
         if store.failedShortcuts.contains(node.id) {
             label += ", shortcut in use by another app"
         }
