@@ -7,8 +7,10 @@ enum FrontApp {
     private static func focusedElement() -> AXUIElement? {
         guard AXIsProcessTrusted() else { return nil }
         var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute as CFString, &focused) == .success
+        guard AXUIElementCopyAttributeValue(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+              let focused, CFGetTypeID(focused) == AXUIElementGetTypeID()
         else { return nil }
+        // Checked by type above. A forced cast would crash if an app ever returned another type.
         return (focused as! AXUIElement)
     }
 
