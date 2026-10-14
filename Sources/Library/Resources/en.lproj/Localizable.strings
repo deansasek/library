@@ -183,3 +183,20 @@
 /* Settings footer under the toggle that names new bookmarks from their pages. */
 "Library requests each new bookmark's page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host." = "Library requests each new bookmark's page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.";
 
+/* Header menu in the manager that chooses how the list is sorted. Its accessibility label too. */
+"Sort" = "Sort";
+
+/* Sort menu item that shows the list in the order you set by dragging. */
+"Your Order" = "Your Order";
+
+/* Sort menu item that sorts the list by name. */
+"Name" = "Name";
+
+/* Sort menu item that sorts the list by path. */
+"Path" = "Path";
+
+/* Sort menu item that sorts the most opened items first. */
+"Most Used" = "Most Used";
+
+/* Sort menu item that sorts the most recently opened items first. */
+"Recently Opened" = "Recently Opened";

@@ -15,11 +15,36 @@ struct ManageView: View {
                 .frame(width: NodeRow.shortcutWidth, alignment: .leading)
             columnTitle("Path", .path)
                 .frame(width: pathWidth, alignment: .leading)
+            sortMenu
         }
         .font(.subheadline)
         .foregroundStyle(.secondary)
         .padding(.horizontal, 14)
         .padding(.vertical, 6)
+    }
+
+    /// The sort menu at the end of the header: your order, Name, Path, Most Used, and Recently Opened. The columns
+    /// also sort by a click, so the menu adds the two orders that have no column.
+    private var sortMenu: some View {
+        Menu {
+            Picker(selection: Binding(get: { state.sortKey }, set: { state.chooseSort($0) })) {
+                Text("Your Order", bundle: L10n.bundle).tag(ManageState.SortKey?.none)
+                Text("Name", bundle: L10n.bundle).tag(ManageState.SortKey?.some(.name))
+                Text("Path", bundle: L10n.bundle).tag(ManageState.SortKey?.some(.path))
+                Text("Most Used", bundle: L10n.bundle).tag(ManageState.SortKey?.some(.mostUsed))
+                Text("Recently Opened", bundle: L10n.bundle).tag(ManageState.SortKey?.some(.recentlyOpened))
+            } label: {
+                Text("Sort", bundle: L10n.bundle)
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .accessibilityLabel(Text("Sort", bundle: L10n.bundle))
+        .help(Text("Sort", bundle: L10n.bundle))
     }
 
     /// A header you can click to sort by that column, with an arrow on the column in use.
@@ -50,7 +75,7 @@ struct ManageView: View {
         guard let key = state.sortKey else { return nodes }
         func value(_ node: LibraryItem) -> String {
             switch key {
-            case .name: return node.name
+            case .name, .mostUsed, .recentlyOpened: return node.name
             case .shortcut: return node.shortcuts?.first?.description ?? "\u{10FFFF}"
             case .path: return node.url ?? node.command ?? node.appPath ?? ""
             }
@@ -59,6 +84,15 @@ struct ManageView: View {
             var node = node
             node.children = node.children.map(displayed)
             return node
+        }
+        if key == .mostUsed || key == .recentlyOpened {
+            // Folders keep their places first, as they do in the other orders. Items are ordered by their use.
+            let folders = result.filter(\.isFolder)
+            let items = result.filter { !$0.isFolder }
+            let ordered = key == .mostUsed
+                ? UsageOrder.mostUsed(items, counts: store.openCounts)
+                : UsageOrder.recentlyOpened(items, opened: store.lastOpened)
+            return folders + ordered
         }
         result.sort { a, b in
             if a.isFolder != b.isFolder { return a.isFolder }

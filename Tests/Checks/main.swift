@@ -1570,5 +1570,27 @@ let splitCharacter = Data("<title>Ok</title>".utf8) + Data(Array(repeating: [UIn
 check(PageTitle.title(in: splitCharacter) == "Ok", "a character cut by the limit does not hide the title")
 check(PageTitle.collapsingWhitespace("  a \t b\n\nc  ") == "a b c", "whitespace collapses and is trimmed")
 
+// ---- Most Used and Recently Opened: largest first, never opened last, ties in tree order ----
+let orderA = LibraryItem(name: "A", url: "https://a.example.com")
+let orderB = LibraryItem(name: "B", url: "https://b.example.com")
+let orderC = LibraryItem(name: "C", url: "https://c.example.com")
+let orderD = LibraryItem(name: "D", url: "https://d.example.com")
+let orderE = LibraryItem(name: "E", url: "https://e.example.com")
+let treeOrder = [orderA, orderB, orderC, orderD, orderE]
+func names(_ items: [LibraryItem]) -> [String] { items.map(\.name) }
+let counts = [orderB.id.uuidString: 2, orderC.id.uuidString: 5, orderD.id.uuidString: 2, orderE.id.uuidString: 0]
+check(names(UsageOrder.mostUsed(treeOrder, counts: counts)) == ["C", "B", "D", "A", "E"],
+      "most used: largest first, ties keep tree order, never opened and zero last in tree order")
+check(names(UsageOrder.mostUsed(treeOrder, counts: [:])) == ["A", "B", "C", "D", "E"], "nothing opened keeps the tree order")
+check(names(UsageOrder.mostUsed([], counts: counts)).isEmpty, "no items give an empty order")
+let opened: [String: Date] = [
+    orderB.id.uuidString: Date(timeIntervalSince1970: 100),
+    orderC.id.uuidString: Date(timeIntervalSince1970: 300),
+    orderD.id.uuidString: Date(timeIntervalSince1970: 100),
+]
+check(names(UsageOrder.recentlyOpened(treeOrder, opened: opened)) == ["C", "B", "D", "A", "E"],
+      "recently opened: most recent first, equal dates keep tree order, never opened last")
+check(names(UsageOrder.recentlyOpened(treeOrder, opened: [:])) == ["A", "B", "C", "D", "E"], "nothing opened keeps the tree order by date too")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

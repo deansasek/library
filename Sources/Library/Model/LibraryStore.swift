@@ -46,6 +46,8 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var failedExtras: Set<Int> = []
     /// How often each item was opened, by id. Preferences, not bookmark data.
     @Published private(set) var openCounts: [String: Int] = UserDefaults.standard.dictionary(forKey: "openCounts") as? [String: Int] ?? [:]
+    /// When each item was last opened, by id. Preferences, not bookmark data. Items never opened have no entry.
+    @Published private(set) var lastOpened: [String: Date] = UserDefaults.standard.dictionary(forKey: "lastOpened") as? [String: Date] ?? [:]
     /// Click shortcuts wait for Accessibility access.
     @Published private(set) var clickAccessMissing = false
     /// True when bookmarks.json is kept in iCloud Drive. Settings > General shows it.
@@ -444,6 +446,8 @@ final class LibraryStore: ObservableObject {
     func recordOpen(_ id: UUID) {
         openCounts[id.uuidString, default: 0] += 1
         UserDefaults.standard.set(openCounts, forKey: "openCounts")
+        lastOpened[id.uuidString] = .now
+        UserDefaults.standard.set(lastOpened, forKey: "lastOpened")
     }
 
     /// Renames a bookmark to the title of its page, but only while it still has the host it was added with, so a
