@@ -57,6 +57,94 @@ check(QuickOpenResult.search("", in: pt, counts: [:]).compactMap(\.node).map(\.n
 check(QuickOpenResult.search("j", in: pt, counts: [:]).compactMap(\.node).map(\.name) == ["Jira", "Jenkins"], "prefix search")
 check(QuickOpenResult.link(from: "example.com/a")?.absoluteString == "https://example.com/a" && QuickOpenResult.link(from: "hello world") == nil, "link detection")
 
+/// The Quick Open search as it was before the index: walks and lowercases the whole tree on every call. The index
+/// must return exactly what this returns.
+func referenceSearch(_ query: String, in nodes: [LibraryItem], counts: [String: Int]) -> [QuickOpenResult] {
+    func flatten(_ nodes: [LibraryItem], folder: String) -> [QuickOpenResult] {
+        nodes.flatMap { node -> [QuickOpenResult] in
+            if let children = node.children {
+                return flatten(children, folder: folder.isEmpty ? node.name : "\(folder) / \(node.name)")
+            }
+            return node.isOpenable ? [QuickOpenResult(kind: .item(node, folder: folder), id: node.id.uuidString)] : []
+        }
+    }
+    func isSubsequence(_ word: String, of text: String) -> Bool {
+        var remaining = word[...]
+        for char in text where char == remaining.first { remaining = remaining.dropFirst() }
+        return remaining.isEmpty
+    }
+    let words = query.lowercased().split(separator: " ").map(String.init)
+    if words.isEmpty {
+        return nodes.sections.flatMap { section -> [QuickOpenResult] in
+            var items = flatten(section.nodes, folder: "")
+            if !items.isEmpty { items[0].section = section.title ?? "Library" }
+            return items
+        }
+    }
+    let all = flatten(nodes, folder: "")
+    let scored: [(result: QuickOpenResult, score: Int, index: Int)] = all.enumerated().compactMap { index, result in
+        guard let node = result.node, case .item(_, let folder) = result.kind else { return nil }
+        let name = node.name.lowercased()
+        let keywords = "\(node.keywords ?? "") \(node.color ?? "")".lowercased().split(separator: " ").map(String.init)
+        let other = "\(node.url ?? "") \(node.command ?? "") \(node.appPath ?? "") \(folder) \(keywords.joined(separator: " "))".lowercased()
+        var total = 0
+        for word in words {
+            let score = name.hasPrefix(word) || keywords.contains(where: { $0.hasPrefix(word) }) ? 4
+                : name.contains(word) ? 3 : isSubsequence(word, of: name) ? 1 : other.contains(word) ? 2 : 0
+            if score == 0 { return nil }
+            total += score
+        }
+        return (result, total, index)
+    }
+    return scored.sorted {
+        if $0.score != $1.score { return $0.score > $1.score }
+        let (a, b) = (counts[$0.result.id] ?? 0, counts[$1.result.id] ?? 0)
+        return a != b ? a > b : $0.index < $1.index
+    }.map(\.result)
+}
+/// Results compared by identity, order, section, and title: everything Quick Open shows.
+func keys(_ results: [QuickOpenResult]) -> [String] { results.map { "\($0.id)|\($0.section ?? "")|\($0.title)" } }
+
+let qoLibrary: [LibraryItem] = [
+    LibraryItem(name: "Apps", isDivider: true),
+    LibraryItem(name: "Safari", appPath: "/Applications/Safari.app", keywords: "browser web"),
+    LibraryItem(name: "Work", children: [
+        LibraryItem(name: "Jira", url: "https://tickets.example.com/browse/{}", color: "blue"),
+        LibraryItem(name: "Deep", children: [LibraryItem(name: "Docs", url: "https://docs.example.com")]),
+        LibraryItem(name: "Jenkins", url: "https://ci.example.com"),
+        LibraryItem(name: "Empty folder", children: []),
+    ]),
+    LibraryItem(name: "Tools", isDivider: true),
+    LibraryItem(name: "Build", command: "make all", keywords: "compile release"),
+    LibraryItem(name: "Deploy", command: "./deploy.sh --prod"),
+    LibraryItem(name: "Terminal", appPath: "/System/Applications/Utilities/Terminal.app"),
+]
+let qoCounts = [qoLibrary.leaves.first { $0.name == "Jenkins" }!.id.uuidString: 3,
+                qoLibrary.leaves.first { $0.name == "Docs" }!.id.uuidString: 3,
+                qoLibrary.leaves.first { $0.name == "Safari" }!.id.uuidString: 1]
+let qoQueries = ["", "  ", "j", "jira", "JIRA", "work", "docs", "example browse", "make", "release", "compile prod",
+                 "blue", "web", "wrk", "trm", "zzz", "dep", "de", "a", "ap s", "app", "http", "tools", "ex", "jen"]
+// One index, built once and searched for every query, as the model does.
+let qoIndex = QuickOpenIndex(nodes: qoLibrary)
+var qoMismatch: [String] = []
+for query in qoQueries {
+    for counts in [[String: Int](), qoCounts] where keys(qoIndex.search(query, counts: counts)) != keys(referenceSearch(query, in: qoLibrary, counts: counts)) {
+        qoMismatch.append("\(query)|\(counts.isEmpty ? "no counts" : "counts")")
+    }
+}
+check(qoMismatch.isEmpty, "index equals the uncached search: \(qoMismatch)")
+check(qoIndex.search("", counts: [:]).first?.section == "Apps", "browse list starts with its divider")
+// A new library gets a new index, and it finds what was added. The old index still answers for the old library.
+var qoGrown = qoLibrary
+qoGrown.append(LibraryItem(name: "Jiraffe", url: "https://zoo.example.com"))
+check(QuickOpenIndex(nodes: qoGrown).search("jira", counts: [:]).map(\.title).contains("Jiraffe")
+      && !qoIndex.search("jiraffe", counts: [:]).contains { $0.title == "Jiraffe" }, "a rebuilt index sees the change, the old one does not")
+check(keys(QuickOpenIndex(nodes: qoGrown).search("jira", counts: [:])) == keys(referenceSearch("jira", in: qoGrown, counts: [:])), "rebuilt index equals the uncached search")
+// The debounce decision: a blank query recomputes at once, a typed one waits one frame. Coalescing itself
+// (cancelling the pending recompute on each keystroke) is in QuickOpenModel.scheduleResults and is not run here.
+check(QuickOpenModel.recomputeDelay(for: "") == nil && QuickOpenModel.recomputeDelay(for: "   ") == nil, "blank query recomputes at once")
+check(QuickOpenModel.recomputeDelay(for: "j") == .milliseconds(16), "typed query waits one frame")
+
 // ---- suggestions ----
 let sel = AddSuggestion.make(selection: "https://swift.org/docs", clipboard: nil, in: tree())
 check(sel?.source == .selection && sel?.node.name == "swift.org", "a selected link is suggested")

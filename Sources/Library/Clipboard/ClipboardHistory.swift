@@ -119,8 +119,10 @@ final class ClipboardHistory: ObservableObject {
     /// Items whose text contains every word.
     func search(_ query: String) -> [ClipItem] {
         let words = query.lowercased().split(separator: " ").map(String.init)
-        guard !words.isEmpty else { return displayOrder }
-        return displayOrder.filter { item in words.allSatisfy(item.searchText.contains) }
+        // Built once for this search. Each item's text was capped at maxSearchableCharacters when it was copied.
+        let order = displayOrder
+        guard !words.isEmpty else { return order }
+        return order.filter { item in words.allSatisfy(item.searchText.contains) }
     }
 
     // MARK: Actions
