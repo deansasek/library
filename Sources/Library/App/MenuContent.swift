@@ -51,7 +51,7 @@ struct MenuContent: View {
                 Section {
                     ForEach(history.pasteQueue) { item in
                         Button {} label: {
-                            Text(item.menuTitle)
+                            Text(clipLock.menuTitle(for: item))
                         }
                         .disabled(true)
                     }

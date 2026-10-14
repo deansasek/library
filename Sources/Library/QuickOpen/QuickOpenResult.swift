@@ -52,6 +52,12 @@ struct QuickOpenResult: Identifiable {
         }
     }
 
+    /// The title a row shows. A locked pinned item shows Pinned Item, not its text, until the user authenticates.
+    @MainActor var displayTitle: String {
+        if case .clip(let item) = kind { return ClipboardLock.shared.title(for: item) }
+        return title
+    }
+
     /// What the item opens, with its folder in front.
     @MainActor var subtitle: String {
         switch kind {

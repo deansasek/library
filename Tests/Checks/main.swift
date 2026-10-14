@@ -1169,7 +1169,17 @@ let twoCopiesResult = Duplicates.merge(twoCopies)
 check(twoCopiesResult.nodes[0].shortcuts == [mergeCmdD] && twoCopiesResult.inheritedCount == 1 && twoCopiesResult.conflicts == ["⌘D (Docs c)"], "two copies with one key: the first wins, the second is listed")
 let plainCopies = [LibraryItem(name: "A", url: "https://a.example.com"), LibraryItem(name: "B", url: "https://a.example.com")]
 check(Duplicates.merge(plainCopies).summary == "Merged 2 items." && Duplicates.merge(plainCopies).nodes[0].shortcuts == nil, "no shortcuts to keep means a plain summary")
+// An app with other arguments, or a link in another browser, opens something else, so it is not a duplicate.
+let sameApp = [LibraryItem(name: "T1", appPath: "/Applications/Terminal.app", arguments: "-x"), LibraryItem(name: "T2", appPath: "/Applications/Terminal.app", arguments: "-x ")]
+check(Duplicates.groups(in: sameApp).count == 1, "apps with the same arguments are duplicates")
+check(Duplicates.groups(in: [LibraryItem(name: "T3", appPath: "/Applications/Terminal.app", arguments: "--new"), LibraryItem(name: "T4", appPath: "/Applications/Terminal.app")]).isEmpty, "apps with other arguments are not duplicates")
+check(Duplicates.groups(in: [LibraryItem(name: "Docs", url: "https://docs.example.com", browser: "com.apple.Safari"), LibraryItem(name: "Docs copy", url: "https://docs.example.com")]).isEmpty, "links in other browsers are not duplicates")
 
+// A bookmark keeps a URL with its own scheme, such as mailto: or obsidian://. A host and port still get https://.
+check(LibraryItem(name: "Vault", url: "obsidian://open?vault=Notes").link?.absoluteString == "obsidian://open?vault=Notes", "a custom URL scheme opens as written")
+check(LibraryItem(name: "Mail", url: "mailto:me@example.com").link?.absoluteString == "mailto:me@example.com", "a mailto link keeps its scheme")
+check(LibraryItem(name: "Local", url: "localhost:8080/app").link?.absoluteString == "https://localhost:8080/app", "a host with a port gets https")
+check(LibraryItem(name: "Plain", url: "example.com/a?u=http://x").link?.absoluteString == "https://example.com/a?u=http://x", "a host whose query has a link gets https")
 // ---- bulk edit (pure) ----
 let bulkTree = [
     LibraryItem(name: "One", url: "https://one.example.com", color: "red"),
@@ -1236,6 +1246,19 @@ if let dupes = try? LibraryBackup.encode([twin, backupClash]) {
     check(backupError(dupes) == .duplicateIDs, "repeated ids are rejected")
 }
 check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")
+// A restore leaves Recently Deleted out of the library, and an id that Recently Deleted uses is given a new one.
+let trashedOld = LibraryItem(name: "Trashed", url: "https://trashed.example.com", deletedDate: backupFixed)
+var folderFromBackup = LibraryItem(name: "Folder", children: [])
+var innerFromBackup = LibraryItem(name: "Inner", url: "https://inner.example.com")
+innerFromBackup.id = trashedOld.id
+folderFromBackup.children = [innerFromBackup]
+let fileItems = [folderFromBackup, LibraryItem(name: "Ghost", url: "https://ghost.example.com", deletedDate: backupFixed),
+                 LibraryItem(name: "Plain", url: "https://plain.example.com")]
+let restorable = LibraryBackup.restorable(fileItems, avoiding: [trashedOld])
+check(restorable.map(\.name) == ["Folder", "Plain"], "a restore leaves Recently Deleted items out of the library")
+check(restorable[0].children?[0].name == "Inner" && restorable[0].children?[0].id != trashedOld.id, "a restored child never reuses a Recently Deleted id")
+check(Set(restorable.allIDs).count == restorable.allIDs.count, "restored ids stay unique")
+check(LibraryBackup.restorable(fileItems, avoiding: []).first?.children?[0].id == innerFromBackup.id, "ids are kept when nothing collides")
 // ---- iCloud Drive library (rules and file steps; temporary folders, never the real iCloud Drive) ----
 func syncItem(_ name: String, id: UUID = UUID(), children: [LibraryItem]? = nil) -> LibraryItem {
     LibraryItem(id: id, name: name, url: "https://\(name).example.com", children: children)
@@ -1421,6 +1444,11 @@ let searchLoadDeadline = Date().addingTimeInterval(10)
 while !searchHistory.pinnedLoaded && Date() < searchLoadDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
 check(searchHistory.pinnedLoaded && searchHistory.items.first?.pinned == true, "the pinned search fixture loads")
 check(searchHistory.search("unlisted").isEmpty, "a locked pinned item is not found by search")
+// A locked pinned item's Quick Open row and actions header show Pinned Item, not its text.
+let lockedRow = QuickOpenResult(kind: .clip(pinnedCopy), id: "clip-locked")
+check(lockedRow.displayTitle == "Pinned Item", "a locked pinned item's Quick Open row hides its text")
+sharedLock.isRequired = false
+check(QuickOpenResult(kind: .clip(pinnedCopy), id: "clip-shown").displayTitle == pinnedCopy.title, "with the setting off, the Quick Open row shows the title")
 sharedLock.isRequired = false
 check(searchHistory.search("unlisted").count == 1 && !sharedLock.isHidden(pinnedCopy), "with the setting off, the pinned item is found and shown")
 try? FileManager.default.removeItem(at: searchFile)

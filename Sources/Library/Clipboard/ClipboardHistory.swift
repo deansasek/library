@@ -322,8 +322,14 @@ final class ClipboardHistory: ObservableObject {
 
     /// Copies the first queued clip and takes it out of the queue. A Command-V in the app in front then pastes it.
     func pasteNext() {
-        guard !pasteQueue.isEmpty else { return }
-        copy(pasteQueue.removeFirst())
+        guard let next = pasteQueue.first else { return }
+        // A locked pinned item is copied only after the user authenticates, as it is everywhere else. It stays queued
+        // until then. The queue is checked again, so a second request does not take a different clip.
+        ClipboardLock.shared.perform(next, for: .copy) { [weak self] in
+            guard let self, self.pasteQueue.first?.id == next.id else { return }
+            self.pasteQueue.removeFirst()
+            self.copy(next)
+        }
     }
 
     func clearPasteQueue() {

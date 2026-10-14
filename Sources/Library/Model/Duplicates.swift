@@ -11,12 +11,15 @@ enum Duplicates {
     }
 
     /// The text that makes two items duplicates, or nil for items that open nothing.
+    /// An application also needs the same arguments, and a link the same browser. Otherwise a merge would remove an
+    /// item that opens the same thing in another way, and the sheet does not show either setting.
     static func key(for item: LibraryItem) -> String? {
         if let path = item.appPath {
-            return "app:" + URL(fileURLWithPath: path).standardized.path
+            let arguments = (item.arguments ?? "").trimmingCharacters(in: .whitespaces)
+            return "app:" + URL(fileURLWithPath: path).standardized.path + "|" + arguments
         }
         guard let url = item.url, !url.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        return "link:" + normalizedLink(url)
+        return "link:" + normalizedLink(url) + "|" + (item.browser ?? "")
     }
 
     /// Lowercases the scheme and host and removes a trailing slash. A missing scheme counts as https, as it does when
