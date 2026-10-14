@@ -38,7 +38,7 @@ Library checks for updates itself, and **Check for Updates…** installs them. Y
 
 1. Press Control-Space to open Quick Open. Type a name and press Return.
 2. Choose **Edit Library…** from the menu bar icon to add bookmarks and apps.
-3. Turn on **Open at Login** in **Settings > General** to have Library start with your Mac.
+3. Turn on **Open at login** in **Settings > General** to have Library start with your Mac.
 
 ## Features
 

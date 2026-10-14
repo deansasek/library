@@ -317,7 +317,7 @@ func checkContrast() {
                    semantic: .labelColor, background: .windowBackgroundColor),
         TextSample(screen: qo, label: "row detail", rect: CGRect(x: 72, y: 215, width: 330, height: 14), width: 780,
                    semantic: .secondaryLabelColor, background: .windowBackgroundColor, skip: glassNote),
-        TextSample(screen: "settings-general", label: "Open at Login", rect: CGRect(x: 30, y: 32, width: 80, height: 16), width: 500,
+        TextSample(screen: "settings-general", label: "Open at login", rect: CGRect(x: 30, y: 32, width: 80, height: 16), width: 500,
                    semantic: .labelColor, background: .windowBackgroundColor),
         TextSample(screen: "settings-general", label: "Welcome Screen", rect: CGRect(x: 30, y: 121, width: 95, height: 16), width: 500,
                    semantic: .labelColor, background: .windowBackgroundColor),

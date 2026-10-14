@@ -4,7 +4,7 @@ import AppKit
 /// address is requested once per run, and results are stored on the bookmarks without an undo step.
 @MainActor
 enum LinkChecker {
-    /// The UserDefaults key of "Check Links Periodically". Off by default.
+    /// The UserDefaults key of "Check links periodically". Off by default.
     static let enabledKey = "checkLinksPeriodically"
     private static let lastRunKey = "lastLinkCheck"
     /// The first scheduled check waits this long after the setting is read, so it does not compete with launch.

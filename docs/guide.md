@@ -33,7 +33,7 @@ Library remembers what you copy, including text, links, images, and files, in ev
 - Open the **Library** menu or Quick Open to see your latest copies. Choose one to copy it again.
 - Pin an item to keep it after you quit.
 - Press Control-Command-V to open the clipboard menu at the pointer. Press 1 through 9 to copy an item, or hold Option to copy it as plain text.
-- When a text field has the keyboard, choosing an item pastes it. Otherwise it copies. Turn this off with **Paste Into Text Fields** in **Settings > Clipboard**. Pasting needs Accessibility access.
+- When a text field has the keyboard, choosing an item pastes it. Otherwise it copies. Turn this off with **Paste into text fields** in **Settings > Clipboard**. Pasting needs Accessibility access.
 - Select an item in Quick Open and press Space to preview it in Quick Look.
 - Copy a link and Library removes tracking codes, such as `utm_source`, `fbclid`, and `gclid`, so the link you paste is clean. Turn this off in **Settings > General**. The link in your history isn't changed.
 - Copy as lower or upper case, trimmed, with its lines joined, or with smart punctuation. Copy a bookmark as a Markdown link. All are in Quick Open, under Tab.
@@ -118,6 +118,6 @@ Press ⌘, to open Settings. General holds startup, iCloud Drive, updates, backu
 
 - **A shortcut doesn't work.** Another app may use the same keys. Check **Settings > Shortcuts**. Control-Space can conflict with the macOS input source shortcut.
 - **Clicks stop working after a macOS update.** Remove Library from Accessibility, then add it again.
-- **Open at Login has no effect.** Move `Library.app` to `/Applications` first. The login item remembers the app's location.
+- **Open at login has no effect.** Move `Library.app` to `/Applications` first. The login item remembers the app's location.
 - **Services don't appear.** Log out and back in, or run `/System/Library/CoreServices/pbs -update`.
 
