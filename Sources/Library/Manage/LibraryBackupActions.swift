@@ -47,7 +47,7 @@ enum LibraryBackupActions {
             let data = try Data(contentsOf: url)
             switch LibraryBackup.decode(data) {
             case .success(let decoded):
-                items = decoded
+                items = LibraryBackup.restorable(decoded, avoiding: store.deleted)
             case .failure(let error):
                 return report("Couldn’t restore the library", "“\(url.lastPathComponent)” couldn’t be restored. \(error.message)")
             }

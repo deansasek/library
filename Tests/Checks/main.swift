@@ -1241,6 +1241,19 @@ if let dupes = try? LibraryBackup.encode([twin, backupClash]) {
     check(backupError(dupes) == .duplicateIDs, "repeated ids are rejected")
 }
 check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")
+// A restore leaves Recently Deleted out of the library, and an id that Recently Deleted uses is given a new one.
+let trashedOld = LibraryItem(name: "Trashed", url: "https://trashed.example.com", deletedDate: backupFixed)
+var folderFromBackup = LibraryItem(name: "Folder", children: [])
+var innerFromBackup = LibraryItem(name: "Inner", url: "https://inner.example.com")
+innerFromBackup.id = trashedOld.id
+folderFromBackup.children = [innerFromBackup]
+let fileItems = [folderFromBackup, LibraryItem(name: "Ghost", url: "https://ghost.example.com", deletedDate: backupFixed),
+                 LibraryItem(name: "Plain", url: "https://plain.example.com")]
+let restorable = LibraryBackup.restorable(fileItems, avoiding: [trashedOld])
+check(restorable.map(\.name) == ["Folder", "Plain"], "a restore leaves Recently Deleted items out of the library")
+check(restorable[0].children?[0].name == "Inner" && restorable[0].children?[0].id != trashedOld.id, "a restored child never reuses a Recently Deleted id")
+check(Set(restorable.allIDs).count == restorable.allIDs.count, "restored ids stay unique")
+check(LibraryBackup.restorable(fileItems, avoiding: []).first?.children?[0].id == innerFromBackup.id, "ids are kept when nothing collides")
 // ---- iCloud Drive library (rules and file steps; temporary folders, never the real iCloud Drive) ----
 func syncItem(_ name: String, id: UUID = UUID(), children: [LibraryItem]? = nil) -> LibraryItem {
     LibraryItem(id: id, name: name, url: "https://\(name).example.com", children: children)

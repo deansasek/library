@@ -79,4 +79,20 @@ enum LibraryBackup {
         let ids = items.allIDs
         return Set(ids).count == ids.count ? .success(items) : .failure(.duplicateIDs)
     }
+
+    /// What a restore puts in the live library. A bookmarks.json copy also holds Recently Deleted items, which stay
+    /// deleted. An item whose id is already used in Recently Deleted gets a new id, children included, since Restore,
+    /// Delete Immediately, and sync look items up by id and one id must name one item.
+    static func restorable(_ items: [LibraryItem], avoiding deleted: [LibraryItem]) -> [LibraryItem] {
+        replacingIDs(items.filter { $0.deletedDate == nil }, taken: Set(deleted.allIDs))
+    }
+
+    private static func replacingIDs(_ items: [LibraryItem], taken: Set<UUID>) -> [LibraryItem] {
+        items.map { item in
+            var item = item
+            if taken.contains(item.id) { item.id = UUID() }
+            if let children = item.children { item.children = replacingIDs(children, taken: taken) }
+            return item
+        }
+    }
 }
