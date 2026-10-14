@@ -1421,6 +1421,11 @@ let searchLoadDeadline = Date().addingTimeInterval(10)
 while !searchHistory.pinnedLoaded && Date() < searchLoadDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
 check(searchHistory.pinnedLoaded && searchHistory.items.first?.pinned == true, "the pinned search fixture loads")
 check(searchHistory.search("unlisted").isEmpty, "a locked pinned item is not found by search")
+// A locked pinned item's Quick Open row and actions header show Pinned Item, not its text.
+let lockedRow = QuickOpenResult(kind: .clip(pinnedCopy), id: "clip-locked")
+check(lockedRow.displayTitle == "Pinned Item", "a locked pinned item's Quick Open row hides its text")
+sharedLock.isRequired = false
+check(QuickOpenResult(kind: .clip(pinnedCopy), id: "clip-shown").displayTitle == pinnedCopy.title, "with the setting off, the Quick Open row shows the title")
 sharedLock.isRequired = false
 check(searchHistory.search("unlisted").count == 1 && !sharedLock.isHidden(pinnedCopy), "with the setting off, the pinned item is found and shown")
 try? FileManager.default.removeItem(at: searchFile)

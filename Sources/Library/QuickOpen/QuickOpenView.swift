@@ -185,7 +185,7 @@ struct QuickOpenView: View {
                 .font(.callout)
                 .textSelection(.enabled)
         case .some:
-            Text(result?.title ?? "").font(.title3.weight(.semibold))
+            Text(result?.displayTitle ?? "").font(.title3.weight(.semibold))
             Text(result?.subtitle ?? "").font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
         case nil:
             EmptyView()
@@ -196,7 +196,7 @@ struct QuickOpenView: View {
         let actions = model.actions
         return ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                header("Actions for “\(model.selected?.title ?? "")”")
+                header("Actions for “\(model.selected?.displayTitle ?? "")”")
                 ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
                     actionLabel(action)
                         .padding(.horizontal, 10)
@@ -245,7 +245,7 @@ struct QuickOpenView: View {
                 Image(nsImage: model.icon(for: result))
             }
             VStack(alignment: .leading, spacing: 1) {
-                Text(result.title)
+                Text(result.displayTitle)
                     .lineLimit(1)
                 if let note = result.noteLine {
                     Text(note)
