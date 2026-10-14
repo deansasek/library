@@ -1,9 +1,13 @@
 #!/bin/zsh
-# Compiles the checks in Tests/ together with the app's source, except the file that starts the app, and runs them.
+# Lints the theming rules, then compiles the checks in Tests/ together with the app's source, except the file that
+# starts the app, and runs them.
 # Tests/Bench also prints timings for a 5,000-item library. The timings never fail the run.
 # They use private pasteboards and temporary files, so they never touch your clipboard or your library.
 set -euo pipefail
 cd "$(dirname "$0")"
+
+# The theming rules: colors, fonts, opacity on text, and icon-only buttons (Tests/lint-theming.sh).
+Tests/lint-theming.sh
 
 sources=(${(f)"$(find Sources/Library -name '*.swift' ! -name LibraryApp.swift)"})
 out="$(mktemp -d)"

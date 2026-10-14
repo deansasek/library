@@ -70,7 +70,7 @@ func customIcon(_ text: String) -> NSImage? {
     guard text.count == 1, text.unicodeScalars.contains(where: { $0.properties.isEmoji && $0.value > 0x238C })
     else { return nil }
     return NSImage(size: NSSize(width: 16, height: 16), flipped: false) { _ in
-        let glyph = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 13)])
+        let glyph = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: NSFont.systemFontSize)])
         let size = glyph.size()
         glyph.draw(at: NSPoint(x: (16 - size.width) / 2, y: (16 - size.height) / 2))
         return true

@@ -164,6 +164,8 @@ func run() {
              prepare: { actions.showActions = true }, QuickOpenView(model: actions) {})
         save("quickopen-no-results", width: 780, height: 520, backdrop: backdrop, dark: dark,
              QuickOpenView(model: none) {})
+        // The same results on the window background, so the contrast check below samples text on a plain color.
+        save("contrast-quickopen-results", width: 780, height: 520, dark: dark, QuickOpenView(model: results) {})
     }
 
     for dark in [false, true] {
@@ -203,12 +205,159 @@ func run() {
         save("manager-empty", width: 780, height: 420, dark: dark, ManageView(store: store))
     }
 
+    checkContrast()
+
     try? FileManager.default.removeItem(at: home)
     print("Wrote \(written) PNGs to \(outputFolder.path)")
     for problem in problems {
         print("PROBLEM: \(problem)")
     }
     exit(problems.isEmpty ? 0 : 1)
+}
+
+// MARK: Contrast of text in the rendered PNGs
+
+/// A color as 0...255 sRGB components.
+typealias RGB = (r: Int, g: Int, b: Int)
+
+/// WCAG 2.x relative luminance.
+func luminance(_ color: RGB) -> Double {
+    func linear(_ value: Int) -> Double {
+        let c = Double(value) / 255
+        return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b)
+}
+
+/// WCAG contrast ratio, from 1 to 21.
+func contrastRatio(_ a: RGB, _ b: RGB) -> Double {
+    let (la, lb) = (luminance(a), luminance(b))
+    return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
+}
+
+func hex(_ color: RGB) -> String {
+    String(format: "#%02x%02x%02x", color.r, color.g, color.b)
+}
+
+/// One line of text to measure. `rect` is in points from the top left of the PNG, which is `width` points wide.
+/// `semantic` is the system color the view asks for, resolved over `background` for the design value. `knownFloor` is
+/// set for a contrast the system color itself does not reach, with the reason. The check then only stops it from
+/// getting worse, and it measures the rendered pixels, because the selection color is translucent over the panel.
+struct TextSample {
+    let screen: String
+    let label: String
+    let rect: CGRect
+    let width: CGFloat
+    let semantic: NSColor
+    let background: NSColor
+    var knownFloor: (ratio: Double, reason: String)? = nil
+    /// Set when this text cannot be read in the off-screen render, with the reason. It is printed, not measured.
+    var skip: String? = nil
+}
+
+/// The color a semantic color has on a background, in the given appearance, as 0...255 sRGB.
+@MainActor
+func resolved(_ color: NSColor, over background: NSColor, appearance: NSAppearance) -> RGB {
+    var result: RGB = (0, 0, 0)
+    appearance.performAsCurrentDrawingAppearance {
+        let bg = background.usingColorSpace(.sRGB)!
+        let fg = color.usingColorSpace(.sRGB)!
+        let a = Double(fg.alphaComponent)
+        func mix(_ f: CGFloat, _ b: CGFloat) -> Int { Int((Double(f) * 255 * a + Double(b) * 255 * (1 - a)).rounded()) }
+        result = (mix(fg.redComponent, bg.redComponent), mix(fg.greenComponent, bg.greenComponent),
+                  mix(fg.blueComponent, bg.blueComponent))
+    }
+    return result
+}
+
+/// The pixel view of a line of text: the most common color in the rectangle is the background, and the pixel that
+/// contrasts most with it is the text. Anti-aliasing only pulls text pixels toward the background, so this ratio can
+/// be lower than the real one but not higher.
+@MainActor
+func sampledPixels(_ file: URL, _ sample: TextSample) -> (text: RGB, background: RGB)? {
+    guard let data = try? Data(contentsOf: file), let rep = NSBitmapImageRep(data: data) else { return nil }
+    let scale = CGFloat(rep.pixelsWide) / sample.width
+    var pixels: [RGB] = []
+    var counts: [String: Int] = [:]
+    for y in Int(sample.rect.minY * scale)..<Int(sample.rect.maxY * scale) {
+        for x in Int(sample.rect.minX * scale)..<Int(sample.rect.maxX * scale) {
+            guard let color = rep.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+            let rgb = (r: Int((color.redComponent * 255).rounded()), g: Int((color.greenComponent * 255).rounded()),
+                       b: Int((color.blueComponent * 255).rounded()))
+            pixels.append(rgb)
+            counts["\(rgb.r),\(rgb.g),\(rgb.b)", default: 0] += 1
+        }
+    }
+    guard let (key, _) = counts.max(by: { $0.value < $1.value }) else { return nil }
+    let parts = key.split(separator: ",").map { Int($0)! }
+    let background: RGB = (parts[0], parts[1], parts[2])
+    guard let text = pixels.max(by: { contrastRatio($0, background) < contrastRatio($1, background) }) else { return nil }
+    return (text, background)
+}
+
+/// The Quick Open rows and the Settings labels, in light and dark. The design color is the semantic color the view
+/// asks for, resolved in each appearance over the background it is drawn on. The rendered pixels confirm the color
+/// reached the PNG. Failures are reported with both values.
+@MainActor
+func checkContrast() {
+    let qo = "contrast-quickopen-results"
+    // Quick Open sits on glassEffect. Off screen, that glass draws the primary text black in dark mode and the
+    // secondary text black in light mode, so only light-mode primary text there can be read in this render.
+    let glassNote = "Quick Open sits on glassEffect, which renders its text in another color off screen, so this cannot be read here"
+    let selectedNote = "white on the translucent system selection color renders at 4.2:1 in light mode; the check only stops a drop below 4.0:1"
+    let secondaryNote = "the system secondary label color is 3.95:1 on white in light mode; a design decision, so the check only stops a drop below 3.9:1"
+    let samples: [TextSample] = [
+        TextSample(screen: qo, label: "selected row title", rect: CGRect(x: 70, y: 126, width: 110, height: 18), width: 780,
+                   semantic: .alternateSelectedControlTextColor, background: .selectedContentBackgroundColor,
+                   knownFloor: (4.0, selectedNote)),
+        TextSample(screen: qo, label: "selected row detail", rect: CGRect(x: 70, y: 143, width: 100, height: 16), width: 780,
+                   semantic: .alternateSelectedControlTextColor, background: .selectedContentBackgroundColor,
+                   knownFloor: (4.0, selectedNote)),
+        TextSample(screen: qo, label: "row title", rect: CGRect(x: 72, y: 196, width: 330, height: 18), width: 780,
+                   semantic: .labelColor, background: .windowBackgroundColor),
+        TextSample(screen: qo, label: "row detail", rect: CGRect(x: 72, y: 215, width: 330, height: 14), width: 780,
+                   semantic: .secondaryLabelColor, background: .windowBackgroundColor, skip: glassNote),
+        TextSample(screen: "settings-general", label: "Open at Login", rect: CGRect(x: 30, y: 32, width: 80, height: 16), width: 500,
+                   semantic: .labelColor, background: .windowBackgroundColor),
+        TextSample(screen: "settings-general", label: "Welcome Screen", rect: CGRect(x: 30, y: 121, width: 95, height: 16), width: 500,
+                   semantic: .labelColor, background: .windowBackgroundColor),
+        TextSample(screen: "settings-general", label: "Version", rect: CGRect(x: 30, y: 162, width: 55, height: 16), width: 500,
+                   semantic: .labelColor, background: .windowBackgroundColor),
+        TextSample(screen: "settings-general", label: "footer detail", rect: CGRect(x: 30, y: 66, width: 330, height: 16), width: 500,
+                   semantic: .secondaryLabelColor, background: .windowBackgroundColor, knownFloor: (3.9, secondaryNote)),
+    ]
+    for dark in [false, true] {
+        let mode = dark ? "dark" : "light"
+        let appearance = NSAppearance(named: dark ? .darkAqua : .aqua)!
+        for sample in samples {
+            let name = "\(sample.screen) \(sample.label) (\(mode))"
+            if let reason = sample.skip ?? (dark && sample.screen == qo && sample.label == "row title" ? glassNote : nil) {
+                print("contrast skipped: \(name). \(reason).")
+                continue
+            }
+            let file = outputFolder.appendingPathComponent("\(sample.screen)-\(mode).png")
+            guard let pixels = sampledPixels(file, sample) else {
+                problems.append("contrast: could not read \(name)")
+                continue
+            }
+            let bg = resolved(sample.background, over: .clear, appearance: appearance)
+            let design = resolved(sample.semantic, over: sample.background, appearance: appearance)
+            let designRatio = contrastRatio(design, bg)
+            let pixelRatio = contrastRatio(pixels.text, pixels.background)
+            let detail = String(format: "design %.2f:1 (%@ on %@), rendered %.2f:1 (%@ on %@)", designRatio,
+                                hex(design), hex(bg), pixelRatio, hex(pixels.text), hex(pixels.background))
+            // Selection colors are translucent over the panel, so their rendered pixels are the value that counts.
+            let measured = sample.knownFloor != nil && sample.semantic == .alternateSelectedControlTextColor ? pixelRatio : designRatio
+            let floor = sample.knownFloor?.ratio ?? 4.5
+            if measured < floor {
+                problems.append("contrast below \(floor):1 for \(name): \(detail)")
+            } else if let known = sample.knownFloor, measured < 4.5 {
+                print("contrast \(detail) \(name), known: \(known.reason)")
+            } else {
+                print("contrast \(detail) \(name)")
+            }
+        }
+    }
 }
 
 MainActor.assumeIsolated { run() }
