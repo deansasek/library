@@ -185,8 +185,10 @@ struct ManageView: View {
         } message: {
             Text("The items are removed for good and can’t be restored.")
         }
-        .dropDestination(for: String.self) { items, _ in
-            store.move(Set(items.flatMap(ids(in:))), to: nil)
+        .dropDestination(for: RowDrag.self) { drags, _ in
+            // Rows dropped on empty space, not on a row, go to the top level.
+            let moved = Set(drags.flatMap(\.ids))
+            store.apply(rowDrop(moving: moved, onto: nil, in: store.nodes, listSorted: false), moving: moved)
             return true
         }
         .dropDestination(for: URL.self) { urls, _ in
@@ -399,9 +401,4 @@ struct ManageView: View {
 private func clean(_ text: String?) -> String? {
     let trimmed = (text ?? "").trimmingCharacters(in: .whitespaces)
     return trimmed.isEmpty ? nil : trimmed
-}
-
-/// Parses the comma-separated ids a drag carries.
-func ids(in payload: String) -> [UUID] {
-    payload.split(separator: ",").compactMap { UUID(uuidString: String($0)) }
 }

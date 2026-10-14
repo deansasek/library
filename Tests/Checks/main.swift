@@ -1381,5 +1381,28 @@ sharedLock.isRequired = false
 check(searchHistory.search("unlisted").count == 1 && !sharedLock.isHidden(pinnedCopy), "with the setting off, the pinned item is found and shown")
 try? FileManager.default.removeItem(at: searchFile)
 
+// ---- row drops: which move a drop makes (pure) ----
+do {
+    let inner = LibraryItem(name: "Inner", url: "inner.example.com")
+    let folder = LibraryItem(name: "Folder", children: [inner])
+    let other = LibraryItem(name: "Other", url: "other.example.com")
+    let divider = LibraryItem(name: "Divider", isDivider: true)
+    let rows = [folder, other, divider]
+    let one: Set<UUID> = [other.id]
+    check(rowDrop(moving: one, onto: folder.id, in: rows, listSorted: false) == .moveInto(folder.id), "drop on a folder moves into it")
+    check(rowDrop(moving: one, onto: folder.id, in: rows, listSorted: true) == .moveInto(folder.id), "drop on a folder moves into it when sorted")
+    check(rowDrop(moving: one, onto: divider.id, in: rows, listSorted: false) == .moveBefore(divider.id), "drop on a row, unsorted, goes before it")
+    check(rowDrop(moving: one, onto: other.id, in: rows, listSorted: false) == .ignore, "drop onto itself is ignored")
+    check(rowDrop(moving: one, onto: divider.id, in: rows, listSorted: true) == .ignore, "drop on a row while sorted does not reorder")
+    check(rowDrop(moving: one, onto: nil, in: rows, listSorted: true) == .moveToTopLevel, "drop on empty space goes to the top level")
+    check(rowDrop(moving: [], onto: nil, in: rows, listSorted: false) == .ignore, "nothing dragged is ignored")
+    check(rowDrop(moving: [folder.id], onto: inner.id, in: rows, listSorted: false) == .ignore, "folder dropped into its own child is rejected")
+    check(rowDrop(moving: [folder.id], onto: inner.id, in: rows, listSorted: true) == .ignore, "folder dropped into its own child is rejected when sorted")
+    check(rowDrop(moving: [folder.id], onto: folder.id, in: rows, listSorted: false) == .ignore, "folder dropped onto itself is rejected")
+    check(rowDrop(moving: [inner.id], onto: folder.id, in: rows, listSorted: false) == .moveInto(folder.id), "a child dropped on its own folder moves into it")
+    check(rowDrop(moving: [other.id], onto: inner.id, in: rows, listSorted: false) == .moveBefore(inner.id), "a row dropped on a folder's child goes before the child")
+    check(rowDrop(moving: [other.id], onto: UUID(), in: rows, listSorted: false) == .ignore, "a target that is not in the library is ignored")
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
