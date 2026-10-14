@@ -22,9 +22,21 @@ struct QuickOpenView: View {
                     .accessibilityLabel("Search Library")
                     .focused($focused)
                 if !model.showActions, model.selected?.hasActions == true {
-                    Text("⇥ Actions")
+                    Button {
+                        model.toggleActions()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("Actions")
+                            Text("⇥")
+                                .foregroundStyle(.tertiary)
+                        }
                         .font(.callout)
-                        .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Show actions for the selected item (Tab)")
+                    .accessibilityLabel("Actions")
+                    .accessibilityHint("Shows actions for the selected item")
                 }
             }
             .padding(.horizontal, 18)
