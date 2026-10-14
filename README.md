@@ -154,6 +154,22 @@ Library reloads `bookmarks.json` when another program changes it, such as an edi
 
 From Terminal, run `open "library://open?name=Jira&value=ABC-123"`.
 
+### Shortcuts
+
+Library provides App Intents for the Shortcuts app and Spotlight:
+
+- **Open Library Item** opens a bookmark or app. It can fill a URL template's value.
+- **Search Library** returns the bookmarks and apps that match a search.
+- **Add Bookmark to Library** and **Add Application to Library** add a web link or an `.app` file.
+- **Frequently Used Library Items** returns the items you open most often.
+- **Open Clipboard Link** opens the web link on the clipboard.
+- **Copy Latest Clip** copies the newest clipboard history item back to the clipboard. It does not paste into other apps.
+- **Search Clipboard History** returns the text of clipboard items that match a search.
+- **Show Quick Open** and **Show Library Menu** open those windows.
+- **Run Terminal Command** runs a terminal command. It asks for confirmation every time, and names the command first.
+
+Shortcuts finds these actions only in a build that includes App Intents metadata. Xcode generates that metadata, and `./build.sh` does not yet.
+
 ### Welcome tour
 
 The welcome tour opens the first time you launch Library. It explains the app and lets you try each shortcut. To see it again, choose **Settings > General > Welcome Screen > Show…**.
