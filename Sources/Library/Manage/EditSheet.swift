@@ -87,6 +87,7 @@ struct EditSheet: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(name.capitalized)
+                .accessibilityAddTraits(node.color == name ? .isSelected : [])
             }
         }
     }

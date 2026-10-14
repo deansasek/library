@@ -28,7 +28,7 @@ struct SettingsView: View {
         .frame(width: 500)
     }
 
-    private var general: some View {
+    var general: some View {
         Form {
             Section {
                 Toggle("Open at Login", isOn: Binding(
@@ -59,7 +59,7 @@ struct SettingsView: View {
     }
 
     /// One list of actions, each named with a verb, as Keyboard Shortcuts in System Settings lists them.
-    private var shortcuts: some View {
+    var shortcuts: some View {
         Form {
             Section {
                 LabeledContent("Show Library Menu") { field(0, $store.extraHotkeys[0]) }
@@ -94,7 +94,7 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private var clipboard: some View {
+    var clipboard: some View {
         Form {
             Section {
                 Toggle("Keep Clipboard History", isOn: $history.isEnabled)
@@ -114,7 +114,9 @@ struct SettingsView: View {
         HStack {
             if store.failedExtras.contains(index) {
                 Image(systemName: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
                     .help("In use by another app")
+                    .accessibilityLabel("In use by another app")
             }
             ShortcutField(shortcut: shortcut,
                           isRecording: recording.target == index,

@@ -202,6 +202,7 @@ struct QuickOpenView: View {
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(result.title)
+                    .lineLimit(1)
                 Text(result.subtitle)
                     .font(.caption)
                     // System secondary colors adapt to light, dark, and Increase Contrast; selected rows keep the selected text color.
