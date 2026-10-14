@@ -178,13 +178,13 @@ The welcome tour opens the first time you launch Library. It explains the app an
 
 **Settings** (⌘,) has three tabs.
 
-- **General:** Open at Login, the welcome screen, and the app version.
+- **General:** Open at Login, Check for Updates Automatically, the welcome screen, and the app version.
 - **Shortcuts:** One list of shortcuts: Show Library Menu, Show Quick Open, Show Clipboard Menu, and Open Copied Link. A picker sets whether the Library menu opens at the pointer or from the menu bar.
 - **Clipboard:** Turn clipboard history, pasting into text fields, and copied GIFs on or off, and clear the history.
 
 ## Privacy
 
-Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play. It contacts `api.github.com` only when you choose **Check for Updates…** in the menu, or when you turn on **Check for updates automatically** in **Settings > General** (off by default; it checks at most once a day, when Library starts). The request names only the app's version, in its User-Agent header, and sends no account or other data.
+Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play. It contacts `api.github.com` only to check for a new release: when you choose **Check for Updates…** in the menu, and, unless you turn off **Check for Updates Automatically** in **Settings > General** (on by default), once an hour while Library runs and when it starts if the last check was an hour or more ago. The only request is to `https://api.github.com/repos/deansasek/library/releases/latest`. It names only the app's version, in its User-Agent header. It also sends the ETag GitHub gave on the last answer, so GitHub can reply that nothing changed. No account or other data is sent. When a newer version exists, the menu shows it at the top, and nothing pops up.
 
 Your data is stored in `~/.library/`:
 

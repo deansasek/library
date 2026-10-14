@@ -30,3 +30,9 @@
 
 /* Menu item that checks GitHub for a newer version of Library. */
 "Check for Updates…" = "Check for Updates…";
+
+/* Settings toggle that checks GitHub for a newer version every hour while Library runs. */
+"Check for Updates Automatically" = "Check for Updates Automatically";
+
+/* Menu item at the top of the Library menu when a newer version exists. The argument is the version number. */
+"Update Available — Version %@" = "Update Available — Version %@";

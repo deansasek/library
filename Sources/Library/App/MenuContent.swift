@@ -4,10 +4,24 @@ struct MenuContent: View {
     @ObservedObject var store: LibraryStore
     @ObservedObject private var loginItem = LoginItem.shared
     @ObservedObject private var history = ClipboardHistory.shared
+    @ObservedObject private var updates = UpdateStatus.shared
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
     var body: some View {
+        // Shown only when an automatic or manual check found a newer version. Choosing it opens the update alert.
+        if let version = updates.availableVersion {
+            Button {
+                UpdateCheck.showAvailable()
+            } label: {
+                Label {
+                    Text("Update Available — Version \(UpdateRules.displayVersion(version))", bundle: L10n.bundle)
+                } icon: {
+                    Image(systemName: "arrow.down.circle")
+                }
+            }
+            Divider()
+        }
         MenuItems(nodes: store.nodes, store: store, topLevel: true)
         Divider()
         Menu {
