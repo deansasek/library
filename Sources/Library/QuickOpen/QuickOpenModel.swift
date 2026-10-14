@@ -515,9 +515,9 @@ final class QuickOpenModel: ObservableObject {
         case .openLink(let url):
             NSWorkspace.shared.open(url)
         case .addLink(let url):
-            store.perform("Add Bookmark") {
-                $0.append(LibraryItem(name: url.host ?? url.absoluteString, url: url.absoluteString), to: nil)
-            }
+            let node = LibraryItem(name: url.host ?? url.absoluteString, url: url.absoluteString)
+            store.perform("Add Bookmark") { $0.append(node, to: nil) }
+            SmartTitle.nameFromPage(node.id, url: url)
         }
     }
 }

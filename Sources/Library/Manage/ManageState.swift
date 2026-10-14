@@ -14,8 +14,9 @@ final class ManageState: ObservableObject {
         var id: Self { self }
     }
 
-    /// A column the list is sorted by. Sorting only changes what the window shows, not your menu order.
-    enum SortKey { case name, shortcut, path }
+    /// What the list is sorted by. Sorting only changes what the window shows, not your menu order. The first three
+    /// are columns. Most used and recently opened come from the sort menu, and always put the largest value first.
+    enum SortKey { case name, shortcut, path, mostUsed, recentlyOpened }
 
     @Published var sortKey: SortKey?
     @Published var ascending = true
@@ -107,6 +108,12 @@ final class ManageState: ObservableObject {
         present(.bulkEdit)
         bulkIDs = ids
         bulkEdit = BulkEdit()
+    }
+
+    /// The sort menu's choice. Nil goes back to your own order. A choice starts ascending, as a column does.
+    func chooseSort(_ key: SortKey?) {
+        sortKey = key
+        ascending = true
     }
 
     /// Clicking a column header sorts by it, then reverses, then goes back to your own order.

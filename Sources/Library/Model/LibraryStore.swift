@@ -46,6 +46,8 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var failedExtras: Set<Int> = []
     /// How often each item was opened, by id. Preferences, not bookmark data.
     @Published private(set) var openCounts: [String: Int] = UserDefaults.standard.dictionary(forKey: "openCounts") as? [String: Int] ?? [:]
+    /// When each item was last opened, by id. Preferences, not bookmark data. Items never opened have no entry.
+    @Published private(set) var lastOpened: [String: Date] = UserDefaults.standard.dictionary(forKey: "lastOpened") as? [String: Date] ?? [:]
     /// Click shortcuts wait for Accessibility access.
     @Published private(set) var clickAccessMissing = false
     /// True when bookmarks.json is kept in iCloud Drive. Settings > General shows it.
@@ -419,6 +421,7 @@ final class LibraryStore: ObservableObject {
     /// Adds a suggestion to the library, with a soft sound, as Safari does for a bookmark.
     func add(_ suggestion: AddSuggestion) {
         perform("Add to Library") { $0.append(suggestion.node, to: nil) }
+        if let url = suggestion.node.link, suggestion.node.url != nil { SmartTitle.nameFromPage(suggestion.node.id, url: url) }
         NSSound(named: "Pop")?.play()
     }
 
@@ -443,6 +446,15 @@ final class LibraryStore: ObservableObject {
     func recordOpen(_ id: UUID) {
         openCounts[id.uuidString, default: 0] += 1
         UserDefaults.standard.set(openCounts, forKey: "openCounts")
+        lastOpened[id.uuidString] = .now
+        UserDefaults.standard.set(lastOpened, forKey: "lastOpened")
+    }
+
+    /// Renames a bookmark to the title of its page, but only while it still has the host it was added with, so a
+    /// name the user has given it meanwhile is kept.
+    func nameBookmark(_ id: UUID, host: String, title: String) {
+        guard let node = nodes.node(withID: id), node.name == host, node.name != title else { return }
+        perform("Name Bookmark") { list in list.update(id) { $0.name = title } }
     }
 
     /// Opens the bookmarks menu from the menu shortcut.

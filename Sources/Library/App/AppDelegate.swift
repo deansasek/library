@@ -141,9 +141,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         let address = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        LibraryStore.shared.perform("Add Bookmark") {
-            $0.append(LibraryItem(name: host, url: address), to: nil)
-        }
+        let node = LibraryItem(name: host, url: address)
+        LibraryStore.shared.perform("Add Bookmark") { $0.append(node, to: nil) }
+        SmartTitle.nameFromPage(node.id, url: url)
     }
 
     /// The web link a Services selection names: an `http` or `https` address, at most 4,096 characters. Other
