@@ -23,11 +23,18 @@ enum QuickOpen {
         panel.onTab = { model.toggleActions() }
         panel.onSpace = { model.togglePreview() }
         panel.onEscape = { [weak panel] in
-            if model.showActions { model.showActions = false } else { panel?.close() }
+            if model.actionGroup != nil {
+                model.actionGroup = nil
+            } else if model.showActions {
+                model.showActions = false
+            } else {
+                panel?.close()
+            }
         }
         panel.onActivate = { [weak panel] in
             let flip = NSEvent.modifierFlags.contains(.option)
-            panel?.close()
+            // Choosing a submenu keeps Quick Open open for its items.
+            if !model.selectedActionOpensGroup { panel?.close() }
             model.activate(flip: flip)
         }
         panel.onSelectIndex = { [weak panel] index in

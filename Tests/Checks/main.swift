@@ -597,6 +597,26 @@ MainActor.assumeIsolated {
     _ = (target, pasteTarget, addTarget)
 }
 
+// ---- clipboard transforms (Copy as…) ----
+let transformTable: [(ClipTransform, String, String)] = [
+    (.plainText, "  Hi\nthere ", "  Hi\nthere "),
+    (.trimmed, "  Hi there \n\t", "Hi there"),
+    (.trimmed, "\n \n", ""),
+    (.trimmed, "inner  spaces\nkept", "inner  spaces\nkept"),
+    (.lowercase, "Hello WORLD é", "hello world é"),
+    (.lowercase, "already", "already"),
+    (.uppercase, "Straße café", "STRASSE CAFÉ"),
+    (.uppercase, "", ""),
+    (.joinedLines, "one\ntwo\r\nthree\rfour", "one two three four"),
+    (.joinedLines, "a\n\nb", "a  b"),
+    (.joinedLines, "single", "single"),
+    (.joinedLines, "trailing\n", "trailing "),
+]
+for (transform, input, expected) in transformTable {
+    check(transform.apply(input) == expected, "\(transform) of \(input.debugDescription) gives \(expected.debugDescription)")
+}
+check(ClipTransform.allCases.map(\.title).allSatisfy { !$0.isEmpty } && ClipTransform.allCases.count == 5, "five named transforms")
+
 // ---- Quick Look sources ----
 func clip(_ kind: ClipItem.Kind, text: String? = nil, files: [URL] = [], reps: [[NSPasteboard.PasteboardType: Data]] = [],
           link: URL? = nil, animated: Data? = nil) -> ClipItem {

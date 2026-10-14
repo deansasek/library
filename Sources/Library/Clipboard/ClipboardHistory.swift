@@ -260,6 +260,12 @@ final class ClipboardHistory: ObservableObject {
 
     func copyPlainText(_ item: ClipItem) {
         guard let text = item.plainText else { return }
+        copyText(text)
+    }
+
+    /// Puts `text` on the clipboard as plain text. It becomes a new entry when the change is seen, and the history keeps
+    /// what it had.
+    func copyText(_ text: String) {
         pasteboard.clearContents()
         pasteboard.setString(text, forType: .string)
     }

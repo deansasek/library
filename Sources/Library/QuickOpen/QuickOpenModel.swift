@@ -47,6 +47,8 @@ final class QuickOpenModel: ObservableObject {
     /// Tab swaps the results for the actions of the selected item.
     @Published var showActions = false
     @Published var actionSelection = 0
+    /// The id of the action whose submenu, such as Copy as…, is listed in place of the actions. Nil otherwise.
+    @Published var actionGroup: String?
     /// Drives the entrance: the card fades and grows in once the panel is placed.
     @Published var appeared = false
 
@@ -241,6 +243,7 @@ final class QuickOpenModel: ObservableObject {
         selectedByHover = false
         selection = results.first?.id
         showActions = false
+        actionGroup = nil
     }
 
     func move(_ step: Int) {
@@ -270,15 +273,31 @@ final class QuickOpenModel: ObservableObject {
     func toggleActions() {
         if showActions {
             showActions = false
+            actionGroup = nil
         } else if selected?.hasActions == true {
             actionSelection = 0
             showActions = true
         }
     }
 
-    /// Actions for the selected item.
+    /// Actions for the selected item, or the submenu that is open.
     var actions: [QuickOpenAction] {
-        selected.map(actions(for:)) ?? []
+        guard let result = selected else { return [] }
+        let list = actions(for: result)
+        if let actionGroup, let group = list.first(where: { $0.id == actionGroup }) { return group.children }
+        return list
+    }
+
+    /// True when Return would open a submenu rather than run an action.
+    var selectedActionOpensGroup: Bool {
+        guard showActions, actionGroup == nil, actions.indices.contains(actionSelection) else { return false }
+        return !actions[actionSelection].children.isEmpty
+    }
+
+    /// Lists the submenu of an action in place of the actions. Escape goes back.
+    func openGroup(_ action: QuickOpenAction) {
+        actionGroup = action.id
+        actionSelection = 0
     }
 
     /// Actions for a result: open it, open it the other way, or copy what it points to.
@@ -350,6 +369,16 @@ final class QuickOpenModel: ObservableObject {
         if item.kind == .link, let link = item.plainText?.trimmingCharacters(in: .whitespacesAndNewlines) {
             list.append(QuickOpenAction(id: "copy-clean", title: "Copy Clean Link") { Self.copyText(TrackingParameters.clean(link)) })
         }
+        if item.kind == .text, let text = item.plainText {
+            let transforms = ClipTransform.allCases.map { transform in
+                QuickOpenAction(id: "\(transform)", title: transform.title) { [pastes] in
+                    history.copyText(transform.apply(text))
+                    if pastes { FrontApp.pasteSoon() }
+                }
+            }
+            list.append(QuickOpenAction(id: "copy-as", title: String(localized: "Copy as…", bundle: L10n.bundle),
+                                        children: transforms) {})
+        }
         list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { ClipPreview.shared.show(item) })
         list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })
         if item.libraryNode != nil {
@@ -363,7 +392,9 @@ final class QuickOpenModel: ObservableObject {
     func activate(flip: Bool) {
         if showActions {
             let list = actions
-            if list.indices.contains(actionSelection) { list[actionSelection].run() }
+            guard list.indices.contains(actionSelection) else { return }
+            let action = list[actionSelection]
+            if action.children.isEmpty { action.run() } else { openGroup(action) }
             return
         }
         guard let result = selected else { return }
