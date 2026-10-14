@@ -395,7 +395,13 @@ struct ManageView: View {
             // been checked, so its old status goes.
             let stored = store.nodes.node(withID: id)
             node.linkStatus = stored?.url == node.url ? stored?.linkStatus : nil
-            store.perform("Edit") { $0.update(id) { $0 = node } }
+            // The draft holds a folder's contents as they were when the sheet opened. Undo or a sync may have changed them
+            // since, so the folder keeps its current contents and takes only the edited fields.
+            store.perform("Edit") { $0.update(id) { current in
+                let children = current.children
+                current = node
+                current.children = children
+            } }
         case .bulkEdit, .duplicates:
             // These sheets apply their own changes.
             break
