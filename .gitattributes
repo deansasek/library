@@ -1,0 +1,8 @@
+# Left out of release zips and GitHub's source archives, because none of it is needed to build the app.
+/.github export-ignore
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/Tests export-ignore
+/docs export-ignore
+/scripts export-ignore
+/test.sh export-ignore

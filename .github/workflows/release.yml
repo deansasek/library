@@ -1,7 +1,7 @@
 name: Release
 
-# Pushing a tag such as v1.2.0 builds the app and publishes it. Running the workflow by hand with a version does the
-# same and creates the tag.
+# Pushing a tag such as v1.2.0 publishes a release. Running the workflow by hand with a version does the same and
+# creates the tag. The release holds a source zip, not a built app: people build it themselves with ./install.sh.
 on:
   push:
     tags: ["v*"]
@@ -29,13 +29,14 @@ jobs:
             version="${GITHUB_REF_NAME#v}"
           fi
           echo "VERSION=$version" >> "$GITHUB_ENV"
-      - name: Run the checks
-        run: ./test.sh
+      # Do not publish a version that does not build or pass its checks.
       - name: Build
         run: ./build.sh
-      # The zip holds the app and nothing else: no source, no tests, no scripts.
-      - name: Zip the app
-        run: ditto -c -k --keepParent --norsrc --noextattr --noqtn build/Library.app "Library-$VERSION.zip"
+      - name: Run the checks
+        run: ./test.sh
+      # .gitattributes leaves out everything the app does not need to build: tests, workflows, docs, and scripts.
+      - name: Zip the source
+        run: git archive --format=zip --prefix="Library-$VERSION/" -o "Library-$VERSION.zip" HEAD
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
