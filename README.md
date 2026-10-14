@@ -18,6 +18,38 @@ Library lives in your menu bar. Keep your bookmarks, apps, folders, and terminal
   <img src="docs/media/menu_bar.gif" width="640" alt="The Library menu opening and closing from the menu bar">
 </p>
 
+## Install
+
+### Download the source
+
+1. Download the latest `Library-x.y.z.zip` from [Releases](https://github.com/deansasek/library/releases). It holds the source, not a built app.
+2. Unzip it and open the folder in Terminal.
+3. Run `./install.sh`. It builds Library on your Mac and copies it to your Applications folder.
+
+Because you build it yourself, macOS opens it without a security warning. To update, download the new zip and run `./install.sh` again.
+
+### One command
+
+Paste this into Terminal. It builds Library and installs `Library.app` in your Applications folder. The source is kept out of the way, in Application Support:
+
+```bash
+git clone https://github.com/deansasek/library.git "$HOME/Library/Application Support/Library/Source" && "$HOME/Library/Application Support/Library/Source/install.sh"
+```
+
+Library checks for updates itself, and **Check for Updates…** installs them. Your library and clipboard history are kept.
+
+### Clone the repository
+
+```bash
+git clone https://github.com/deansasek/library.git
+cd library
+./install.sh
+```
+
+To build without installing, run `./build.sh`. The app is written to `build/Library.app`. To update, run `./update.sh`. It stops if you have uncommitted changes or aren't on `main`. Otherwise it fast-forwards `main` from `origin` (it never resets or force-pushes), shows the version before and after, and runs `./install.sh`. `DRY_RUN=1 ./update.sh` shows the commands without running them.
+
+**Requirements:** macOS 26 or later, and the Xcode Command Line Tools.
+
 ## Features
 
 ### Open anything
@@ -115,28 +147,6 @@ The defaults are Control and right-click for the menu, Control-Space for Quick O
 ### Stay up to date
 
 Library checks GitHub for a new release every hour while it runs, and when it starts if the last check was an hour or more ago. When there's a newer version, a single item appears at the top of the menu. Nothing pops up. Turn this off in **Settings > General**, or choose **Check for Updates…** at any time. See [Privacy](#privacy) for exactly what is sent.
-
-## Install
-
-### Download the source
-
-1. Download the latest `Library-x.y.z.zip` from [Releases](https://github.com/deansasek/library/releases). It holds the source, not a built app.
-2. Unzip it and open the folder in Terminal.
-3. Run `./install.sh`. It builds Library on your Mac and copies it to your Applications folder.
-
-Because you build it yourself, macOS opens it without a security warning. To update, download the new zip and run `./install.sh` again.
-
-### Clone the repository
-
-```bash
-git clone https://github.com/deansasek/library.git
-cd library
-./install.sh
-```
-
-To build without installing, run `./build.sh`. The app is written to `build/Library.app`. To update, run `./update.sh`. It stops if you have uncommitted changes or aren't on `main`. Otherwise it fast-forwards `main` from `origin` (it never resets or force-pushes), shows the version before and after, and runs `./install.sh`. `DRY_RUN=1 ./update.sh` shows the commands without running them.
-
-**Requirements:** macOS 26 or later, and the Xcode Command Line Tools.
 
 ## Getting started
 
