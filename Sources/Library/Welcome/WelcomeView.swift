@@ -26,6 +26,7 @@ final class WelcomeModel: ObservableObject {
 struct WelcomeView: View {
     @ObservedObject var store: LibraryStore
     @ObservedObject var model: WelcomeModel
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var loginItem = LoginItem.shared
     let close: () -> Void
 
@@ -48,7 +49,7 @@ struct WelcomeView: View {
         }
         .frame(width: 540, height: 580)
         .clipped()
-        .animation(.easeInOut(duration: 0.28), value: model.page)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: model.page)
     }
 
     // MARK: Pages
