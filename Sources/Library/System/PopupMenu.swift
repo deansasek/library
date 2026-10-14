@@ -25,9 +25,10 @@ enum PopupMenu {
     static func show(store: LibraryStore, selection: String? = nil) {
         let target = Target(store: store)
         let menu = NSMenu()
-        if !store.frequent.isEmpty {
+        let frequent = store.frequent
+        if !frequent.isEmpty {
             menu.addItem(NSMenuItem.sectionHeader(title: "Frequently Used"))
-            store.frequent.forEach { menu.addItem(item(for: $0, target: target)) }
+            frequent.forEach { menu.addItem(item(for: $0, target: target)) }
         }
         fill(menu, with: store.nodes, target: target)
         if let suggestion = store.suggestion(selection: selection) {

@@ -88,9 +88,11 @@ struct MenuItems: View {
     var topLevel = false
 
     var body: some View {
-        if topLevel && !store.frequent.isEmpty {
+        // Read once per build, since the list is sorted from the whole library each time it is read.
+        let frequent = topLevel ? store.frequent : []
+        if !frequent.isEmpty {
             Section("Frequently Used") {
-                rows(store.frequent)
+                rows(frequent)
             }
         }
         ForEach(Array(nodes.sections.enumerated()), id: \.offset) { _, section in
