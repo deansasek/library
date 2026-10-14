@@ -3,8 +3,13 @@ import PackageDescription
 
 let package = Package(
     name: "Library",
+    defaultLocalization: "en",
     platforms: [.macOS("26.0")],
     targets: [
-        .executableTarget(name: "Library", path: "Sources/Library")
+        .executableTarget(
+            name: "Library",
+            path: "Sources/Library",
+            resources: [.process("Resources")]
+        )
     ]
 )

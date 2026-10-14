@@ -192,6 +192,10 @@ Updates don't change this data.
 - **Open at Login has no effect.** Move `Library.app` to `/Applications` first. The login item stores the app's location.
 - **Services don't appear.** Log out and back in, or run `/System/Library/CoreServices/pbs -update`.
 
+## Languages
+
+The app is in English for now. Its strings live in `Sources/Library/Resources/en.lproj/Localizable.strings`. A string is localized when it is written with `Text("…", bundle: L10n.bundle)` (or `String(localized: "…", bundle: L10n.bundle)` where a `String` is needed). Use that form, not a plain `Text("…")`, so the app reads the string from its resource bundle. To add a string, add a `"key" = "value";` line with a `/* comment */` above it, then use the same text as the key. Dynamic text, such as file names, counts, and clipboard contents, is not localized.
+
 ## Development
 
 - `./build.sh` builds the app.

@@ -15,9 +15,15 @@ struct SettingsView: View {
 
     var body: some View {
         TabView {
-            general.navigationTitle("General").tabItem { Label("General", systemImage: "gearshape") }
-            shortcuts.navigationTitle("Shortcuts").tabItem { Label("Shortcuts", systemImage: "keyboard") }
-            clipboard.navigationTitle("Clipboard").tabItem { Label("Clipboard", systemImage: "doc.on.clipboard") }
+            general.navigationTitle(String(localized: "General", bundle: L10n.bundle)).tabItem {
+                Label { Text("General", bundle: L10n.bundle) } icon: { Image(systemName: "gearshape") }
+            }
+            shortcuts.navigationTitle(String(localized: "Shortcuts", bundle: L10n.bundle)).tabItem {
+                Label { Text("Shortcuts", bundle: L10n.bundle) } icon: { Image(systemName: "keyboard") }
+            }
+            clipboard.navigationTitle(String(localized: "Clipboard", bundle: L10n.bundle)).tabItem {
+                Label { Text("Clipboard", bundle: L10n.bundle) } icon: { Image(systemName: "doc.on.clipboard") }
+            }
         }
         .frame(width: 500)
     }
