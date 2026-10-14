@@ -93,6 +93,7 @@ Choose **Edit Library…** to manage your items in the Library window.
 - Select several rows with ⌘-click or ⇧-click. Drag rows to reorder them or move them into a folder.
 - Right-click a row to open it, show it in Finder, get info, rename, move, share, or delete it. Press Return to rename the selected row.
 - Use ⌘Z to undo and ⇧⌘Z to redo changes. Undo history lasts until you quit.
+- Choose **File > Import Bookmarks…** to add the bookmarks from Safari or Chrome (or another Chromium browser). Pick the browser's bookmarks file. The import goes into one folder, "Imported from Safari" or "Imported from Chrome", and can be undone with ⌘Z.
 
 A divider appears as a titled section in the menu. The items below it belong to that section.
 

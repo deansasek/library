@@ -26,6 +26,8 @@ struct ManageCommands: Commands {
                 .keyboardShortcut("n", modifiers: [.command, .shift])
             Button("New Divider…") { state?.present(.divider) }
             Divider()
+            Button("Import Bookmarks…") { BookmarkImporter.run(into: store) }
+            Divider()
             Button("Edit…") {
                 if let state, let id = state.selection.first { state.edit(id, in: store) }
             }
