@@ -13,19 +13,21 @@ Library is a menu bar app for macOS. Keep your bookmarks, apps, folders, and ter
 ## Requirements
 
 - macOS 26 or later
-- Xcode Command Line Tools, only to build from source
+- Xcode Command Line Tools
 
 ## Install
 
-### Download
+### Download the source
 
-1. Download the latest `Library-x.y.z.zip` from [Releases](https://github.com/deansasek/library/releases).
-2. Unzip it and drag `Library.app` into your Applications folder.
-3. Open it. macOS says it can't check the app for malicious software, because Library isn't notarized. Open **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**. You only do this once.
+1. Download the latest `Library-x.y.z.zip` from [Releases](https://github.com/deansasek/library/releases). It holds the source, not a built app.
+2. Unzip it and open the folder in Terminal.
+3. Run `./install.sh`. It builds Library on your Mac and copies it to your Applications folder.
 
-To update, download the new zip and replace `Library.app`. Your data is not affected.
+Because you build it yourself, macOS opens it without a security warning.
 
-### Build from source
+To update, download the new zip and run `./install.sh` again. Your data is not affected.
+
+### Clone the repository
 
 ```bash
 git clone https://github.com/deansasek/library.git
@@ -33,7 +35,7 @@ cd library
 ./install.sh
 ```
 
-`install.sh` builds the app and copies it to `/Applications`. To build without installing, run `./build.sh`. The app is written to `build/Library.app`.
+To build without installing, run `./build.sh`. The app is written to `build/Library.app`.
 
 To update, run `git pull`, then `./install.sh` again. Your data is not affected.
 
@@ -205,4 +207,4 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-You can also run the **Release** workflow by hand and give it a version. Either way, GitHub Actions runs the checks, builds the app, and publishes `Library-1.2.0.zip`. The zip holds `Library.app` and nothing else: no source, no tests, no scripts.
+You can also run the **Release** workflow by hand and give it a version. Either way, GitHub Actions builds the app and runs the checks, to be sure the version is sound, then publishes `Library-1.2.0.zip`. The zip is the source, not a built app. It holds only what is needed to build: `Sources/`, `Resources/`, `Package.swift`, `build.sh`, `install.sh`, and this README. The tests, workflows, docs, and icon script are left out. `.gitattributes` sets that list, and GitHub's own source archives follow it too.
