@@ -8,5 +8,5 @@ sources=(${(f)"$(find Sources/Library -name '*.swift' ! -name LibraryApp.swift)"
 out="$(mktemp -d)"
 trap 'rm -rf "$out"' EXIT
 
-swiftc -swift-version 5 -O $sources Tests/Checks/main.swift -o "$out/checks"
+swiftc -swift-version 6 -O $sources Tests/Checks/main.swift -o "$out/checks"
 "$out/checks"

@@ -50,7 +50,7 @@ struct QuickOpenResult: Identifiable {
     }
 
     /// What the item opens, with its folder in front.
-    var subtitle: String {
+    @MainActor var subtitle: String {
         switch kind {
         case .answer(_, let detail): return "\(detail) · Return copies the answer"
         case .addSuggestion(let suggestion): return suggestion.subtitle
