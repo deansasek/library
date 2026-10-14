@@ -114,6 +114,12 @@ Select an item and press ⌘I, or choose **Edit…** from the toolbar or a right
 
 Turn a bookmark into a template. Put `{}` where the value goes in the URL. When you open the bookmark, Library asks for the value and fills it in. For example, a ticket number. Library encodes the value for the URL.
 
+For several values, name each placeholder: `{project}` or `{id:Issue number}`. Placeholders with the same name share one value. Library asks for all of them in one sheet, with a label for each field.
+
+### Open all in a folder
+
+Choose **Open All** from a folder's right-click menu, or from its submenu in the menu bar. Library opens every bookmark and app in the folder, including those in folders inside it, about 150 ms apart. Commands and templates are skipped. Library asks first when there are more than five items.
+
 ### Choose what a click does
 
 **Opens In** sets how a click opens an item.
