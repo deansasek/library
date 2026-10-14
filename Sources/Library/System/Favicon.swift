@@ -1,3 +1,4 @@
+import ImageIO
 import SwiftUI
 
 enum Favicon {
@@ -38,37 +39,35 @@ enum Favicon {
     }
 
     private static func image(at url: URL) async -> Data? {
-        guard let (data, response) = await get(url), (response as? HTTPURLResponse)?.statusCode == 200,
-              NSImage(data: data) != nil else { return nil }
+        guard let (data, response) = await get(url), response.statusCode == 200,
+              NSImage(data: data) != nil, pixelsAllowed(data) else { return nil }
         return data
     }
 
-    /// Streams the body with `URLSession.bytes` and stops as soon as it passes `maxBytes`, so an oversized
-    /// response is never held in memory in full. A declared Content-Length over the cap is refused before reading.
-    /// The 10 s timeout is unchanged.
-    private static func get(_ url: URL) async -> (Data, URLResponse)? {
-        guard let (bytes, response) = try? await URLSession.shared.bytes(for: URLRequest(url: url, timeoutInterval: 10)),
-              declaredLengthAllowed(response.expectedContentLength) else { return nil }
-        var data = Data()
-        do {
-            for try await byte in bytes {
-                data.append(byte)
-                guard byteCountAllowed(data.count) else { return nil }
-            }
-        } catch {
-            return nil
-        }
-        return (data, response)
+    /// Downloads at most `maxBytes`, so an oversized response is never held in memory in full. The download stops
+    /// when the limit is passed. Only http and https addresses are read, so a page cannot point the icon at a
+    /// local file. The 10 s timeout is unchanged.
+    private static func get(_ url: URL) async -> (data: Data, response: HTTPURLResponse)? {
+        await WebFetch.fetch(url, limit: maxBytes)
     }
 
-    /// Whether a response may be read, from its declared length. -1 means the server did not say, so the streamed count decides.
-    static func declaredLengthAllowed(_ length: Int64) -> Bool {
-        length < 0 || length <= Int64(maxBytes)
+    /// The largest picture a favicon may decode to. A small file can declare a huge picture, so the size is read
+    /// from its header before the picture is decoded.
+    static let maxPixelSide = 4096
+
+    /// Whether the picture's header declares a size a favicon could have. Formats without a pixel size (vector
+    /// files) are allowed, since they do not expand in memory the way a bitmap does.
+    static func pixelsAllowed(_ data: Data) -> Bool {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int else { return true }
+        return pixelSizeAllowed(width: width, height: height)
     }
 
-    /// Whether the bytes read so far are still within the cap.
-    static func byteCountAllowed(_ count: Int) -> Bool {
-        count <= maxBytes
+    /// Whether a picture of this size may be decoded.
+    static func pixelSizeAllowed(width: Int, height: Int) -> Bool {
+        width > 0 && height > 0 && width <= maxPixelSide && height <= maxPixelSide
     }
 
     /// The failure timestamps still inside the window. Timestamps in the future (after a clock change) are dropped too.

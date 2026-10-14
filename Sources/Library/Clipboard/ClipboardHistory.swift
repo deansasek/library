@@ -207,8 +207,9 @@ final class ClipboardHistory: ObservableObject {
     /// still picture, with the real address only in the HTML. This asks the site for that one file.
     private func fetchGIF(digest: String, from url: URL) {
         Task {
-            guard let (data, response) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 10)),
-                  (response as? HTTPURLResponse)?.statusCode == 200, data.count <= Self.maxItemBytes,
+            // Only web addresses, and the download stops at the item size limit.
+            guard let (data, response) = await WebFetch.fetch(url, limit: Self.maxItemBytes),
+                  response.statusCode == 200,
                   data.starts(with: Array("GIF8".utf8)),
                   let index = items.firstIndex(where: { $0.digest == digest }) else { return }
             items[index].animatedData = data
@@ -356,7 +357,7 @@ final class ClipboardHistory: ObservableObject {
         else { return nil }
         for match in regex.matches(in: html, range: NSRange(html.startIndex..., in: html)) {
             guard let range = Range(match.range(at: 1), in: html), let url = URL(string: String(html[range])),
-                  url.scheme?.hasPrefix("http") == true, url.path.lowercased().hasSuffix(".gif") else { continue }
+                  WebFetch.isWeb(url), url.path.lowercased().hasSuffix(".gif") else { continue }
             return url
         }
         return nil
