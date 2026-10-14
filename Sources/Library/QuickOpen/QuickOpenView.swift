@@ -15,9 +15,11 @@ struct QuickOpenView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.title2)
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
                 TextField("Library Search", text: $model.query)
                     .textFieldStyle(.plain)
                     .font(.title2.weight(.light))
+                    .accessibilityLabel("Search Library")
                     .focused($focused)
                 if !model.showActions, model.selected?.hasActions == true {
                     Text("⇥ Actions")
@@ -139,6 +141,7 @@ struct QuickOpenView: View {
         case .item(let node, let folder)?:
             HStack(spacing: 10) {
                 Image(nsImage: model.store.icon(for: node)).resizable().frame(width: 32, height: 32)
+                    .accessibilityHidden(true)
                 Text(node.name).font(.title3.weight(.semibold))
             }
             Text(node.url ?? node.command ?? node.appPath ?? "")
@@ -178,6 +181,9 @@ struct QuickOpenView: View {
                             close()
                             action.run()
                         }
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAddTraits(index == model.actionSelection ? .isSelected : [])
                 }
             }
             .padding(8)
