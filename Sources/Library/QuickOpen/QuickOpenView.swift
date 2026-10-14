@@ -198,7 +198,8 @@ struct QuickOpenView: View {
                 Text(result.title)
                 Text(result.subtitle)
                     .font(.caption)
-                    .opacity(0.7)
+                    // System secondary colors adapt to light, dark, and Increase Contrast; selected rows keep the selected text color.
+                    .foregroundStyle(selected ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.8)) : AnyShapeStyle(.secondary))
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -206,7 +207,7 @@ struct QuickOpenView: View {
             if index < 9 {
                 Text("⌘\(index + 1)")
                     .font(.callout)
-                    .opacity(0.6)
+                    .foregroundStyle(selected ? AnyShapeStyle(Color(nsColor: .alternateSelectedControlTextColor).opacity(0.7)) : AnyShapeStyle(.tertiary))
             }
         }
         .padding(.horizontal, 10)
