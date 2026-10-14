@@ -10,7 +10,10 @@ final class QuickOpenModel: ObservableObject {
     }
     @Published private(set) var results: [QuickOpenResult] = []
     @Published var selection: String? {
-        didSet { refreshPreview() }
+        didSet {
+            refreshPreview()
+            ClipPreview.shared.follow(selected?.clip)
+        }
     }
     private var animatedImages: [UUID: NSImage] = [:]
 
@@ -55,6 +58,13 @@ final class QuickOpenModel: ObservableObject {
             self?.objectWillChange.send()
             self?.refreshPreview()
         }
+    }
+
+    /// Space previews the selected clip in Quick Look, or closes the preview if it is open. Returns false, so Space
+    /// types a space, when the search has text and the selection is not a clip, or when there is nothing to preview.
+    func togglePreview() -> Bool {
+        guard !showActions, query.isEmpty || selected?.clip != nil, let item = selected?.clip else { return false }
+        return ClipPreview.shared.toggle(item)
     }
 
     private func refreshPreview() {
@@ -259,6 +269,7 @@ final class QuickOpenModel: ObservableObject {
                 if pastes { FrontApp.pasteSoon() }
             })
         }
+        list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { ClipPreview.shared.show(item) })
         list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })
         if item.libraryNode != nil {
             list.append(QuickOpenAction(id: "add", title: "Add to Library") { [store] in store.addToLibrary(item) })

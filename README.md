@@ -76,6 +76,7 @@ Library remembers what you copy, including text, links, images, and files, in ev
 - Pin an item to keep it after you quit Library.
 - Press Control-Command-V to open the clipboard menu at the pointer. Press 1 through 9 to copy an item. Hold Option to copy it as plain text.
 - Choose an item in the clipboard menu or Quick Open while a text field has the keyboard, and Library pastes it there. Otherwise it copies the item. Menu headers say "Paste" when it will paste. Turn this off with **Paste Into Text Fields** in **Settings > Clipboard**. Pasting needs Accessibility access.
+- Select a copied item in Quick Open and press Space to preview it in Quick Look. Press Space or Escape to close the preview.
 - Library skips anything a password manager marks as private.
 - Copies over 25 MB are skipped.
 

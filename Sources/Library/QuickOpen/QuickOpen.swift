@@ -20,6 +20,7 @@ enum QuickOpen {
         panel.contentViewController = controller
         panel.onMove = { model.move($0) }
         panel.onTab = { model.toggleActions() }
+        panel.onSpace = { model.togglePreview() }
         panel.onEscape = { [weak panel] in
             if model.showActions { model.showActions = false } else { panel?.close() }
         }
@@ -77,6 +78,8 @@ private final class QuickOpenPanel: NSPanel {
     var onSelectIndex: ((Int) -> Void)?
     var onTab: (() -> Void)?
     var onEscape: (() -> Void)?
+    /// Returns true when Space was used to preview a clip, so it is not typed.
+    var onSpace: (() -> Bool)?
 
     /// Key codes of the digits 1 to 9 on the number row.
     private static let digitKeys: [UInt16] = [18, 19, 20, 21, 23, 22, 26, 28, 25]
@@ -112,6 +115,7 @@ private final class QuickOpenPanel: NSPanel {
         isClosing = true
         cleanup.forEach { $0() }
         cleanup = []
+        ClipPreview.shared.close()
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || alphaValue == 0 {
             super.close()
             return
@@ -178,6 +182,8 @@ private final class QuickOpenPanel: NSPanel {
             case 36, 76: onActivate?(); return
             case 48: onTab?(); return
             case 53: onEscape?(); return
+            case 49 where event.modifierFlags.intersection([.command, .option, .control]).isEmpty:
+                if onSpace?() == true { return }
             default: break
             }
         }
