@@ -13,11 +13,19 @@ Library is a menu bar app for macOS. Keep your bookmarks, apps, folders, and ter
 ## Requirements
 
 - macOS 26 or later
-- Xcode Command Line Tools
+- Xcode Command Line Tools, only to build from source
 
 ## Install
 
-Library is distributed as source. Build and install it with:
+### Download
+
+1. Download the latest `Library-x.y.z.zip` from [Releases](https://github.com/deansasek/library/releases).
+2. Unzip it and drag `Library.app` into your Applications folder.
+3. Open it. macOS says it can't check the app for malicious software, because Library isn't notarized. Open **System Settings > Privacy & Security**, scroll down, and click **Open Anyway**. You only do this once.
+
+To update, download the new zip and replace `Library.app`. Your data is not affected.
+
+### Build from source
 
 ```bash
 git clone https://github.com/deansasek/library.git
@@ -181,3 +189,20 @@ Updates don't change this data.
 - **Clicks stop working after a macOS update.** Remove Library from Accessibility, then add it again.
 - **Open at Login has no effect.** Move `Library.app` to `/Applications` first. The login item stores the app's location.
 - **Services don't appear.** Log out and back in, or run `/System/Library/CoreServices/pbs -update`.
+
+## Development
+
+- `./build.sh` builds the app.
+- `./test.sh` runs the checks in `Tests/` against the app's source. They use private pasteboards and temporary files, so they never touch your clipboard or your library.
+- Every pull request, and every push to `main`, builds the app and runs the checks on GitHub Actions.
+
+## Releasing
+
+Push a tag to publish a release:
+
+```bash
+git tag v1.2.0
+git push origin v1.2.0
+```
+
+You can also run the **Release** workflow by hand and give it a version. Either way, GitHub Actions runs the checks, builds the app, and publishes `Library-1.2.0.zip`. The zip holds `Library.app` and nothing else: no source, no tests, no scripts.

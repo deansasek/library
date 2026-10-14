@@ -1,0 +1,19 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: ./build.sh
+      - name: Run the checks
+        run: ./test.sh

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Builds Library.app in ./build.
+# Builds Library.app in ./build. Set VERSION to stamp a version, as the release workflow does.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -21,7 +21,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleExecutable</key><string>Library</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>1.0</string>
+    <key>CFBundleShortVersionString</key><string>${VERSION:-1.0}</string>
     <key>CFBundleVersion</key><string>$(date +%Y%m%d%H%M)</string>
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSUIElement</key><true/>
