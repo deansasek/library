@@ -8,15 +8,19 @@
 
 </div>
 
+Library lives in your menu bar. Keep your bookmarks, apps, folders, and terminal commands in one place, open any of them from the menu or a shortcut, and bring back anything you copied a moment ago.
+
+Press Control-Space to open Quick Open from anywhere, then start typing. It searches your library, your clipboard, and your snippets.
+
 <p align="center">
   <img src="docs/media/quick_open.gif" width="640" alt="Quick Open finding a bookmark as you type">
 </p>
 
+Click the Library icon in the menu bar to open your items and recent copies, or to edit your library.
+
 <p align="center">
   <img src="docs/media/menu_bar.gif" width="640" alt="The Library menu opening and closing from the menu bar">
 </p>
-
-Library lives in your menu bar. Keep your bookmarks, apps, folders, and terminal commands in one place, open any of them from the menu or a shortcut, and bring back anything you copied a moment ago.
 
 ## Install
 
