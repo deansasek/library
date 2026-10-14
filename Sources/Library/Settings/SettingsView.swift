@@ -11,6 +11,7 @@ struct SettingsView: View {
     @ObservedObject var store: LibraryStore
     @ObservedObject private var loginItem = LoginItem.shared
     @ObservedObject private var history = ClipboardHistory.shared
+    @ObservedObject private var tracking = TrackingPreferences.shared
     @StateObject private var recording = RecordingState()
     @AppStorage(UpdateCheck.automaticKey) private var checksForUpdates = true
 
@@ -66,6 +67,11 @@ struct SettingsView: View {
                 LabeledContent("Version", value: version)
             } footer: {
                 Text("The welcome screen explains Library, lists your shortcuts, and asks for access. The build number changes with every build, so you can tell which one is running after an update.")
+            }
+            Section {
+                Toggle("Remove tracking parameters when copying links", isOn: $tracking.removesOnCopy)
+            } footer: {
+                Text("Removes tracking codes such as utm_source, fbclid, and gclid from a link you copy. The other parts of the link stay the same, and the saved link is not changed.")
             }
         }
         .formStyle(.grouped)

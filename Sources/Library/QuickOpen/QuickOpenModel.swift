@@ -294,6 +294,8 @@ final class QuickOpenModel: ObservableObject {
     func actions(for result: QuickOpenResult) -> [QuickOpenAction] {
         if case .clip(let item) = result.kind { return clipActions(for: item) }
         if case .snippet(let snippet) = result.kind { return snippetActions(for: snippet) }
+        if case .openLink(let url) = result.kind { return linkActions(for: url) }
+        if case .addLink(let url) = result.kind { return linkActions(for: url) }
         guard let node = result.node else { return [] }
         var list = [QuickOpenAction(id: "open", title: "Open") { open(node) }]
         if let labels = node.modeLabels {
@@ -306,7 +308,10 @@ final class QuickOpenModel: ObservableObject {
                 NSPasteboard.general.setString(text, forType: .string)
             })
         }
-        if let url = node.url { copy("Copy Link", url) }
+        if let url = node.url {
+            copy("Copy Link", url)
+            copy("Copy Clean Link", TrackingParameters.clean(url))
+        }
         if let command = node.command { copy("Copy Command", command) }
         if let path = node.appPath {
             copy("Copy Path", path)
@@ -315,6 +320,11 @@ final class QuickOpenModel: ObservableObject {
             })
         }
         return list
+    }
+
+    /// A link typed into Quick Open: copy it without its tracking parameters.
+    private func linkActions(for url: URL) -> [QuickOpenAction] {
+        [QuickOpenAction(id: "copy-clean", title: "Copy Clean Link") { Self.copyText(TrackingParameters.clean(url.absoluteString)) }]
     }
 
     private func snippetActions(for snippet: Snippet) -> [QuickOpenAction] {
@@ -345,6 +355,9 @@ final class QuickOpenModel: ObservableObject {
                 history.copyPlainText(item)
                 if pastes { FrontApp.pasteSoon() }
             })
+        }
+        if item.kind == .link, let link = item.plainText?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            list.append(QuickOpenAction(id: "copy-clean", title: "Copy Clean Link") { Self.copyText(TrackingParameters.clean(link)) })
         }
         list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { ClipPreview.shared.show(item) })
         list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })

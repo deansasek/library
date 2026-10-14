@@ -34,7 +34,7 @@ struct QuickOpenResult: Identifiable {
     /// Library items and clipboard items have actions on Tab and right-click.
     var hasActions: Bool {
         switch kind {
-        case .item, .clip, .snippet: return true
+        case .item, .clip, .snippet, .openLink, .addLink: return true
         default: return false
         }
     }

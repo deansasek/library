@@ -236,14 +236,26 @@ final class ClipboardHistory: ObservableObject {
 
     // MARK: Actions
 
-    /// Puts the item back on the clipboard in every format it had.
+    /// Puts the item back on the clipboard in every format it had. A link has its tracking parameters removed
+    /// when the setting is on; the history keeps the link as it was copied.
     func copy(_ item: ClipItem) {
+        let cleans = item.kind == .link && TrackingPreferences.shared.removesOnCopy
         pasteboard.clearContents()
         pasteboard.writeObjects(item.representations.map { representation in
             let pasteboardItem = NSPasteboardItem()
-            representation.forEach { pasteboardItem.setData($1, forType: $0) }
+            representation.forEach { type, data in
+                pasteboardItem.setData(cleans ? Self.cleaned(data, type: type) : data, forType: type)
+            }
             return pasteboardItem
         })
+    }
+
+    /// The link text, with tracking parameters removed, for the formats that carry the link. Other data is unchanged.
+    private static func cleaned(_ data: Data, type: NSPasteboard.PasteboardType) -> Data {
+        guard type == .string || type == .URL else { return data }
+        let link = String(decoding: data, as: UTF8.self)
+        let clean = TrackingParameters.clean(link)
+        return clean == link ? data : Data(clean.utf8)
     }
 
     func copyPlainText(_ item: ClipItem) {

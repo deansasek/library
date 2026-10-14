@@ -79,6 +79,7 @@ Library remembers what you copy, including text, links, images, and files, in ev
 - Select a copied item in Quick Open and press Space to preview it in Quick Look. Press Space or Escape to close the preview.
 - Library skips anything a password manager marks as private.
 - Copies over 25 MB are skipped.
+- Copying a link removes tracking codes such as `utm_source`, `fbclid`, and `gclid`, so the link you paste is clean. Other parts of the link stay as they are. Turn this off with **Remove tracking parameters when copying links** in **Settings > General**. The link saved in your history or library is not changed. **Copy Clean Link** in Quick Open removes them from any link, whatever the setting.
 
 ### Save snippets
 
@@ -188,7 +189,7 @@ The welcome tour opens the first time you launch Library. It explains the app an
 
 **Settings** (⌘,) has three tabs.
 
-- **General:** Open at Login, Check for Updates Automatically, the welcome screen, and the app version.
+- **General:** Open at Login, Check for Updates Automatically, the welcome screen, removing tracking parameters from copied links, and the app version.
 - **Shortcuts:** One list of shortcuts: Show Library Menu, Show Quick Open, Show Clipboard Menu, and Open Copied Link. A picker sets whether the Library menu opens at the pointer or from the menu bar.
 - **Clipboard:** Turn clipboard history, pasting into text fields, and copied GIFs on or off, and clear the history.
 
