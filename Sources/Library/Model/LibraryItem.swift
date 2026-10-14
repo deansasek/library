@@ -105,7 +105,17 @@ struct LibraryItem: Codable, Identifiable, Equatable {
         guard let filled = fillTemplate(url ?? "", declared: templateFields, values: values) else { return nil }
         let trimmed = filled.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
-        return URL(string: trimmed.contains("://") ? trimmed : "https://\(trimmed)")
+        return URL(string: hasScheme(trimmed) ? trimmed : "https://\(trimmed)")
+    }
+
+    /// True when the text starts with a URL scheme, such as mailto:, tel:, or obsidian://. A host and port such as
+    /// localhost:8080 is not a scheme, so it still gets https:// in front.
+    private func hasScheme(_ text: String) -> Bool {
+        guard let colon = text.firstIndex(of: ":") else { return false }
+        let scheme = text[..<colon]
+        guard let first = scheme.first, first.isLetter,
+              scheme.allSatisfy({ $0.isLetter || $0.isNumber || "+-.".contains($0) }) else { return false }
+        return !(text[text.index(after: colon)...].first?.isNumber ?? false)
     }
 
     /// True for this node or any node beneath it.

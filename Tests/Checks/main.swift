@@ -1175,6 +1175,11 @@ check(Duplicates.groups(in: sameApp).count == 1, "apps with the same arguments a
 check(Duplicates.groups(in: [LibraryItem(name: "T3", appPath: "/Applications/Terminal.app", arguments: "--new"), LibraryItem(name: "T4", appPath: "/Applications/Terminal.app")]).isEmpty, "apps with other arguments are not duplicates")
 check(Duplicates.groups(in: [LibraryItem(name: "Docs", url: "https://docs.example.com", browser: "com.apple.Safari"), LibraryItem(name: "Docs copy", url: "https://docs.example.com")]).isEmpty, "links in other browsers are not duplicates")
 
+// A bookmark keeps a URL with its own scheme, such as mailto: or obsidian://. A host and port still get https://.
+check(LibraryItem(name: "Vault", url: "obsidian://open?vault=Notes").link?.absoluteString == "obsidian://open?vault=Notes", "a custom URL scheme opens as written")
+check(LibraryItem(name: "Mail", url: "mailto:me@example.com").link?.absoluteString == "mailto:me@example.com", "a mailto link keeps its scheme")
+check(LibraryItem(name: "Local", url: "localhost:8080/app").link?.absoluteString == "https://localhost:8080/app", "a host with a port gets https")
+check(LibraryItem(name: "Plain", url: "example.com/a?u=http://x").link?.absoluteString == "https://example.com/a?u=http://x", "a host whose query has a link gets https")
 // ---- bulk edit (pure) ----
 let bulkTree = [
     LibraryItem(name: "One", url: "https://one.example.com", color: "red"),
