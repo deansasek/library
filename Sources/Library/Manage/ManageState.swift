@@ -10,7 +10,7 @@ enum IconTab: String, CaseIterable {
 @MainActor
 final class ManageState: ObservableObject {
     enum Sheet: Identifiable, Hashable {
-        case bookmark, terminal, folder, divider, application, edit(UUID)
+        case bookmark, terminal, folder, divider, application, edit(UUID), bulkEdit, duplicates
         var id: Self { self }
     }
 
@@ -46,6 +46,13 @@ final class ManageState: ObservableObject {
     @Published var iconSearch = ""
     @Published var iconTab = IconTab.symbols
 
+    // Bulk edit sheet: the items it applies to, and the changes so far.
+    @Published var bulkIDs: Set<UUID> = []
+    @Published var bulkEdit = BulkEdit()
+
+    // Find Duplicates sheet: the item to keep in each group, by group id. Missing groups keep their first item.
+    @Published var keepChoices: [String: UUID] = [:]
+
     var filteredApps: [InstalledApp] {
         let query = search.trimmingCharacters(in: .whitespaces)
         return query.isEmpty ? apps : apps.filter { $0.name.localizedCaseInsensitiveContains(query) }
@@ -58,6 +65,8 @@ final class ManageState: ObservableObject {
         case .terminal: return filled(name) && filled(command)
         case .folder, .divider: return filled(name)
         case .application: return appSelection != nil
+        case .bulkEdit: return !bulkEdit.changesNothing
+        case .duplicates: return true
         case .edit:
             guard filled(draft.name) else { return false }
             if draft.url != nil { return filled(draft.url) }
@@ -74,6 +83,22 @@ final class ManageState: ObservableObject {
         draft = node
         let isSymbol = node.icon.map { NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil } ?? true
         iconTab = isSymbol ? .symbols : .emoji
+    }
+
+    /// Get Info for the selection: the single-item sheet for one item, the bulk sheet for several.
+    func editSelection(in store: LibraryStore) {
+        if selection.count == 1, let id = selection.first {
+            edit(id, in: store)
+        } else if selection.count > 1 {
+            editMany(selection)
+        }
+    }
+
+    /// Opens the bulk sheet for the items in `ids`, with no changes yet.
+    func editMany(_ ids: Set<UUID>) {
+        present(.bulkEdit)
+        bulkIDs = ids
+        bulkEdit = BulkEdit()
     }
 
     /// Clicking a column header sorts by it, then reverses, then goes back to your own order.
@@ -96,6 +121,7 @@ final class ManageState: ObservableObject {
         arguments = ""
         search = ""
         appSelection = nil
+        keepChoices = [:]
         recordingIndex = nil
         showIconPicker = false
         iconSearch = ""
