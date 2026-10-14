@@ -28,6 +28,7 @@ struct ManageCommands: Commands {
             Divider()
             Button("Import Bookmarks…") { BookmarkImporter.run(into: store) }
             Button("Find Duplicates…") { state?.present(.duplicates) }
+            Button("Export Library…") { LibraryBackupActions.export(store) }
             Divider()
             Button("Edit…") { state?.editSelection(in: store) }
                 .keyboardShortcut("i")
