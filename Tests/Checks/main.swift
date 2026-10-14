@@ -4,7 +4,6 @@ import Carbon
 
 var failures = 0
 @MainActor func check(_ ok: Bool, _ what: String, line: Int = #line) { if !ok { failures += 1; print("FAIL line \(line): \(what)") } }
-func answer(_ q: String) -> String? { QuickAnswers.answer(for: q)?.value }
 
 func tree() -> [LibraryItem] {
     [
@@ -24,26 +23,45 @@ check(jira.isTemplate && jira.link(filling: "ABC-123")?.absoluteString == "https
 check(jira.link(filling: "a b/c")?.absoluteString == "https://x.example.com/browse/a%20b%2Fc", "template encodes")
 
 // ---- URL templates with named fields ----
-check(templateFields(in: "x.example.com/{}") == [TemplateField(name: "", label: nil)], "bare placeholder is one unnamed field")
-check(templateFields(in: "a/{}/{}") == [TemplateField(name: "", label: nil)], "repeated bare placeholder is one field")
-check(templateFields(in: "a/{ticket:Ticket number}/{user}/{ticket}") == [
+check(templateFieldList(in: "x.example.com/{}") == [TemplateField(name: "", label: nil)], "bare placeholder is one unnamed field")
+check(templateFieldList(in: "a/{}/{}") == [TemplateField(name: "", label: nil)], "repeated bare placeholder is one field")
+check(templateFieldList(in: "a/{ticket:Ticket number}/{user}/{ticket}", declared: ["ticket", "user"]) == [
     TemplateField(name: "ticket", label: "Ticket number"), TemplateField(name: "user", label: nil),
-], "named fields share a name and keep the first label")
-check(templateFields(in: "a/{ticket}/{ticket:Later}").first?.label == "Later", "a label given later fills in a bare name")
-check(templateFields(in: "a/{:Only label}").first == TemplateField(name: "", label: "Only label"), "a label without a name")
-check(templateFields(in: "a/{ticket:}").first == TemplateField(name: "ticket", label: nil), "empty label is no label")
-check(templateFields(in: "a/{open").isEmpty && templateFields(in: "a/{x{}").map(\.name) == [""], "unclosed braces are text")
-check(!LibraryItem(name: "Plain", url: "a.example.com/{open").isTemplate && LibraryItem(name: "N", url: "a/{id}").isTemplate, "isTemplate for named fields")
-
-let bug = LibraryItem(name: "Bug", url: "bugs.example.com/{project}/{id:Issue}?q={project}")
+], "declared fields share a name and keep the first label")
+check(templateFieldList(in: "a/{ticket}/{ticket:Later}", declared: ["ticket"]).first?.label == "Later", "a label given later fills in a bare name")
+check(templateFieldList(in: "a/{:Only label}").first == TemplateField(name: "", label: "Only label"), "a label without a name")
+check(templateFieldList(in: "a/{ticket:}", declared: ["ticket"]).first == TemplateField(name: "ticket", label: nil), "empty label is no label")
+check(templateFieldList(in: "a/{open", declared: ["open"]).isEmpty && templateFieldList(in: "a/{x{}").map(\.name) == [""], "unclosed braces are text")
+check(!LibraryItem(name: "Plain", url: "a.example.com/{open").isTemplate && !LibraryItem(name: "N", url: "a/{id}").isTemplate, "undeclared named braces are plain text")
+let oldJSON = Data(#"{"id":"6F1C3E2A-1B2C-4D5E-8F90-123456789ABC","name":"Jira","url":"x.example.com/{}"}"#.utf8)
+let oldItem = try? JSONDecoder().decode(LibraryItem.self, from: oldJSON)
+check(oldItem?.templateFields == nil && oldItem?.isTemplate == true, "a file without templateFields loads, and {} still asks")
+if let declared = oldItem.map({ var item = $0; item.templateFields = ["q:Query"]; return item }),
+   let data = try? JSONEncoder().encode(declared), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.templateFields == ["q:Query"], "declared fields round-trip through the file")
+} else {
+    check(false, "declared fields round-trip through the file")
+}
+check(LibraryItem(name: "N", url: "a/{id}").placeholders.isEmpty && templatePreview("a/{id}") == "a/{id}" && withoutPlaceholders("a/{id}") == "a/{id}", "undeclared braces are not a template, preview or removal")
+check(LibraryItem(name: "N", url: "a/{id}", templateFields: ["id"]).isTemplate, "declared named field is a template")
+check(templateFieldList(in: "a/{id}/{x}", declared: ["id"]).map(\.name) == ["id"] && templateFieldList(in: "a/{id}/{x}", declared: ["id"]).count == 1, "undeclared names in a template stay text")
+check(parseTemplateFields("query:Search terms, sort , ,:NoName, query:Again, ,") == ["query:Search terms", "sort"], "Fields text: names, labels, blanks and repeats")
+check(parseTemplateFields("  ") == nil && parseTemplateFields("a{b, c}d, e") == ["e"] && parseTemplateFields("x:") == ["x"], "Fields text: empty and braces dropped")
+let declaredBug = LibraryItem(name: "Declared", url: "a.example.com/{q}?x={q:Other}", templateFields: parseTemplateFields("q:Search"))
+check(declaredBug.placeholders == [TemplateField(name: "q", label: "Search")], "declared label beats the URL label")
+check(declaredBug.link(values: ["q": "a b&c"])?.absoluteString == "https://a.example.com/a%20b%26c?x=a%20b%26c", "declared fields fill and encode as before")
+check(declaredBug.link(values: [:]) == nil, "declared values are required")
+check(fillTemplate("a/{q}", values: ["q": "x"]) == "a/{q}" && fillTemplate("a/{q}/{}", values: ["": "x"]) == "a/{q}/x", "undeclared braces are untouched by a fill")
+let bug = LibraryItem(name: "Bug", url: "bugs.example.com/{project}/{id:Issue}?q={project}", templateFields: ["project", "id"])
 check(bug.placeholders.map(\.name) == ["project", "id"], "two fields, project shared")
 check(bug.link(values: ["project": "WEB", "id": "12 3"])?.absoluteString == "https://bugs.example.com/WEB/12%203?q=WEB", "several values fill every placeholder")
 check(bug.link(values: ["project": "WEB"]) == nil && bug.link(values: [:]) == nil, "a missing value is rejected")
 check(bug.link(values: ["project": "a b/c", "id": "1"])?.absoluteString == "https://bugs.example.com/a%20b%2Fc/1?q=a%20b%2Fc", "named values encode the same way")
 check(jira.link(values: ["": "ABC-123"])?.absoluteString == "https://x.example.com/browse/ABC-123", "bare value by its empty name")
 check(bug.link(values: ["project": "", "id": ""])?.absoluteString == "https://bugs.example.com//?q=", "empty values still fill, the caller rejects them")
-check(templatePreview("a/{id:Issue}/{}/{id}/{user}") == "a/‹Issue›/‹value›/‹Issue›/‹user›", "preview labels")
-check(withoutPlaceholders("a/{}/{x:Y}/b") == "a///b", "placeholders removed")
+check(templatePreview("a/{id:Issue}/{}/{id}/{user}", declared: ["id", "user"]) == "a/‹Issue›/‹value›/‹Issue›/‹user›", "preview labels")
+check(templatePreview("a/{id:Issue}/{}/{id}/{user}") == "a/{id:Issue}/‹value›/{id}/{user}", "preview leaves undeclared braces")
+check(withoutPlaceholders("a/{}/{x:Y}/b", declared: ["x"]) == "a///b" && withoutPlaceholders("a/{}/{x:Y}/b") == "a//{x:Y}/b", "placeholders removed, undeclared kept")
 check(LibraryItem(name: "Plain", url: "x.example.com/a").placeholders.isEmpty, "no placeholders for a plain URL")
 
 // ---- Open All selection ----
@@ -249,12 +267,6 @@ check(sel?.source == .selection && sel?.node.name == "swift.org", "a selected li
 check(AddSuggestion.make(selection: "just some words", clipboard: nil, in: tree()) == nil, "plain selected text is not")
 check(AddSuggestion.make(selection: "https://docs.example.com", clipboard: nil, in: tree()) == nil, "a link already in the library is not")
 check(AddSuggestion.make(selection: nil, clipboard: nil, in: tree()) == nil, "nothing to suggest")
-
-// ---- quick answers ----
-check(answer("12*8") == "96" && answer("(2+3)*4") == "20" && answer("2^10") == "1024" && answer("10/4") == "2.5", "arithmetic")
-check(answer("5/0") == nil && answer("42") == nil && answer("2+") == nil && answer("jira") == nil, "not answers")
-check(answer("5 km in miles")?.hasPrefix("3.10685") == true && answer("72 f to c")?.hasPrefix("22.2222") == true, "conversions")
-check(answer("5 km in kg") == nil, "mismatched units")
 
 // ---- tracking parameters: a table of links and their cleaned copies ----
 let trackingTable: [(link: String, clean: String)] = [
@@ -953,8 +965,6 @@ if let written = ClipPreviewSource.write(Data("secret".utf8), extension: "txt", 
     ClipPreviewSource.removeLeftovers(in: previewChecks)
     check(!FileManager.default.fileExists(atPath: written.path), "preview files left by an earlier run are removed")
 } else { check(false, "the preview file is written") }
-check(answer(String(repeating: "(", count: 100_000) + "1") == nil, "a huge pasted line gets no answer and does not crash")
-check(answer("(((1+2)))") == "3", "brackets still calculate")
 let boundedIcons = IconCache(capacity: 10)
 for index in 0..<25 { _ = boundedIcons.icon(at: "/copied/\(index)", modified: nil) { NSImage() } }
 check(boundedIcons.count <= 10, "the icon cache is bounded")
@@ -995,14 +1005,51 @@ let dupGroups = Duplicates.groups(in: dupTree)
 check(dupGroups.count == 2 && dupGroups[0].items.map(\.name) == ["Docs", "Docs copy"] && dupGroups[1].isApp, "groups by link and by app path, in library order")
 check(Duplicates.groups(in: [LibraryItem(name: "A", url: "https://a.com"), LibraryItem(name: "B", url: "https://b.com")]).isEmpty, "no duplicates means no groups")
 check(Duplicates.folderTitle(of: dupTree[1].children![0].id, in: dupTree) == "Work" && Duplicates.folderTitle(of: dupTree[0].id, in: dupTree) == "Top level", "folder titles")
-let merged = Duplicates.merged(dupTree)
+let merged = Duplicates.merge(dupTree).nodes
 check(merged.leaves.map(\.name) == ["Docs", "Other", "Safari", "Commands", "Divider"], "the first item of each group is kept by default")
 check(merged.leaves.first { $0.name == "Docs" }?.keywords == "wiki handbook" && merged.leaves.first { $0.name == "Safari" }?.keywords == "browser web", "keywords join unique words, first spelling wins")
 check(merged.node(withID: dupTree[1].children![0].id) == nil, "removed item is gone")
-let chosen = Duplicates.merged(dupTree, keeping: [dupGroups[0].id: dupTree[1].children![0].id])
+let chosen = Duplicates.merge(dupTree, keeping: [dupGroups[0].id: dupTree[1].children![0].id]).nodes
 check(chosen.leaves.map(\.name) == ["Docs copy", "Other", "Safari", "Commands", "Divider"] && chosen.folders().map(\.title) == ["Work"], "a chosen item is kept, in its own folder")
 check(chosen.leaves.first { $0.name == "Docs copy" }?.shortcuts?.isEmpty == false, "the kept item keeps its shortcuts")
 check(Duplicates.joinKeywords([nil, "a B", "b c", " "]) == "a B c" && Duplicates.joinKeywords([nil]) == nil, "keyword join")
+
+// ---- merging keeps the shortcuts of the copies (pure) ----
+let mergeCmdD = Shortcut(keyCode: 2, modifiers: UInt32(cmdKey), key: "D")
+let mergeCmdE = Shortcut(keyCode: 14, modifiers: UInt32(cmdKey), key: "E")
+let inheritTree = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs old", url: "https://docs.example.com/"),
+]
+let inherit = Duplicates.merge(inheritTree)
+check(inherit.nodes.map(\.name) == ["Docs"] && inherit.nodes[0].shortcuts == [mergeCmdD], "the kept item inherits a shortcut from a copy")
+check(inherit.summary == "Merged 3 items. 1 shortcut was kept from another copy." && inherit.conflicts.isEmpty, "summary after inheriting one shortcut")
+let chosenCopy = Duplicates.merge(inheritTree, keeping: [Duplicates.groups(in: inheritTree)[0].id: inheritTree[1].id])
+check(chosenCopy.nodes.map(\.name) == ["Docs copy"] && chosenCopy.inheritedCount == 0 && chosenCopy.summary == "Merged 3 items.", "a chosen copy keeps its own shortcut and inherits nothing it already has")
+let clashTree = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [Shortcut(keyCode: 2, modifiers: UInt32(cmdKey), key: "d"), mergeCmdE]),
+]
+let clash = Duplicates.merge(clashTree)
+check(clash.nodes[0].shortcuts == [mergeCmdD, mergeCmdE], "a clashing copy shortcut is dropped, the other is inherited")
+check(clash.conflicts == ["⌘d (Docs copy)"] && clash.summary == "Merged 2 items. 1 shortcut was kept from another copy. Not kept, because the key is already used: ⌘d (Docs copy).", "a clash is listed in the summary")
+let elsewhere = [
+    LibraryItem(name: "Mail", url: "https://mail.example.com", shortcuts: [mergeCmdE]),
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs copy", url: "https://docs.example.com", shortcuts: [mergeCmdE]),
+]
+let elsewhereResult = Duplicates.merge(elsewhere)
+check(elsewhereResult.nodes.first { $0.name == "Docs" }?.shortcuts == nil && elsewhereResult.summary == "Merged 2 items. Not kept, because the key is already used: ⌘E (Docs copy).", "a key used by another item is a clash")
+let twoCopies = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com"),
+    LibraryItem(name: "Docs b", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+    LibraryItem(name: "Docs c", url: "https://docs.example.com", shortcuts: [mergeCmdD]),
+]
+let twoCopiesResult = Duplicates.merge(twoCopies)
+check(twoCopiesResult.nodes[0].shortcuts == [mergeCmdD] && twoCopiesResult.inheritedCount == 1 && twoCopiesResult.conflicts == ["⌘D (Docs c)"], "two copies with one key: the first wins, the second is listed")
+let plainCopies = [LibraryItem(name: "A", url: "https://a.example.com"), LibraryItem(name: "B", url: "https://a.example.com")]
+check(Duplicates.merge(plainCopies).summary == "Merged 2 items." && Duplicates.merge(plainCopies).nodes[0].shortcuts == nil, "no shortcuts to keep means a plain summary")
 
 // ---- bulk edit (pure) ----
 let bulkTree = [
@@ -1064,9 +1111,9 @@ check(backupError(Data(#"{"format":"library-backup","items":[]}"#.utf8)) == .uns
 check(backupError(Data("not json".utf8)) == .malformed && backupError(Data()) == .malformed, "garbage is rejected")
 check(backupError(Data(#"{"format":"library-backup","version":1,"items":"oops"}"#.utf8)) == .malformed, "bad items are rejected")
 let twin = LibraryItem(name: "Twin", url: "https://twin.example.com")
-var clash = LibraryItem(name: "Other", url: "https://other.example.com")
-clash.id = twin.id
-if let dupes = try? LibraryBackup.encode([twin, clash]) {
+var backupClash = LibraryItem(name: "Other", url: "https://other.example.com")
+backupClash.id = twin.id
+if let dupes = try? LibraryBackup.encode([twin, backupClash]) {
     check(backupError(dupes) == .duplicateIDs, "repeated ids are rejected")
 }
 check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")
@@ -1202,6 +1249,62 @@ do {
     check(!LibrarySync.isLinked(local) && (try? Data(contentsOf: local)) == Data("RECOVER".utf8), "recovery copies the iCloud copy back to this Mac")
     check(LibrarySync.enablePrompt(iCloudFolderExists: true, cloudFileExists: false) == .move, "a missing iCloud copy is a move, not a read")
 }
+// ---- Pinned item lock: state transitions and the title and copy decisions. The Touch ID or password prompt
+// itself needs a person at the keyboard, so these checks never run it. ----
+var lockState = PinnedLock()
+check(!lockState.isUnlocked, "a new session starts locked, so quitting clears the unlock")
+let firstAttempt = lockState.generation
+lockState.finishAuthentication(succeeded: false, startedAt: firstAttempt)
+check(!lockState.isUnlocked, "a cancelled or failed prompt leaves the items locked")
+lockState.finishAuthentication(succeeded: true, startedAt: firstAttempt)
+check(lockState.isUnlocked, "a successful prompt unlocks")
+lockState.finishAuthentication(succeeded: false, startedAt: firstAttempt)
+check(lockState.isUnlocked, "unlocked stays unlocked: a cancelled prompt does not relock")
+lockState.systemWillSleep()
+check(!lockState.isUnlocked, "the Mac going to sleep locks the items")
+lockState.finishAuthentication(succeeded: true, startedAt: firstAttempt)
+check(!lockState.isUnlocked, "a prompt that began before sleep cannot unlock after it")
+lockState.finishAuthentication(succeeded: true, startedAt: lockState.generation)
+check(lockState.isUnlocked, "a prompt that begins after sleep unlocks")
+lockState.lock()
+check(!lockState.isUnlocked, "Lock Pinned Items locks again")
+check(PinnedLock.access(pinned: true, required: true, unlocked: false) == .afterAuthentication, "a locked pinned item needs authentication to copy or show")
+check(PinnedLock.access(pinned: true, required: true, unlocked: true) == .now, "an unlocked pinned item copies at once")
+check(PinnedLock.access(pinned: false, required: true, unlocked: false) == .now, "unpinned history is never locked")
+check(PinnedLock.access(pinned: true, required: false, unlocked: false) == .now, "with the setting off, pinned items are open")
+check(PinnedLock.displayed("card 4111", pinned: true, required: true, unlocked: false) == "Pinned Item", "a locked pinned item's title is replaced")
+check(PinnedLock.displayed("card 4111", pinned: true, required: true, unlocked: true) == "card 4111", "an unlocked pinned item's title is shown")
+check(PinnedLock.displayed("notes", pinned: false, required: true, unlocked: false) == "notes", "an unpinned title is shown")
+check(PinnedLock.displayed("notes", pinned: true, required: false, unlocked: false) == "notes", "the title is shown with the setting off")
+// Touch ID and the Mac password may both be missing: enabling is refused, and a locked item explains instead of prompting.
+check(LockAvailability.decide(canAuthenticate: true, enabling: true, needsAuthentication: false) == .available, "with Touch ID or a password, the setting turns on")
+check(LockAvailability.decide(canAuthenticate: false, enabling: true, needsAuthentication: false) == .unavailableOnEnable, "with no password or Touch ID, the setting does not turn on")
+check(LockAvailability.decide(canAuthenticate: false, enabling: false, needsAuthentication: true) == .unavailableOnUse, "a locked item with no password or Touch ID explains instead of prompting")
+check(LockAvailability.decide(canAuthenticate: false, enabling: false, needsAuthentication: false) == .available, "turning the setting off or showing unpinned history needs no password")
+
+// The app's setting decides what the shared lock hides. It is set back to off afterwards.
+let sharedLock = ClipboardLock.shared
+sharedLock.isRequired = true
+var pinnedCopy = clip(.text, text: "a secret note")
+pinnedCopy.pinned = true
+check(sharedLock.isHidden(pinnedCopy) && sharedLock.title(for: pinnedCopy) == "Pinned Item" && sharedLock.menuTitle(for: pinnedCopy) == "Pinned Item",
+      "with the setting on, a locked pinned item is hidden in lists and menus")
+check(!sharedLock.isHidden(clip(.text, text: "an unpinned note")), "with the setting on, unpinned history is not hidden")
+// Searching the history must not reveal a locked pinned item's text.
+let searchFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-search-\(UUID().uuidString).json")
+let searchKey = SymmetricKey(size: .bits256)
+let searchPins = [PinnedFile.Clip(source: "Notes", date: Date(), representations: [["public.utf8-plain-text": Data("unlisted search words".utf8)]])]
+try? JSONEncoder().encode(searchPins).write(to: searchFile)
+let searchHistory = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-s-\(UUID().uuidString)")), file: searchFile, key: { searchKey })
+// Pinned items load in the background, so wait for the load to finish before checking them. The main run loop is
+// pumped meanwhile, since the load publishes its result on the main actor.
+let searchLoadDeadline = Date().addingTimeInterval(10)
+while !searchHistory.pinnedLoaded && Date() < searchLoadDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+check(searchHistory.pinnedLoaded && searchHistory.items.first?.pinned == true, "the pinned search fixture loads")
+check(searchHistory.search("unlisted").isEmpty, "a locked pinned item is not found by search")
+sharedLock.isRequired = false
+check(searchHistory.search("unlisted").count == 1 && !sharedLock.isHidden(pinnedCopy), "with the setting off, the pinned item is found and shown")
+try? FileManager.default.removeItem(at: searchFile)
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

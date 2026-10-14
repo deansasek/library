@@ -22,7 +22,8 @@ final class QuickOpenModel: ObservableObject {
     @Published var selection: String? {
         didSet {
             refreshPreview()
-            ClipPreview.shared.follow(selected?.clip)
+            // A locked pinned item is not previewed until the user asks for it.
+            ClipPreview.shared.follow(selected?.clip.flatMap { ClipboardLock.shared.isHidden($0) ? nil : $0 })
         }
     }
     private var animatedImages: [UUID: NSImage] = [:]
@@ -31,7 +32,7 @@ final class QuickOpenModel: ObservableObject {
     func animatedImage(for item: ClipItem) -> NSImage? {
         // The row holds a copy from when the list was built. A GIF may have finished downloading since.
         let item = ClipboardHistory.shared.items.first { $0.id == item.id } ?? item
-        guard item.isAnimated else { return nil }
+        guard !ClipboardLock.shared.isHidden(item), item.isAnimated else { return nil }
         if let cached = animatedImages[item.id] { return cached }
         let image = item.loadAnimated()
         animatedImages[item.id] = image
@@ -51,6 +52,7 @@ final class QuickOpenModel: ObservableObject {
     @Published var appeared = false
 
     private var historyObserver: AnyCancellable?
+    private var lockObserver: AnyCancellable?
 
     /// The text selected in the app that was in front when Quick Open opened. It can suggest adding a link.
     private let selectedText: String?
@@ -77,17 +79,35 @@ final class QuickOpenModel: ObservableObject {
             self?.objectWillChange.send()
             self?.refreshPreview()
         }
+        // Unlocking or locking a pinned item changes what the rows and the preview show.
+        lockObserver = ClipboardLock.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] in
+            self?.objectWillChange.send()
+            self?.refreshPreview()
+        }
     }
 
     /// Space previews the selected clip in Quick Look, or closes the preview if it is open. Returns false, so Space
     /// types a space, when the search has text and the selection is not a clip, or when there is nothing to preview.
+    /// A locked pinned item asks for authentication first, and Space is used up by that.
     func togglePreview() -> Bool {
         guard !showActions, query.isEmpty || selected?.clip != nil, let item = selected?.clip else { return false }
+        if ClipboardLock.shared.isHidden(item) {
+            ClipboardLock.shared.perform(item, for: .show) { ClipPreview.shared.toggle(item) }
+            return true
+        }
         return ClipPreview.shared.toggle(item)
     }
 
+    /// Shows a locked pinned item's text in the preview, once the user authenticates.
+    func reveal(_ item: ClipItem) {
+        ClipboardLock.shared.perform(item, for: .show) {}
+    }
+
     private func refreshPreview() {
-        previewImage = selected?.clip.flatMap { animatedImage(for: $0) ?? $0.image }
+        previewImage = selected?.clip.flatMap { clip -> NSImage? in
+            guard !ClipboardLock.shared.isHidden(clip) else { return nil }
+            return animatedImage(for: clip) ?? clip.image
+        }
     }
 
     /// How long a query change waits before the results are recomputed. Nil means now: a blank query shows the
@@ -150,10 +170,6 @@ final class QuickOpenModel: ObservableObject {
             list.insert(QuickOpenResult(kind: .openLink(link), id: "open"), at: 0)
             list.append(QuickOpenResult(kind: .addLink(link), id: "add"))
         }
-        list.append(QuickOpenResult(kind: .webSearch(text), id: "web"))
-        if let answer = QuickAnswers.answer(for: text) {
-            list.insert(QuickOpenResult(kind: .answer(value: answer.value, detail: answer.detail), id: "answer"), at: 0)
-        }
         // Headers as Spotlight has them: the first result is the Top Hit, and each kind of result after it
         // gets its own header the first time it appears.
         var shown = Set<String>()
@@ -162,7 +178,6 @@ final class QuickOpenModel: ObservableObject {
             switch list[index].kind {
             case .item: group = "Library"
             case .clip: group = "Clipboard"
-            case .answer: group = "Answer"
             case .snippet: group = "Snippets"
             default: group = "Suggestions"
             }
@@ -192,14 +207,12 @@ final class QuickOpenModel: ObservableObject {
 
     func icon(for result: QuickOpenResult) -> NSImage {
         switch result.kind {
-        case .answer: return symbol("equal.circle")
         case .addSuggestion: return symbol("plus.circle")
-        case .clip(let item): return item.icon
+        case .clip(let item): return ClipboardLock.shared.icon(for: item)
         case .item(let node, _): return store.icon(for: node)
         case .openLink: return symbol("safari")
         case .snippet: return symbol("text.quote")
         case .addLink: return symbol("plus.circle")
-        case .webSearch: return symbol("magnifyingglass")
         }
     }
 
@@ -208,7 +221,7 @@ final class QuickOpenModel: ObservableObject {
         let provider = NSItemProvider()
         isDragging = true
         switch result.kind {
-        case .clip(let item):
+        case .clip(let item) where !ClipboardLock.shared.isHidden(item):
             if let image = item.image {
                 provider.registerObject(image, visibility: .all)
             } else if let url = item.fileURLs.first {
@@ -220,8 +233,6 @@ final class QuickOpenModel: ObservableObject {
             if let url = node.shareURL { provider.registerObject(url as NSURL, visibility: .all) }
         case .openLink(let url), .addLink(let url):
             provider.registerObject(url as NSURL, visibility: .all)
-        case .answer(let value, _):
-            provider.registerObject(value as NSString, visibility: .all)
         case .snippet(let snippet):
             provider.registerObject(snippet.text as NSString, visibility: .all)
         default:
@@ -342,27 +353,35 @@ final class QuickOpenModel: ObservableObject {
 
     private func clipActions(for item: ClipItem) -> [QuickOpenAction] {
         let history = ClipboardHistory.shared
+        // Every action that copies or shows the text goes through the lock. Pin and Delete reveal nothing.
+        let lock = ClipboardLock.shared
         let verb = pastes ? "Paste" : "Copy"
         var list = [QuickOpenAction(id: "copy", title: verb) { [pastes] in
-            history.copy(item)
-            if pastes { FrontApp.pasteSoon() }
+            lock.perform(item, for: .copy) {
+                history.copy(item)
+                if pastes { FrontApp.pasteSoon() }
+            }
         }]
         if pastes {
-            list.append(QuickOpenAction(id: "copy-only", title: "Copy") { history.copy(item) })
+            list.append(QuickOpenAction(id: "copy-only", title: "Copy") { lock.perform(item, for: .copy) { history.copy(item) } })
         }
         if item.plainText != nil {
             list.append(QuickOpenAction(id: "plain", title: "\(verb) as Plain Text") { [pastes] in
-                history.copyPlainText(item)
-                if pastes { FrontApp.pasteSoon() }
+                lock.perform(item, for: .copy) {
+                    history.copyPlainText(item)
+                    if pastes { FrontApp.pasteSoon() }
+                }
             })
         }
         if item.kind == .link, let link = item.plainText?.trimmingCharacters(in: .whitespacesAndNewlines) {
-            list.append(QuickOpenAction(id: "copy-clean", title: "Copy Clean Link") { Self.copyText(TrackingParameters.clean(link)) })
+            list.append(QuickOpenAction(id: "copy-clean", title: "Copy Clean Link") { lock.perform(item, for: .copy) { Self.copyText(TrackingParameters.clean(link)) } })
         }
-        list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { ClipPreview.shared.show(item) })
+        list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { lock.perform(item, for: .show) { ClipPreview.shared.show(item) } })
         list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })
         if item.libraryNode != nil {
-            list.append(QuickOpenAction(id: "add", title: "Add to Library") { [store] in store.addToLibrary(item) })
+            list.append(QuickOpenAction(id: "add", title: "Add to Library") { [store] in
+                lock.perform(item, for: .show) { store.addToLibrary(item) }
+            })
         }
         list.append(QuickOpenAction(id: "delete", title: "Delete") { history.remove(item) })
         return list
@@ -377,15 +396,15 @@ final class QuickOpenModel: ObservableObject {
         }
         guard let result = selected else { return }
         switch result.kind {
-        case .answer(let value, _):
-            Self.copyText(value)
         case .snippet(let snippet):
             Self.copyText(snippet.text)
         case .addSuggestion(let suggestion):
             store.add(suggestion)
         case .clip(let item):
-            ClipboardHistory.shared.copy(item)
-            if pastes { FrontApp.pasteSoon() }
+            ClipboardLock.shared.perform(item, for: .copy) { [pastes] in
+                ClipboardHistory.shared.copy(item)
+                if pastes { FrontApp.pasteSoon() }
+            }
         case .item(let node, _):
             open(node, forceNew: flip ? node.openNew != true : nil)
         case .openLink(let url):
@@ -393,11 +412,6 @@ final class QuickOpenModel: ObservableObject {
         case .addLink(let url):
             store.perform("Add Bookmark") {
                 $0.append(LibraryItem(name: url.host ?? url.absoluteString, url: url.absoluteString), to: nil)
-            }
-        case .webSearch(let query):
-            let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-            if let url = URL(string: "https://www.google.com/search?q=\(encoded)") {
-                NSWorkspace.shared.open(url)
             }
         }
     }

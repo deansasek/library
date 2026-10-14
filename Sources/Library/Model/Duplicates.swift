@@ -61,21 +61,81 @@ enum Duplicates {
         return nil
     }
 
+    /// What a merge did: the new tree, and the counts and names the summary alert shows.
+    struct MergeResult {
+        let nodes: [LibraryItem]
+        /// Items in the merged groups, kept and removed.
+        let mergedCount: Int
+        /// Shortcuts moved from removed copies to the item kept.
+        let inheritedCount: Int
+        /// Shortcuts of removed copies that were not moved, as "⌘D (Docs copy)", because the key was already used.
+        let conflicts: [String]
+
+        /// The alert text, such as "Merged 3 items. 1 shortcut was kept from another copy."
+        var summary: String {
+            var sentences = ["Merged \(mergedCount) items."]
+            if inheritedCount > 0 {
+                sentences.append(inheritedCount == 1 ? "1 shortcut was kept from another copy."
+                    : "\(inheritedCount) shortcuts were kept from other copies.")
+            }
+            if !conflicts.isEmpty {
+                sentences.append("Not kept, because the key is already used: " + conflicts.joined(separator: ", ") + ".")
+            }
+            return sentences.joined(separator: " ")
+        }
+    }
+
     /// Keeps one item per group and removes the others, returning the new tree. `choices` maps a group id to the item
-    /// to keep. A group without a choice keeps its first item. The kept item keeps its own shortcuts and folder, and its
-    /// keywords become the unique words of every item in the group.
-    static func merged(_ nodes: [LibraryItem], keeping choices: [String: UUID] = [:]) -> [LibraryItem] {
+    /// to keep. A group without a choice keeps its first item. The kept item keeps its own folder and shortcuts, and
+    /// its keywords become the unique words of every item in the group. It also takes each shortcut of the removed
+    /// copies whose key combination no remaining item uses. Those that clash are dropped and listed in the result.
+    static func merge(_ nodes: [LibraryItem], keeping choices: [String: UUID] = [:]) -> MergeResult {
+        let found = groups(in: nodes)
+        var kept: [(group: Group, item: LibraryItem, others: [LibraryItem])] = []
+        for group in found {
+            let item = group.items.first { $0.id == choices[group.id] } ?? group.items[0]
+            kept.append((group, item, group.items.filter { $0.id != item.id }))
+        }
+        let removedIDs = Set(kept.flatMap { $0.others.map(\.id) })
+        var taken = Set(everyNode(nodes).filter { !removedIDs.contains($0.id) }.flatMap { ($0.shortcuts ?? []).filter { !$0.isEmpty }.map(comboKey) })
+
         var result = nodes
-        for group in groups(in: nodes) {
-            let kept = group.items.first { $0.id == choices[group.id] } ?? group.items[0]
-            let others = group.items.filter { $0.id != kept.id }
-            let keywords = joinKeywords([kept.keywords] + others.map(\.keywords))
-            result.update(kept.id) { $0.keywords = keywords }
-            for other in others {
+        var inherited = 0
+        var conflicts: [String] = []
+        for entry in kept {
+            var moved: [Shortcut] = []
+            for other in entry.others {
+                for shortcut in (other.shortcuts ?? []) where !shortcut.isEmpty {
+                    if taken.insert(comboKey(shortcut)).inserted {
+                        moved.append(shortcut)
+                    } else {
+                        conflicts.append("\(shortcut.description) (\(other.name))")
+                    }
+                }
+            }
+            let keywords = joinKeywords([entry.item.keywords] + entry.others.map(\.keywords))
+            result.update(entry.item.id) {
+                $0.keywords = keywords
+                if !moved.isEmpty { $0.shortcuts = ($0.shortcuts ?? []) + moved }
+            }
+            inherited += moved.count
+            for other in entry.others {
                 result.removeNode(other.id)
             }
         }
-        return result
+        return MergeResult(nodes: result, mergedCount: found.reduce(0) { $0 + $1.items.count },
+                           inheritedCount: inherited, conflicts: conflicts)
+    }
+
+    /// Every node in the tree, folders included.
+    private static func everyNode(_ nodes: [LibraryItem]) -> [LibraryItem] {
+        nodes.flatMap { [$0] + everyNode($0.children ?? []) }
+    }
+
+    /// The key combination of a shortcut, so two shortcuts that do the same thing compare equal. Openers that
+    /// differ only in "open in new window" still clash.
+    static func comboKey(_ shortcut: Shortcut) -> String {
+        "\(shortcut.keyCode)|\(shortcut.key.lowercased())|\(shortcut.modifiers)|\(shortcut.button ?? -1)|\(shortcut.gesture ?? "")"
     }
 
     /// The words of every text, in order, without repeats. Case is ignored when comparing, and the first spelling wins.

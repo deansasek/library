@@ -64,11 +64,6 @@ func runAuditBenchmark() async {
             data.append(chunk)
         }
     }
-    // Quick Open runs the calculator on every keystroke. A pasted line is now refused before it is parsed.
-    let longLine = String(repeating: "(", count: 300) + "1"
-    await timeAsync("quick answer, 300-character line") {
-        for _ in 0..<1_000 { _ = QuickAnswers.answer(for: longLine) }
-    }
     // The Quick Open watch runs on the main thread every half second. This is what one window-list query costs.
     await timeAsync("window list query for the Spotlight watch") {
         for _ in 0..<20 { _ = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) }

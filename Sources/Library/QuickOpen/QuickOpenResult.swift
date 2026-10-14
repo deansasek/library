@@ -6,12 +6,9 @@ struct QuickOpenResult: Identifiable {
         case item(LibraryItem, folder: String)
         case openLink(URL)
         case addLink(URL)
-        case webSearch(String)
         case clip(ClipItem)
         /// The link or application on the clipboard, offered as an addition to the library.
         case addSuggestion(AddSuggestion)
-        /// An arithmetic or unit answer. Return copies the value.
-        case answer(value: String, detail: String)
         /// A saved snippet. Return copies its text.
         case snippet(Snippet)
     }
@@ -41,21 +38,18 @@ struct QuickOpenResult: Identifiable {
 
     var title: String {
         switch kind {
-        case .answer(let value, _): return value
         case .addSuggestion(let suggestion): return suggestion.title
         case .clip(let item): return item.title
         case .item(let node, _): return node.name
         case .snippet(let snippet): return snippet.name
         case .openLink(let url): return "Open \(url.host ?? url.absoluteString)"
         case .addLink(let url): return "Add “\(url.host ?? url.absoluteString)” to Library"
-        case .webSearch(let query): return "Search the Web for “\(query)”"
         }
     }
 
     /// What the item opens, with its folder in front.
     @MainActor var subtitle: String {
         switch kind {
-        case .answer(_, let detail): return "\(detail) · Return copies the answer"
         case .addSuggestion(let suggestion): return suggestion.subtitle
         case .clip(let item): return item.subtitle
         case .snippet(let snippet): return snippet.text.split(whereSeparator: \.isNewline).joined(separator: " ")
@@ -63,7 +57,6 @@ struct QuickOpenResult: Identifiable {
             let detail = node.url ?? node.command ?? node.appPath ?? ""
             return folder.isEmpty ? detail : "\(folder) · \(detail)"
         case .openLink(let url), .addLink(let url): return url.absoluteString
-        case .webSearch: return "Google"
         }
     }
 

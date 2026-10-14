@@ -124,6 +124,22 @@ struct QuickOpenView: View {
     @ViewBuilder
     private func previewContent(_ result: QuickOpenResult?) -> some View {
         switch result?.kind {
+        case .clip(let item)? where ClipboardLock.shared.isHidden(item):
+            // A locked pinned item shows no text until the user authenticates here.
+            Label {
+                Text("Pinned Item", bundle: L10n.bundle)
+            } icon: {
+                Image(systemName: "lock.fill")
+            }
+            .font(.title3.weight(.semibold))
+            Button {
+                model.reveal(item)
+            } label: {
+                Text("Show Pinned Item", bundle: L10n.bundle)
+            }
+            Text(item.subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
         case .clip(let item)?:
             switch item.kind {
             case .image:
@@ -163,9 +179,6 @@ struct QuickOpenView: View {
             if !folder.isEmpty {
                 Text("In \(folder)").font(.caption).foregroundStyle(.secondary)
             }
-        case .answer(let value, let detail)?:
-            Text(value).font(.largeTitle.weight(.light))
-            Text(detail).font(.callout).foregroundStyle(.secondary)
         case .snippet(let snippet)?:
             Text(snippet.name).font(.title3.weight(.semibold))
             Text(String(snippet.text.prefix(4000)))

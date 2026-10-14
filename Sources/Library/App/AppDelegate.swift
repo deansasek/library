@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSUpdateDynamicServices()
         _ = ClipboardHistory.shared  // starts watching the clipboard
         ClipPreviewSource.removeLeftovers()
+        _ = ClipboardLock.shared  // starts watching for sleep, so the pinned items lock
         if UserDefaults.standard.bool(forKey: "reenableLoginItemAfterMove") {
             UserDefaults.standard.removeObject(forKey: "reenableLoginItemAfterMove")
             LoginItem.shared.set(true)

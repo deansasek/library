@@ -109,10 +109,21 @@ struct EditSheet: View {
                     get: { node.isTemplate },
                     set: { on in
                         let url = node.url ?? ""
-                        state.draft.url = on ? url + "{}" : withoutPlaceholders(url)
+                        state.draft.url = on ? url + "{}" : withoutPlaceholders(url, declared: node.templateFields)
+                        if !on {
+                            state.draft.templateFields = nil
+                            state.fieldsText = ""
+                        }
                     }
                 ))
                 if node.isTemplate {
+                    TextField("Fields", text: Binding(
+                        get: { state.fieldsText },
+                        set: { text in
+                            state.fieldsText = text
+                            state.draft.templateFields = parseTemplateFields(text)
+                        }
+                    ), prompt: Text("Optional, such as query:Search"))
                     if node.placeholders.contains(where: { $0.name.isEmpty }) {
                         TextField("Prompt", text: Binding(
                             get: { node.promptLabel ?? "" },
@@ -120,7 +131,7 @@ struct EditSheet: View {
                         ), prompt: Text("Value"))
                     }
                     LabeledContent("Opens") {
-                        Text(templatePreview(node.url ?? ""))
+                        Text(templatePreview(node.url ?? "", declared: node.templateFields))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
@@ -128,7 +139,7 @@ struct EditSheet: View {
                 }
             } footer: {
                 if node.isTemplate {
-                    Text("Each value you enter replaces its placeholder. Write {name:Label} to ask for several labeled values in one sheet.")
+                    Text("Each value you enter replaces its placeholder. To ask for several values, name them in Fields, such as query:Search, and write {query} in the URL. Other braces are plain text.")
                 }
             }
         } else if let path = node.appPath {

@@ -85,8 +85,14 @@ struct DuplicatesSheet: View {
     /// Removes the items that were not chosen, as one undoable step.
     private func merge() {
         let choices = state.keepChoices
-        store.perform("Merge Duplicates") { $0 = Duplicates.merged($0, keeping: choices) }
+        var outcome: Duplicates.MergeResult?
+        store.perform("Merge Duplicates") { nodes in
+            let result = Duplicates.merge(nodes, keeping: choices)
+            nodes = result.nodes
+            outcome = result
+        }
         state.selection = state.selection.intersection(Set(store.nodes.allIDs))
         state.sheet = nil
+        state.mergeSummary = outcome?.summary
     }
 }

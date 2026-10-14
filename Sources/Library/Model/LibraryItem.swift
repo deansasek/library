@@ -31,6 +31,9 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     var deletedDate: Date?
     /// The folder the item was in when it was deleted, so Restore can put it back there.
     var deletedFrom: UUID?
+    /// The named fields a URL template declares in Get Info, each "name" or "name:Label". Only declared names are
+    /// placeholders, so `{name}` is plain text in a URL without them. Nil for templates that use only `{}`.
+    var templateFields: [String]?
 
     var isFolder: Bool { children != nil }
 
@@ -57,11 +60,11 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     /// True for items that open something, so they can have a shortcut.
     var isOpenable: Bool { url != nil || appPath != nil || command != nil }
 
-    /// True when the URL has a placeholder (`{}`, `{name}`, or `{name:Label}`) that is filled in when opening.
+    /// True when the URL has a placeholder (`{}`, or a declared `{name}` or `{name:Label}`) that is filled in when opening.
     var isTemplate: Bool { !placeholders.isEmpty }
 
     /// The distinct values the URL asks for, in order. Empty when the URL is not a template.
-    var placeholders: [TemplateField] { templateFields(in: url ?? "") }
+    var placeholders: [TemplateField] { templateFieldList(in: url ?? "", declared: templateFields) }
 
     /// The URL to open, with every placeholder left empty. Adds `https://` when the scheme is missing.
     var link: URL? { link(filling: "") }
@@ -74,7 +77,7 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     /// The URL to open with each placeholder replaced by the percent-encoded value for its name. Nil when a
     /// placeholder has no value, or when nothing is left to open.
     func link(values: [String: String]) -> URL? {
-        guard let filled = fillTemplate(url ?? "", values: values) else { return nil }
+        guard let filled = fillTemplate(url ?? "", declared: templateFields, values: values) else { return nil }
         let trimmed = filled.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return nil }
         return URL(string: trimmed.contains("://") ? trimmed : "https://\(trimmed)")
@@ -99,9 +102,11 @@ private struct PlaceholderToken {
     let label: String?
 }
 
-/// The placeholders of `url` in order. `{}` has no name, `{name}` has one, and `{name:Label}` adds a label. Braces
-/// that never close, or that enclose another `{`, are plain text.
-private func placeholderTokens(in url: String) -> [PlaceholderToken] {
+/// The placeholders of `url` that are fields, in order. `{}` is always a field. A named one, `{name}` or
+/// `{name:Label}`, is a field only when `declared` names it, so other braces stay plain text. Braces that never
+/// close, or that enclose another `{`, are plain text too.
+private func placeholderTokens(in url: String, declared: [String]?) -> [PlaceholderToken] {
+    let names = Set((declared ?? []).map { splitDeclaredField($0).name })
     var tokens: [PlaceholderToken] = []
     var index = url.startIndex
     while let open = url[index...].firstIndex(of: "{") {
@@ -114,33 +119,63 @@ private func placeholderTokens(in url: String) -> [PlaceholderToken] {
         let parts = url[afterOpen..<close].split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
         let name = parts[0].trimmingCharacters(in: .whitespaces)
         let label = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
-        tokens.append(PlaceholderToken(range: open..<url.index(after: close), name: name, label: label.isEmpty ? nil : label))
+        if name.isEmpty || names.contains(name) {
+            tokens.append(PlaceholderToken(range: open..<url.index(after: close), name: name, label: label.isEmpty ? nil : label))
+        }
         index = url.index(after: close)
     }
     return tokens
 }
 
-/// The distinct fields `url` asks for, in the order they first appear. A name that repeats shares one field, and the
-/// first label given for it is kept.
-func templateFields(in url: String) -> [TemplateField] {
+/// The name and label of one declared field, such as "query:Search terms". The label is empty when none is given.
+private func splitDeclaredField(_ text: String) -> (name: String, label: String) {
+    let parts = text.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: false)
+    let name = parts[0].trimmingCharacters(in: .whitespaces)
+    let label = parts.count > 1 ? parts[1].trimmingCharacters(in: .whitespaces) : ""
+    return (name, label)
+}
+
+/// The fields Get Info declares, from its Fields text: comma-separated names, each with an optional label after a
+/// colon, such as "query:Search terms, sort". Empty names and repeated names are dropped, and the first one wins.
+/// Nil when nothing is left, so the URL has no named fields.
+func parseTemplateFields(_ text: String) -> [String]? {
+    var seen = Set<String>()
+    var fields: [String] = []
+    for part in text.split(separator: ",") {
+        let (name, label) = splitDeclaredField(String(part))
+        guard !name.isEmpty, !name.contains(where: { "{}".contains($0) }), seen.insert(name).inserted else { continue }
+        fields.append(label.isEmpty ? name : name + ":" + label)
+    }
+    return fields.isEmpty ? nil : fields
+}
+
+/// The distinct fields `url` asks for, in the order they first appear. A name that repeats shares one field. Its
+/// label is the one declared for it, or else the first label the URL gives it.
+func templateFieldList(in url: String, declared: [String]? = nil) -> [TemplateField] {
+    var declaredLabels: [String: String] = [:]
+    for field in declared ?? [] {
+        let (name, label) = splitDeclaredField(field)
+        if declaredLabels[name] == nil { declaredLabels[name] = label }
+    }
     var fields: [TemplateField] = []
-    for token in placeholderTokens(in: url) {
+    for token in placeholderTokens(in: url, declared: declared) {
+        let declaredLabel = declaredLabels[token.name].flatMap { $0.isEmpty ? nil : $0 }
         if let index = fields.firstIndex(where: { $0.name == token.name }) {
-            if fields[index].label == nil, let label = token.label {
+            if fields[index].label == nil, let label = declaredLabel ?? token.label {
                 fields[index] = TemplateField(name: token.name, label: label)
             }
         } else {
-            fields.append(TemplateField(name: token.name, label: token.label))
+            fields.append(TemplateField(name: token.name, label: declaredLabel ?? token.label))
         }
     }
     return fields
 }
 
 /// `url` with each placeholder replaced by `text(name)`. Nil when `text` returns nil for a name.
-private func replacePlaceholders(in url: String, _ text: (String) -> String?) -> String? {
+private func replacePlaceholders(in url: String, declared: [String]?, _ text: (String) -> String?) -> String? {
     var result = ""
     var last = url.startIndex
-    for token in placeholderTokens(in: url) {
+    for token in placeholderTokens(in: url, declared: declared) {
         guard let replacement = text(token.name) else { return nil }
         result += String(url[last..<token.range.lowerBound]) + replacement
         last = token.range.upperBound
@@ -150,22 +185,22 @@ private func replacePlaceholders(in url: String, _ text: (String) -> String?) ->
 
 /// `url` with each placeholder replaced by the percent-encoded value for its name. Nil when a name has no value.
 /// Values are encoded the same way for every placeholder: only unreserved characters pass through.
-func fillTemplate(_ url: String, values: [String: String]) -> String? {
+func fillTemplate(_ url: String, declared: [String]? = nil, values: [String: String]) -> String? {
     let unreserved = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-    return replacePlaceholders(in: url) { name in
+    return replacePlaceholders(in: url, declared: declared) { name in
         values[name].map { $0.addingPercentEncoding(withAllowedCharacters: unreserved) ?? $0 }
     }
 }
 
 /// `url` with every placeholder removed.
-func withoutPlaceholders(_ url: String) -> String {
-    replacePlaceholders(in: url) { _ in "" } ?? url
+func withoutPlaceholders(_ url: String, declared: [String]? = nil) -> String {
+    replacePlaceholders(in: url, declared: declared) { _ in "" } ?? url
 }
 
 /// `url` with each placeholder shown as ‹label› for the edit sheet's preview.
-func templatePreview(_ url: String) -> String {
-    let fields = templateFields(in: url)
-    return replacePlaceholders(in: url) { name in
+func templatePreview(_ url: String, declared: [String]? = nil) -> String {
+    let fields = templateFieldList(in: url, declared: declared)
+    return replacePlaceholders(in: url, declared: declared) { name in
         let field = fields.first { $0.name == name }
         return "‹\(field?.label ?? (name.isEmpty ? "value" : name))›"
     } ?? url
