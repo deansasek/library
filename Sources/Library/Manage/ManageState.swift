@@ -24,6 +24,8 @@ final class ManageState: ObservableObject {
     /// The row a drag is over, for the drop highlight.
     @Published var dropTarget: UUID?
     @Published var sheet: Sheet?
+    /// The text in the window's search field. Separate from `search`, which filters the app picker.
+    @Published var query = ""
 
     // Add sheets.
     @Published var name = ""

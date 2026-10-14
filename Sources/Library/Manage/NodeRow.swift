@@ -33,6 +33,7 @@ struct NodeRow: View {
                     if store.failedShortcuts.contains(node.id) {
                         Image(systemName: "exclamationmark.triangle")
                             .help("A shortcut is in use by another app")
+                            .accessibilityLabel("Shortcut in use by another app")
                     }
                     Text(shortcuts.map(\.description).joined(separator: ", "))
                         .lineLimit(1)
@@ -45,6 +46,8 @@ struct NodeRow: View {
                 .truncationMode(.middle)
                 .frame(width: pathWidth, alignment: .leading)
         }
+        .accessibilityElement(children: state.renamingID == node.id ? .contain : .combine)
+        .accessibilityLabel(accessibilityName)
         .onDrag {
             // The ids move rows inside this window. A link or app file can also be dropped into other apps.
             let provider = NSItemProvider()
@@ -80,6 +83,23 @@ struct NodeRow: View {
                 }
             }
         }
+    }
+
+    /// The name and kind, as VoiceOver reads a row. Adds a warning when a shortcut is in use elsewhere.
+    private var accessibilityName: String {
+        var label = "\(node.name), \(kindName)"
+        if store.failedShortcuts.contains(node.id) {
+            label += ", shortcut in use by another app"
+        }
+        return label
+    }
+
+    private var kindName: String {
+        if node.isDivider == true { return "divider" }
+        if node.isFolder { return "folder" }
+        if node.appPath != nil { return "application" }
+        if node.command != nil { return "terminal command" }
+        return "bookmark"
     }
 
     /// What the item opens, plus its behavior when it is not the default.

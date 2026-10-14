@@ -13,6 +13,7 @@ struct LibraryApp: App {
             ManageView(store: store)
         }
         .windowResizability(.contentMinSize)
+        .windowToolbarStyle(.unified)
         // A menu bar app starts with no window.
         .defaultLaunchBehavior(.suppressed)
         // Opening a library:// link must not open the window. The app delegate handles it.
