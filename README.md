@@ -191,7 +191,7 @@ Your data is stored in `~/.library/`:
 | File | Contents |
 | --- | --- |
 | `bookmarks.json` | Your items, folders, shortcuts, and order |
-| `clipboard.json` | Pinned clipboard items, readable only by you |
+| `clipboard.json` | Pinned clipboard items, encrypted with a key kept in your Keychain |
 | `favicons/` | Cached site icons. Library downloads them again if you delete the folder. |
 
 If Library can't read `bookmarks.json`, it saves a copy as `bookmarks-damaged.json` and tells you when it launches.

@@ -49,14 +49,12 @@ final class ClipboardHistory: ObservableObject {
     /// Pinned items are saved here, so text you keep survives a restart. Everything else stays in memory.
     nonisolated static let defaultFile = LibraryStore.dir.appendingPathComponent("clipboard.json")
 
-    private struct StoredClip: Codable {
-        var source: String?
-        var date: Date
-        var representations: [[String: Data]]
-    }
-
     private let pasteboard: NSPasteboard
     private let file: URL?
+    /// Supplies the key that encrypts pinned items. Tests pass their own, so they never touch the Keychain.
+    private let loadKey: () throws -> SymmetricKey
+    /// True when clipboard.json exists but could not be opened because the key was unavailable.
+    private var leavesPinnedFile = false
     private var timer: Timer?
     private var lastChange: Int
     /// Counts copies, so an older copy that finishes building late does not take over `current`.
@@ -65,10 +63,12 @@ final class ClipboardHistory: ObservableObject {
     private(set) var pendingCaptures = 0
 
     /// `pasteboard` is the system clipboard, or another one for checking the history without touching it.
-    /// `file` is where pinned items are saved. Nil saves nothing.
-    init(pasteboard: NSPasteboard = .general, file: URL? = ClipboardHistory.defaultFile) {
+    /// `file` is where pinned items are saved. Nil saves nothing. `key` encrypts that file.
+    init(pasteboard: NSPasteboard = .general, file: URL? = ClipboardHistory.defaultFile,
+         key: @escaping () throws -> SymmetricKey = ClipboardKey.key) {
         self.pasteboard = pasteboard
         self.file = file
+        self.loadKey = key
         lastChange = pasteboard.changeCount
         isEnabled = UserDefaults.standard.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
         playsGIFs = UserDefaults.standard.object(forKey: "clipboardPlaysGIFs") as? Bool ?? false
@@ -78,30 +78,79 @@ final class ClipboardHistory: ObservableObject {
     }
 
     private func loadPinned() {
-        guard let file, let data = try? Data(contentsOf: file),
-              let stored = try? JSONDecoder().decode([StoredClip].self, from: data) else { return }
-        items = stored.compactMap { clip in
-            let representations = clip.representations.map { representation in
-                Dictionary(uniqueKeysWithValues: representation.map { (NSPasteboard.PasteboardType($0.key), $0.value) })
+        guard let file, FileManager.default.fileExists(atPath: file.path) else { return }
+        guard let data = try? Data(contentsOf: file) else {
+            NSLog("Library: could not read clipboard.json, so pinned items were not loaded")
+            return
+        }
+        let key: SymmetricKey?
+        do {
+            key = try loadKey()
+        } catch {
+            NSLog("Library: pinned clipboard key unavailable, so pinned items were not loaded: \(error)")
+            key = nil
+        }
+        // Without a key, the file was not verified, so nothing may overwrite or delete it until a later launch.
+        leavesPinnedFile = key == nil
+        switch PinnedFile.read(data, key: key) {
+        case .clips(let clips, let migrated):
+            items = clips.compactMap { clip in
+                let representations = clip.representations.map { representation in
+                    Dictionary(uniqueKeysWithValues: representation.map { (NSPasteboard.PasteboardType($0.key), $0.value) })
+                }
+                let bytes = representations.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } }
+                guard var item = Self.makeItem(representations: representations, bytes: bytes, date: clip.date) else { return nil }
+                item.pinned = true
+                item.sourceApp = clip.source
+                return item
             }
-            let bytes = representations.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } }
-            guard var item = Self.makeItem(representations: representations, bytes: bytes, date: clip.date) else { return nil }
-            item.pinned = true
-            item.sourceApp = clip.source
-            return item
+            // A plain-text file from before encryption is saved again, which replaces it with the sealed copy.
+            if migrated {
+                NSLog("Library: encrypting pinned clipboard items saved before encryption")
+                savePinned()
+            }
+        case .unreadable:
+            // With no key, the file may be fine, so it is left alone. With a key, it is damaged: keep it for
+            // inspection and start with no pins.
+            guard key != nil else { return }
+            NSLog("Library: clipboard.json could not be read, so it was moved to clipboard-damaged.bin")
+            quarantine(file)
         }
     }
 
-    /// Writes the pinned items to clipboard.json, readable only by you, or removes the file when none are left.
+    /// Moves a damaged clipboard.json aside, replacing any earlier copy of it.
+    private func quarantine(_ file: URL) {
+        let damaged = file.deletingLastPathComponent().appendingPathComponent("clipboard-damaged.bin")
+        try? FileManager.default.removeItem(at: damaged)
+        do {
+            try FileManager.default.moveItem(at: file, to: damaged)
+        } catch {
+            NSLog("Library: could not move the damaged clipboard.json aside: \(error)")
+        }
+    }
+
+    /// Writes the pinned items to clipboard.json, sealed with the Keychain key, or removes the file when none are
+    /// left. If the key is unavailable, nothing is written, so no plain text is ever saved.
     private func savePinned() {
         guard let file else { return }
-        let stored = items.filter(\.pinned).map { item in
-            StoredClip(source: item.sourceApp, date: item.date, representations: item.representations.map { representation in
+        guard !leavesPinnedFile else {
+            NSLog("Library: pinned clipboard items were not saved, because clipboard.json was not opened this launch")
+            return
+        }
+        let clips = items.filter(\.pinned).map { item in
+            PinnedFile.Clip(source: item.sourceApp, date: item.date, representations: item.representations.map { representation in
                 Dictionary(uniqueKeysWithValues: representation.map { ($0.key.rawValue, $0.value) })
             })
         }
-        guard !stored.isEmpty, let data = try? JSONEncoder().encode(stored) else {
+        guard !clips.isEmpty else {
             try? FileManager.default.removeItem(at: file)
+            return
+        }
+        let data: Data
+        do {
+            data = try PinnedFile.encode(clips, key: loadKey())
+        } catch {
+            NSLog("Library: pinned clipboard items were not saved, because the key is unavailable: \(error)")
             return
         }
         // The temporary file is private from the moment it is created, then renamed over the old one, so the
