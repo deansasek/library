@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A bookmark (`url`), an application (`appPath`), a terminal command (`command`),
 /// a folder (`children`), or a titled divider (`isDivider`).
-struct LibraryItem: Codable, Identifiable {
+struct LibraryItem: Codable, Identifiable, Equatable {
     var id = UUID()
     var name: String
     var url: String?
@@ -26,6 +26,8 @@ struct LibraryItem: Codable, Identifiable {
     var keywords: String?
     /// Label for the value prompt of a URL template.
     var promptLabel: String?
+    /// When this item last changed on this Mac. Used to merge changes from another Mac through iCloud Drive.
+    var modified: Date?
 
     var isFolder: Bool { children != nil }
 

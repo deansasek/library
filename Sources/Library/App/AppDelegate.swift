@@ -19,6 +19,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Library was just moved to Applications. Show the last page of the tour, with its check mark.
             UserDefaults.standard.removeObject(forKey: "resumeWelcomeAfterMove")
             Welcome.show(store: LibraryStore.shared, page: WelcomeModel.pageCount - 1)
+        } else if LibraryStore.shared.cloudFileMissing {
+            DispatchQueue.main.async { Self.reportCloudFileMissing() }
         } else if LibraryStore.shared.fileReadFailed {
             DispatchQueue.main.async { Self.reportReadFailure() }
         } else if LibraryStore.shared.hadUnreadableFile {
@@ -60,6 +62,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.activateFileViewerSelecting([LibraryStore.dir.appendingPathComponent("bookmarks-damaged.json")])
         }
+    }
+
+    /// Says that the library is linked to iCloud Drive and the iCloud copy is gone. Library changes nothing until it is back.
+    private static func reportCloudFileMissing() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Library Can’t Find bookmarks.json in iCloud Drive"
+        alert.informativeText = "Your library is kept in iCloud Drive, and that copy is missing. It may have been removed on another Mac, or iCloud may still be downloading it. Library won’t change anything until the file is back."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     /// Says that bookmarks.json exists but cannot be read. Library leaves the file as it is.

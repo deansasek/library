@@ -41,6 +41,16 @@ struct SettingsView: View {
                 Text("Library lives in the menu bar and opens its items from there.")
             }
             Section {
+                Toggle("Keep Library in iCloud Drive", isOn: Binding(
+                    get: { store.keepsInICloud },
+                    set: { store.setKeepsInICloud($0) }
+                ))
+            } header: {
+                Text("Storage")
+            } footer: {
+                Text("Library keeps bookmarks.json in iCloud Drive, so your library follows you to your other Macs. Clipboard history stays on this Mac.")
+            }
+            Section {
                 Toggle(isOn: $checksForUpdates) {
                     Text("Check for Updates Automatically", bundle: L10n.bundle)
                 }

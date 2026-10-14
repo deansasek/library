@@ -1070,6 +1070,119 @@ if let dupes = try? LibraryBackup.encode([twin, clash]) {
     check(backupError(dupes) == .duplicateIDs, "repeated ids are rejected")
 }
 check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")
+// ---- iCloud Drive library (rules and file steps; temporary folders, never the real iCloud Drive) ----
+func syncAt(_ seconds: Double) -> Date { Date(timeIntervalSince1970: 1_000_000 + seconds) }
+func syncItem(_ name: String, _ seconds: Double?, id: UUID = UUID(), children: [LibraryItem]? = nil) -> LibraryItem {
+    LibraryItem(id: id, name: name, url: "https://\(name).example.com", children: children, modified: seconds.map(syncAt))
+}
+
+// Prompt and steps
+check(LibrarySync.enablePrompt(iCloudFolderExists: false, cloudFileExists: true) == .unavailable, "no iCloud Drive, no move")
+check(LibrarySync.enablePrompt(iCloudFolderExists: true, cloudFileExists: false) == .move, "empty iCloud moves the library")
+check(LibrarySync.enablePrompt(iCloudFolderExists: true, cloudFileExists: true) == .askWhichToKeep, "two libraries ask")
+do {
+    let local = URL(fileURLWithPath: "/t/.library/bookmarks.json"), cloud = URL(fileURLWithPath: "/t/icloud/Library/bookmarks.json")
+    let bl = URL(fileURLWithPath: "/t/.library/before.json"), bc = URL(fileURLWithPath: "/t/.library/replaced.json")
+    check(LibrarySync.enableSteps(local: local, cloud: cloud, backupLocal: bl, backupCloud: bc, prompt: .move, choice: .useThisMac)
+        == [.copy(from: local, to: cloud), .verify(cloud, matches: local), .remove(local), .link(local, to: cloud)], "move copies, verifies, then links")
+    check(LibrarySync.enableSteps(local: local, cloud: cloud, backupLocal: bl, backupCloud: bc, prompt: .askWhichToKeep, choice: .useICloud)
+        == [.copy(from: local, to: bl), .remove(local), .link(local, to: cloud)], "using iCloud backs up this Mac's file first")
+    check(LibrarySync.enableSteps(local: local, cloud: cloud, backupLocal: bl, backupCloud: bc, prompt: .askWhichToKeep, choice: .useThisMac)
+        == [.copy(from: cloud, to: bc), .copy(from: local, to: cloud), .verify(cloud, matches: local), .remove(local), .link(local, to: cloud)], "replacing iCloud backs it up first")
+    check(LibrarySync.enableSteps(local: local, cloud: cloud, backupLocal: bl, backupCloud: bc, prompt: .askWhichToKeep, choice: .cancel).isEmpty, "cancel does nothing")
+    check(LibrarySync.disableSteps(local: local, cloud: cloud)
+        == [.remove(local), .copy(from: cloud, to: local), .verify(local, matches: cloud), .remove(cloud)], "turning off verifies before removing the iCloud copy")
+}
+
+// Stamps
+do {
+    let a = syncItem("a", 1), b = syncItem("b", 1), now = syncAt(50)
+    let renamed = [LibraryItem(id: a.id, name: "a2", url: a.url, modified: a.modified), b]
+    let afterRename = LibrarySync.stamped(renamed, against: [a, b], at: now)
+    check(afterRename[0].modified == now && afterRename[1].modified == syncAt(1), "a rename stamps only that item")
+    let swapped = LibrarySync.stamped([b, a], against: [a, b], at: now)
+    check(swapped.allSatisfy { $0.modified == now }, "a move stamps the items that moved")
+    let added = LibrarySync.stamped([a, b, syncItem("c", nil)], against: [a, b], at: now)
+    check(added[2].modified == now && added[0].modified == syncAt(1), "a new item is stamped, the others are not")
+    let x = syncItem("x", 2), folder = syncItem("f", 1, children: [x])
+    var edited = folder; edited.children = [LibraryItem(id: x.id, name: "x2", url: x.url, modified: x.modified)]
+    let inside = LibrarySync.stamped([edited], against: [folder], at: now)
+    check(inside[0].children?[0].modified == now && inside[0].modified == syncAt(1), "a change inside a folder stamps the item, not the folder")
+    let encoded = try! JSONEncoder().encode([a])
+    check((try? JSONDecoder().decode([LibraryItem].self, from: encoded))?.first?.modified == syncAt(1), "the stamp is saved in bookmarks.json")
+}
+
+// Merge
+do {
+    let id = UUID(), other = UUID()
+    let mine = syncItem("Mine", 2, id: id), theirs = syncItem("Theirs", 3, id: id)
+    let notice = LibrarySync.merge(local: [mine], remote: [theirs], lastSynced: syncAt(1), knownIDs: [id])
+    check(notice.items.map(\.name) == ["Theirs"] && notice.replacedEdits == ["Mine"], "a newer remote edit replaces an unsynced local edit, and says so")
+    let quiet = LibrarySync.merge(local: [syncItem("Old", 1, id: id)], remote: [theirs], lastSynced: syncAt(1.5), knownIDs: [id])
+    check(quiet.items.map(\.name) == ["Theirs"] && quiet.replacedEdits.isEmpty, "a synced local copy is replaced quietly")
+    let localWins = LibrarySync.merge(local: [syncItem("Local", 3, id: id)], remote: [syncItem("Remote", 2, id: id)], lastSynced: syncAt(1), knownIDs: [id])
+    check(localWins.items.map(\.name) == ["Local"] && localWins.replacedEdits.isEmpty, "a newer local edit wins without a notice")
+    let deleted = LibrarySync.merge(local: [syncItem("a", 1, id: id), syncItem("b", 1, id: other)], remote: [syncItem("a", 5, id: id)],
+                                    lastSynced: syncAt(1), knownIDs: [id, other])
+    check(deleted.items.map(\.name) == ["a"], "an item the newer side deleted stays deleted")
+    let newLocal = LibrarySync.merge(local: [syncItem("a", 1, id: id), syncItem("new", 2)], remote: [syncItem("a", 5, id: id)],
+                                     lastSynced: syncAt(1), knownIDs: [id])
+    check(newLocal.items.map(\.name) == ["a", "new"], "an item this Mac has not synced yet is kept")
+    let newRemote = LibrarySync.merge(local: [syncItem("a", 1, id: id)], remote: [syncItem("a", 1, id: id), syncItem("r", 6)],
+                                      lastSynced: syncAt(1), knownIDs: [id])
+    check(newRemote.items.map(\.name) == ["a", "r"], "an item added on the other Mac is kept")
+    let a = syncItem("a", 1), b = syncItem("b", 1)
+    let order = LibrarySync.merge(local: [a, b], remote: [b, a].map { var c = $0; c.modified = syncAt(0.5); return c }, lastSynced: syncAt(0), knownIDs: [a.id, b.id])
+    check(order.items.map(\.name) == ["a", "b"], "the side with the newer change decides the order")
+}
+
+// File steps on temporary folders
+do {
+    let fm = FileManager.default
+    let root = fm.temporaryDirectory.appendingPathComponent("library-sync-check-\(UUID().uuidString)", isDirectory: true)
+    defer { try? fm.removeItem(at: root) }
+    let local = root.appendingPathComponent(".library/bookmarks.json")
+    let cloud = root.appendingPathComponent("iCloud/Library/bookmarks.json")
+    let before = root.appendingPathComponent(".library/bookmarks-before-iCloud.json")
+    let replaced = root.appendingPathComponent(".library/bookmarks-iCloud-replaced.json")
+    try! fm.createDirectory(at: local.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try! Data("LOCAL".utf8).write(to: local)
+
+    try! LibrarySync.run(LibrarySync.enableSteps(local: local, cloud: cloud, backupLocal: before, backupCloud: replaced,
+                                                 prompt: .move, choice: .useThisMac))
+    check(LibrarySync.linkDestination(of: local) == cloud && (try? Data(contentsOf: cloud)) == Data("LOCAL".utf8), "moving links this Mac's file to iCloud")
+    check(LibrarySync.isLinked(local) && !LibrarySync.isDanglingLink(local), "the link works")
+    // A save writes to the link's destination, so the link stays a link.
+    try! Data("SAVED".utf8).write(to: LibrarySync.linkDestination(of: local)!, options: .atomic)
+    check(LibrarySync.isLinked(local) && (try? Data(contentsOf: local)) == Data("SAVED".utf8), "a save through the destination keeps the link")
+    try! LibrarySync.run(LibrarySync.disableSteps(local: local, cloud: cloud))
+    check(!LibrarySync.isLinked(local) && (try? Data(contentsOf: local)) == Data("SAVED".utf8) && !fm.fileExists(atPath: cloud.path), "turning off leaves a real file and removes the iCloud copy")
+
+    // Two libraries: iCloud is kept.
+    try! LibrarySync.run(LibrarySync.enableSteps(local: local, cloud: cloud, backupLocal: before, backupCloud: replaced,
+                                                 prompt: .move, choice: .useThisMac))
+    try! Data("LOCAL2".utf8).write(to: local)
+    try! Data("CLOUD".utf8).write(to: cloud)
+    try! LibrarySync.run(LibrarySync.enableSteps(local: local, cloud: cloud, backupLocal: before, backupCloud: replaced,
+                                                 prompt: .askWhichToKeep, choice: .useICloud))
+    check(LibrarySync.isLinked(local) && (try? Data(contentsOf: local)) == Data("CLOUD".utf8), "using the iCloud library links to it")
+    check((try? Data(contentsOf: before)) != nil, "the replaced file is kept as a backup")
+
+    // A copy that does not match stops the steps before anything is removed.
+    let stray = root.appendingPathComponent("stray.json")
+    try! Data("X".utf8).write(to: stray)
+    var mismatch = false
+    do { try LibrarySync.run([.verify(stray, matches: cloud)]) } catch { mismatch = true }
+    check(mismatch, "a mismatch is an error")
+
+    // The iCloud copy disappears, as after another Mac turned the option off.
+    try! fm.removeItem(at: cloud)
+    check(LibrarySync.isDanglingLink(local), "a link to a missing iCloud copy is dangling")
+    try! Data("RECOVER".utf8).write(to: root.appendingPathComponent("iCloud/Library/bookmarks.json"))
+    LibrarySync.recover(local: local, cloud: cloud)
+    check(!LibrarySync.isLinked(local) && (try? Data(contentsOf: local)) == Data("RECOVER".utf8), "recovery copies the iCloud copy back to this Mac")
+    check(LibrarySync.enablePrompt(iCloudFolderExists: true, cloudFileExists: false) == .move, "a missing iCloud copy is a move, not a read")
+}
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
