@@ -572,6 +572,19 @@ final class LibraryStore: ObservableObject {
         }
     }
 
+    /// Stores link check results on the bookmarks. Not an undo step, since a check is not an edit. The change is still
+    /// saved to bookmarks.json.
+    func recordLinkStatuses(_ statuses: [UUID: LinkStatus]) {
+        guard !statuses.isEmpty else { return }
+        undoSuppressed = true
+        var edited = nodes
+        for (id, status) in statuses {
+            edited.update(id) { $0.linkStatus = status }
+        }
+        nodes = edited
+        undoSuppressed = false
+    }
+
     /// Moves nodes into folder `folderID`, or to the top level when `nil`.
     func move(_ ids: Set<UUID>, to folderID: UUID?) {
         if let folderID, !nodes.folders(skipping: ids).contains(where: { $0.id == folderID }) {

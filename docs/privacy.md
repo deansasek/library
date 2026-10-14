@@ -10,6 +10,7 @@ The app connects to the internet only for these:
 
 - **Favicons** from the sites you bookmark.
 - **Copied GIFs**, only if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default). Library downloads a GIF you copied from a web page so it can play.
+- **Link checks**, only if you turn on **Check Links Periodically** in **Settings > General** (off by default): once a day, Library requests each bookmark's address with a HEAD request, which reads no page content.
 - **Update checks** to `https://api.github.com/repos/deansasek/library/releases/latest`. This happens when you choose **Check for Updates…**, and every hour when automatic checks are on (the default). The request names only the app's version, in its User-Agent header, and the ETag from GitHub's last answer, so unchanged checks cost nothing. No account or other data is sent.
 
 **Touch ID or password lock.** Turn on **Require Touch ID or password to show pinned items** in **Settings > Clipboard** (off by default). Pinned items stay hidden until you authenticate. The unlock lasts in memory until you choose **Lock Pinned Items**, the Mac sleeps, or Library quits. Search doesn't look inside locked items. If the Mac has no password and no Touch ID, Library won't turn the lock on and explains how to add one.

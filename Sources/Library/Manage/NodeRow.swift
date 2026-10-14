@@ -25,6 +25,12 @@ struct NodeRow: View {
                     Text(node.name)
                         .fontWeight(node.isDivider == true ? .semibold : .regular)
                         .lineLimit(1)
+                    if let warning = linkWarning {
+                        Image(systemName: warning.symbol)
+                            .foregroundStyle(.orange)
+                            .help(warning.help)
+                            .accessibilityLabel(warning.label)
+                    }
                 }
                 if let readLater = node.readLater {
                     // A book for unread, a check for read: the Reading List state, shown beside the name.
@@ -88,10 +94,29 @@ struct NodeRow: View {
         if let readLater = node.readLater {
             label += readLater == .read ? ", in Reading List, read" : ", in Reading List, unread"
         }
+        if let warning = linkWarning {
+            label += ", \(warning.label)"
+        }
         if store.failedShortcuts.contains(node.id) {
             label += ", shortcut in use by another app"
         }
         return label
+    }
+
+    /// The warning for a bookmark whose last link check failed: a broken page, or a site that could not be reached.
+    private var linkWarning: (symbol: String, help: String, label: String)? {
+        switch node.linkStatus?.kind {
+        case .broken:
+            return ("exclamationmark.triangle",
+                    String(localized: "Broken link. The page returned an error when Library last checked it.", bundle: L10n.bundle),
+                    String(localized: "broken link", bundle: L10n.bundle))
+        case .unreachable:
+            return ("wifi.exclamationmark",
+                    String(localized: "Unreachable link. Library could not reach the site when it last checked it.", bundle: L10n.bundle),
+                    String(localized: "unreachable link", bundle: L10n.bundle))
+        case .ok, nil:
+            return nil
+        }
     }
 
     private var kindName: String {

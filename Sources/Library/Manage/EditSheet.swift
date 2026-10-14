@@ -105,6 +105,14 @@ struct EditSheet: View {
         }
     }
 
+    private func linkStatusName(_ kind: LinkStatus.Kind) -> Text {
+        switch kind {
+        case .ok: Text("Working", bundle: L10n.bundle)
+        case .broken: Text("Broken", bundle: L10n.bundle)
+        case .unreachable: Text("Unreachable", bundle: L10n.bundle)
+        }
+    }
+
     @ViewBuilder
     private var details: some View {
         if node.url != nil {
@@ -148,6 +156,13 @@ struct EditSheet: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                             .truncationMode(.middle)
+                    }
+                }
+                if let status = store.nodes.node(withID: node.id)?.linkStatus {
+                    LabeledContent("Link Status") { linkStatusName(status.kind) }
+                    LabeledContent("Last Checked") {
+                        Text(status.checked.formatted(date: .abbreviated, time: .shortened))
+                            .foregroundStyle(.secondary)
                     }
                 }
             } footer: {
