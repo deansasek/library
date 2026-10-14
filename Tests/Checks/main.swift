@@ -318,6 +318,20 @@ for bad in ["", "{\"roots\": {", "not a bookmarks file", "<plist version=\"1.0\"
 }
 check((try? BookmarkImport.parse(safariPlist.prefix(300))) == nil, "rejects truncated plist")
 check((try? BookmarkImport.parse(chromeJSON.prefix(120))) == nil, "rejects truncated JSON")
+// ---- Library window search ----
+let searchTree = tree() + [LibraryItem(name: "Build", command: "make all", keywords: "compile release")]
+check(searchTree.matching("") .allIDs == searchTree.allIDs, "empty search keeps the tree")
+check(searchTree.matching("   ").allIDs == searchTree.allIDs, "blank search keeps the tree")
+check(searchTree.matching("jira").leaves.map(\.name) == ["Jira"], "search by name")
+check(searchTree.matching("SAFARI").leaves.map(\.name) == ["Safari"], "search ignores case")
+check(searchTree.matching("example browse").leaves.map(\.name) == ["Jira"], "every word must match")
+check(searchTree.matching("docs").leaves.map(\.name) == ["Docs"], "search by URL")
+check(searchTree.matching("docs").folders().map(\.title) == ["Work", "Work / Deep"], "search keeps folders of matches")
+check(searchTree.matching("make").leaves.map(\.name) == ["Build"], "search by command")
+check(searchTree.matching("release").leaves.map(\.name) == ["Build"], "search by keywords")
+check(searchTree.matching("apps").isEmpty, "dividers do not match")
+check(searchTree.matching("work").leaves.map(\.name) == ["Jira", "Docs"], "folder name match keeps contents")
+check(searchTree.matching("zzz").isEmpty, "no match is empty")
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

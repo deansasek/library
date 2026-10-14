@@ -39,6 +39,15 @@ struct ManageView: View {
         .accessibilityLabel("Sort by \(title)")
     }
 
+    /// The tree the search field leaves in view.
+    private var visible: [LibraryItem] { store.nodes.matching(state.query) }
+
+    /// The one share URL for a single selected item, or nil.
+    private var singleShareURL: URL? {
+        guard state.selection.count == 1, let id = state.selection.first else { return nil }
+        return store.nodes.node(withID: id)?.shareURL
+    }
+
     /// The nodes in the order the window shows them: yours, or sorted by a column at every level, folders first.
     private func displayed(_ nodes: [LibraryItem]) -> [LibraryItem] {
         guard let key = state.sortKey else { return nodes }
@@ -72,15 +81,19 @@ struct ManageView: View {
                 list(pathWidth: pathWidth)
             }
         }
-        .frame(minWidth: 680, idealWidth: 780, minHeight: 300, idealHeight: 420)
+        .frame(minWidth: 680, idealWidth: 780, minHeight: 320, idealHeight: 420)
+        // Remembers the window's size and position across launches.
+        .background(WindowFrameAutosave(name: "ManageWindow"))
     }
 
     private func list(pathWidth: CGFloat) -> some View {
-        List(displayed(store.nodes), children: \.children, selection: $state.selection) { node in
+        let shown = visible.leaves.count
+        return List(displayed(visible), children: \.children, selection: $state.selection) { node in
             NodeRow(pathWidth: pathWidth, node: node, store: store, state: state)
         }
         .listStyle(.inset(alternatesRowBackgrounds: true))
-        .navigationSubtitle("\(store.nodes.leaves.count) \(store.nodes.leaves.count == 1 ? "item" : "items")")
+        .navigationSubtitle("\(shown) \(shown == 1 ? "item" : "items")")
+        .searchable(text: $state.query, placement: .toolbar, prompt: "Name, URL, command, or keyword")
         .focusedSceneValue(\.manageState, state)
         .onAppear { store.undoManager = undoManager }
         .overlay {
@@ -92,6 +105,8 @@ struct ManageView: View {
                 } actions: {
                     Button("Add Bookmark") { state.present(.bookmark) }
                 }
+            } else if visible.isEmpty {
+                ContentUnavailableView.search(text: state.query)
             }
         }
         .contextMenu(forSelectionType: UUID.self) { ids in
@@ -138,6 +153,44 @@ struct ManageView: View {
                 } label: {
                     Label("Add", systemImage: "plus")
                 }
+                .help("Add a bookmark, application, command, folder, or divider (⌘N, ⇧⌘N)")
+                .accessibilityLabel("Add")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    if let id = state.selection.first { state.edit(id, in: store) }
+                } label: {
+                    Label("Get Info", systemImage: "info.circle")
+                }
+                .help("Get Info for the selected item (⌘I)")
+                .accessibilityLabel("Get Info")
+                .disabled(state.selection.count != 1)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                if let url = singleShareURL {
+                    ShareLink(item: url) {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .help("Share the selected item")
+                    .accessibilityLabel("Share")
+                } else {
+                    Button {} label: {
+                        Label("Share", systemImage: "square.and.arrow.up")
+                    }
+                    .help("Share the selected item")
+                    .accessibilityLabel("Share")
+                    .disabled(true)
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button(role: .destructive) {
+                    delete(state.selection)
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .help("Delete the selected items (⌘⌫)")
+                .accessibilityLabel("Delete")
+                .disabled(state.selection.isEmpty)
             }
         }
         .sheet(item: $state.sheet) { sheet in
