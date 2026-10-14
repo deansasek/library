@@ -1,4 +1,5 @@
 import AppKit
+import CryptoKit
 import Carbon
 
 var failures = 0
@@ -131,11 +132,73 @@ if case .unreadable = BookmarkFile.load(from: bookmarks) {} else { check(false, 
 try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: bookmarks.path)
 try? FileManager.default.removeItem(at: folder)
 
+// ---- pinned clipboard file: sealing, migration, damage. A test key is used; the Keychain is never touched ----
+do {
+    let key = SymmetricKey(size: .bits256)
+    let secret = Data("secret pinned text".utf8)
+    if let sealed = try? PinnedFile.seal(secret, key: key) {
+        check((try? PinnedFile.open(sealed, key: key)) == secret, "sealed bytes open with the same key")
+        check(sealed.range(of: secret) == nil && sealed.range(of: Data("pinned".utf8)) == nil, "sealed bytes hide the text")
+        check((try? PinnedFile.open(sealed, key: SymmetricKey(size: .bits256))) == nil, "a different key cannot open")
+        var tampered = sealed
+        tampered[tampered.count - 1] ^= 0xFF
+        if case .unreadable = PinnedFile.read(tampered, key: key) {} else { check(false, "a tampered file is rejected") }
+        if case .unreadable = PinnedFile.read(sealed, key: nil) {} else { check(false, "a sealed file with no key is unreadable") }
+    } else { check(false, "seal") }
+
+    // A plain-text file from before encryption is read and marked for re-saving.
+    let legacy = Data(#"[{"date":0,"source":"Notes","representations":[{"public.utf8-plain-text":"bGVnYWN5"}]}]"#.utf8)
+    if case .clips(let clips, let migrated) = PinnedFile.read(legacy, key: key) {
+        check(migrated && clips.count == 1 && clips[0].source == "Notes", "a plain-text file migrates")
+    } else { check(false, "a plain-text file migrates") }
+    let clip = PinnedFile.Clip(source: nil, date: Date(), representations: [["public.utf8-plain-text": Data("x".utf8)]])
+    if let sealed = try? PinnedFile.encode([clip], key: key) {
+        if case .clips(let clips, let migrated) = PinnedFile.read(sealed, key: key) {
+            check(!migrated && clips.count == 1, "a sealed file reads without migrating")
+        } else { check(false, "a sealed file reads") }
+        check(sealed.range(of: Data("public.utf8-plain-text".utf8)) == nil, "the sealed file hides type names")
+    } else { check(false, "encode") }
+
+    // A damaged file is rejected without a crash.
+    if case .unreadable = PinnedFile.read(Data(repeating: 0x41, count: 96), key: key) {} else { check(false, "a corrupt file is rejected") }
+    if case .unreadable = PinnedFile.read(Data(), key: key) {} else { check(false, "an empty file is rejected") }
+}
+
 // ---- clipboard history and menu, on a private pasteboard ----
 MainActor.assumeIsolated {
+    let testKey = SymmetricKey(size: .bits256)
     let board = NSPasteboard(name: NSPasteboard.Name("library-checks-\(UUID().uuidString)"))
     let saveFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-\(UUID().uuidString).json")
-    let history = ClipboardHistory(pasteboard: board, file: saveFile)
+    let history = ClipboardHistory(pasteboard: board, file: saveFile, key: { testKey })
+
+    // A plain-text pinned file from before encryption is migrated on load, leaving no plain text behind.
+    let legacyFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-legacy-\(UUID().uuidString).json")
+    let legacy = [PinnedFile.Clip(source: "Notes", date: Date(), representations: [["public.utf8-plain-text": Data("legacy pin".utf8)]])]
+    try? JSONEncoder().encode(legacy).write(to: legacyFile)
+    let migrated = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-m-\(UUID().uuidString)")), file: legacyFile, key: { testKey })
+    check(migrated.items.map(\.title) == ["legacy pin"] && migrated.items.first?.pinned == true, "a plain-text file loads its pins")
+    let migratedBytes = (try? Data(contentsOf: legacyFile)) ?? Data()
+    check(migratedBytes.range(of: Data("legacy pin".utf8)) == nil, "a migrated file hides the text")
+    if case .clips(_, let migratedAgain) = PinnedFile.read(migratedBytes, key: testKey) {
+        check(!migratedAgain, "a migrated file is sealed with the key")
+    } else { check(false, "a migrated file reads back") }
+    try? FileManager.default.removeItem(at: legacyFile)
+
+    // A damaged pinned file is moved aside, and the history starts with no pins.
+    let damagedFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-damaged-\(UUID().uuidString).json")
+    try? Data(repeating: 0x42, count: 80).write(to: damagedFile)
+    let damagedHistory = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-d-\(UUID().uuidString)")), file: damagedFile, key: { testKey })
+    let movedAside = damagedFile.deletingLastPathComponent().appendingPathComponent("clipboard-damaged.bin")
+    check(damagedHistory.items.isEmpty && !FileManager.default.fileExists(atPath: damagedFile.path) && FileManager.default.fileExists(atPath: movedAside.path), "a damaged file is kept aside")
+    try? FileManager.default.removeItem(at: movedAside)
+
+    // With no key, a sealed file is neither moved nor overwritten.
+    let lockedFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-locked-\(UUID().uuidString).json")
+    let sealedBytes = (try? PinnedFile.encode(legacy, key: testKey)) ?? Data()
+    try? sealedBytes.write(to: lockedFile)
+    let locked = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-l-\(UUID().uuidString)")), file: lockedFile, key: { throw ClipboardKey.KeychainError(status: -1) })
+    check(locked.items.isEmpty && (try? Data(contentsOf: lockedFile)) == sealedBytes, "no key leaves the sealed file untouched")
+    try? FileManager.default.removeItem(at: lockedFile)
 
     // Copies are built in the background, so a check waits until the history has added them.
     @MainActor func settle() {
@@ -161,7 +224,12 @@ MainActor.assumeIsolated {
     history.togglePin(history.items[2])
     check(FileManager.default.fileExists(atPath: saveFile.path), "pinning saves the file")
     check(((try? FileManager.default.attributesOfItem(atPath: saveFile.path))?[.posixPermissions] as? Int) == 0o600, "private file")
-    let reloaded = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-2-\(UUID().uuidString)")), file: saveFile)
+    let pinnedBytes = (try? Data(contentsOf: saveFile)) ?? Data()
+    check((try? JSONDecoder().decode([PinnedFile.Clip].self, from: pinnedBytes)) == nil, "the pinned file is not plain JSON")
+    if let pinnedText = history.items.first(where: \.pinned)?.plainText {
+        check(pinnedBytes.range(of: Data(pinnedText.utf8)) == nil, "the pinned file hides the pinned text")
+    } else { check(false, "an item is pinned") }
+    let reloaded = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-2-\(UUID().uuidString)")), file: saveFile, key: { testKey })
     check(reloaded.items.count == history.items.filter(\.pinned).count, "pinned items reload")
     copy("secret", extra: ["org.nspasteboard.ConcealedType": Data()])
     check(!history.items.contains { $0.title == "secret" }, "private copies skipped")
