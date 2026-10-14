@@ -25,6 +25,27 @@
 /* Reason shown in the Touch ID or password prompt, after "Use Touch ID or enter your password to". */
 "copy a pinned clipboard item" = "copy a pinned clipboard item";
 
+/* Alert title when the clipboard lock is turned on but the Mac has no Touch ID or password. */
+"Set a Mac Password to Lock Clipboard Items" = "Set a Mac Password to Lock Clipboard Items";
+
+/* Alert text when the clipboard lock is turned on but the Mac has no Touch ID or password. */
+"Clipboard lock uses Touch ID or your Mac password. Add a password in System Settings, then turn this on again." = "Clipboard lock uses Touch ID or your Mac password. Add a password in System Settings, then turn this on again.";
+
+/* Alert button that opens the Users & Groups pane of System Settings, where a Mac password can be added. */
+"Open Users & Groups" = "Open Users & Groups";
+
+/* Alert title when a locked pinned clipboard item is asked for but Touch ID and the Mac password are not available. */
+"Clipboard Items Can’t Be Unlocked" = "Clipboard Items Can’t Be Unlocked";
+
+/* Alert text when a locked pinned clipboard item is asked for but Touch ID and the Mac password are not available. */
+"Touch ID and your Mac password are not available, so pinned items stay locked. Turn off the lock to show them." = "Touch ID and your Mac password are not available, so pinned items stay locked. Turn off the lock to show them.";
+
+/* Alert button that turns off the clipboard lock, which unlocks the pinned clipboard items. */
+"Turn Off Lock" = "Turn Off Lock";
+
+/* Alert button that dismisses a clipboard lock alert without changing anything. */
+"Cancel" = "Cancel";
+
 /* Settings tab for general options. */
 "General" = "General";
 

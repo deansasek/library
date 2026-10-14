@@ -125,7 +125,10 @@ struct SettingsView: View {
     var clipboard: some View {
         Form {
             Section {
-                Toggle("Require Touch ID or password to show pinned items", isOn: $clipLock.isRequired)
+                Toggle("Require Touch ID or password to show pinned items", isOn: Binding(
+                    get: { clipLock.isRequired },
+                    set: { clipLock.setRequired($0) }
+                ))
             } footer: {
                 Text("Pinned items show as Pinned Item until you authenticate with Touch ID or your Mac password. They stay unlocked until you choose Lock Pinned Items in the Library menu, the Mac sleeps, or Library quits.")
             }

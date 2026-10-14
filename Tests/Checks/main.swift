@@ -1097,6 +1097,11 @@ check(PinnedLock.displayed("card 4111", pinned: true, required: true, unlocked: 
 check(PinnedLock.displayed("card 4111", pinned: true, required: true, unlocked: true) == "card 4111", "an unlocked pinned item's title is shown")
 check(PinnedLock.displayed("notes", pinned: false, required: true, unlocked: false) == "notes", "an unpinned title is shown")
 check(PinnedLock.displayed("notes", pinned: true, required: false, unlocked: false) == "notes", "the title is shown with the setting off")
+// Touch ID and the Mac password may both be missing: enabling is refused, and a locked item explains instead of prompting.
+check(LockAvailability.decide(canAuthenticate: true, enabling: true, needsAuthentication: false) == .available, "with Touch ID or a password, the setting turns on")
+check(LockAvailability.decide(canAuthenticate: false, enabling: true, needsAuthentication: false) == .unavailableOnEnable, "with no password or Touch ID, the setting does not turn on")
+check(LockAvailability.decide(canAuthenticate: false, enabling: false, needsAuthentication: true) == .unavailableOnUse, "a locked item with no password or Touch ID explains instead of prompting")
+check(LockAvailability.decide(canAuthenticate: false, enabling: false, needsAuthentication: false) == .available, "turning the setting off or showing unpinned history needs no password")
 
 // The app's setting decides what the shared lock hides. It is set back to off afterwards.
 let sharedLock = ClipboardLock.shared
