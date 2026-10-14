@@ -1,0 +1,126 @@
+import AppKit
+import Carbon
+
+var failures = 0
+func check(_ ok: Bool, _ what: String, line: Int = #line) { if !ok { failures += 1; print("FAIL line \(line): \(what)") } }
+func answer(_ q: String) -> String? { QuickAnswers.answer(for: q)?.value }
+
+func tree() -> [LibraryItem] {
+    [
+        LibraryItem(name: "Apps", isDivider: true),
+        LibraryItem(name: "Safari", appPath: "/Applications/Safari.app"),
+        LibraryItem(name: "Work", children: [
+            LibraryItem(name: "Jira", url: "tickets.example.com/browse/{}"),
+            LibraryItem(name: "Deep", children: [LibraryItem(name: "Docs", url: "https://docs.example.com")]),
+        ]),
+    ]
+}
+
+// ---- model ----
+check(splitArguments("--profile \"My Work\" -n 'a b'") == ["--profile", "My Work", "-n", "a b"], "quoted arguments")
+let jira = LibraryItem(name: "Jira", url: "x.example.com/browse/{}")
+check(jira.isTemplate && jira.link(filling: "ABC-123")?.absoluteString == "https://x.example.com/browse/ABC-123", "template fill")
+check(jira.link(filling: "a b/c")?.absoluteString == "https://x.example.com/browse/a%20b%2Fc", "template encodes")
+
+var nodes = tree()
+let docs = nodes.leaves.first { $0.name == "Docs" }!
+check(nodes.removeNode(docs.id)?.name == "Docs" && nodes.node(withID: docs.id) == nil, "remove nested")
+nodes = tree()
+let deep = nodes.folders().first { $0.title == "Work / Deep" }!
+nodes.append(LibraryItem(name: "New", url: "https://n.com"), to: deep.id)
+check(nodes.leaves.map(\.name).contains("New"), "append into folder")
+check(nodes.folders(skipping: [nodes.folders().first { $0.title == "Work" }!.id]).isEmpty, "skip subtree")
+check(tree().sections.map(\.title) == ["Apps"], "sections")
+
+var data = tree()
+data[1].shortcuts = [Shortcut(keyCode: 17, modifiers: 256, key: "T", openNew: true)]
+data[1].icon = "star.fill"; data[1].color = "red"; data[1].keywords = "term"; data[1].browser = "com.apple.Safari"
+if let back = try? JSONDecoder().decode([LibraryItem].self, from: JSONEncoder().encode(data)) {
+    check(back[1].shortcuts?.first?.description == "⌘T" && back[1].icon == "star.fill" && back[1].color == "red"
+          && back[1].keywords == "term" && back[1].browser == "com.apple.Safari" && back[2].children?.count == 2, "JSON round trip")
+} else { check(false, "decode") }
+
+// ---- shortcuts ----
+check(Shortcut(modifiers: UInt32(controlKey), button: 1).description == "⌃Right Click", "click description")
+check(Shortcut(modifiers: 0, gesture: "cornerTopLeft").isCorner, "corner")
+check(Shortcut.scrollName(dx: 0, dy: -5, inverted: true) == "scrollUp", "natural scroll up")
+check(Shortcut(modifiers: 0).isEmpty, "empty shortcut")
+
+// ---- custom icons ----
+check(customIcon("star.fill") != nil && customIcon("🚀") != nil && customIcon("1") == nil, "icons")
+
+// ---- Quick Open search ----
+let pt = [LibraryItem(name: "Jira", url: "https://x.atlassian.net"),
+          LibraryItem(name: "Work", children: [LibraryItem(name: "Jenkins", url: "https://ci.example.com")]),
+          LibraryItem(name: "Terminal", appPath: "/System/Applications/Utilities/Terminal.app")]
+check(QuickOpenResult.search("", in: pt, counts: [:]).compactMap(\.node).map(\.name) == ["Jira", "Jenkins", "Terminal"], "empty search order")
+check(QuickOpenResult.search("j", in: pt, counts: [:]).compactMap(\.node).map(\.name) == ["Jira", "Jenkins"], "prefix search")
+check(QuickOpenResult.link(from: "example.com/a")?.absoluteString == "https://example.com/a" && QuickOpenResult.link(from: "hello world") == nil, "link detection")
+
+// ---- suggestions ----
+let sel = AddSuggestion.make(selection: "https://swift.org/docs", clipboard: nil, in: tree())
+check(sel?.source == .selection && sel?.node.name == "swift.org", "a selected link is suggested")
+check(AddSuggestion.make(selection: "just some words", clipboard: nil, in: tree()) == nil, "plain selected text is not")
+check(AddSuggestion.make(selection: "https://docs.example.com", clipboard: nil, in: tree()) == nil, "a link already in the library is not")
+check(AddSuggestion.make(selection: nil, clipboard: nil, in: tree()) == nil, "nothing to suggest")
+
+// ---- quick answers ----
+check(answer("12*8") == "96" && answer("(2+3)*4") == "20" && answer("2^10") == "1024" && answer("10/4") == "2.5", "arithmetic")
+check(answer("5/0") == nil && answer("42") == nil && answer("2+") == nil && answer("jira") == nil, "not answers")
+check(answer("5 km in miles")?.hasPrefix("3.10685") == true && answer("72 f to c")?.hasPrefix("22.2222") == true, "conversions")
+check(answer("5 km in kg") == nil, "mismatched units")
+
+// ---- clipboard history and menu, on a private pasteboard ----
+MainActor.assumeIsolated {
+    let board = NSPasteboard(name: NSPasteboard.Name("library-checks-\(UUID().uuidString)"))
+    let saveFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-\(UUID().uuidString).json")
+    let history = ClipboardHistory(pasteboard: board, file: saveFile)
+
+    @MainActor func copy(_ text: String, extra: [String: Data] = [:]) {
+        board.clearContents()
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        extra.forEach { item.setData($1, forType: NSPasteboard.PasteboardType($0)) }
+        board.writeObjects([item])
+        history.poll()
+    }
+
+    copy("first copy"); copy("https://example.com/page"); copy("line one\n   line  two")
+    check(history.items.map(\.title) == ["line one", "https://example.com/page", "first copy"], "newest first, one-line titles")
+    check(history.items[1].kind == .link, "link kind")
+    copy("first copy")
+    check(history.items.count == 3 && history.items[0].title == "first copy", "a repeat moves to the top")
+    history.togglePin(history.items[2])
+    check(FileManager.default.fileExists(atPath: saveFile.path), "pinning saves the file")
+    check(((try? FileManager.default.attributesOfItem(atPath: saveFile.path))?[.posixPermissions] as? Int) == 0o600, "private file")
+    let reloaded = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-2-\(UUID().uuidString)")), file: saveFile)
+    check(reloaded.items.count == history.items.filter(\.pinned).count, "pinned items reload")
+    copy("secret", extra: ["org.nspasteboard.ConcealedType": Data()])
+    check(!history.items.contains { $0.title == "secret" }, "private copies skipped")
+    check(history.search("example").count == 1, "search")
+    copy("web image", extra: ["public.html": Data(#"<img src="https://media.example.com/clips/party.gif?w=2">"#.utf8)])
+    check(history.items[0].gifURL?.path == "/clips/party.gif", "GIF address in HTML")
+    copy("web", extra: ["public.html": Data(#"<img src="file:///tmp/secret.gif">"#.utf8)])
+    check(history.items[0].gifURL == nil, "only web addresses")
+    for index in 0..<60 { copy("filler \(index)") }
+    check(history.items.filter { !$0.pinned }.count <= 50 && history.items.contains { $0.pinned }, "trimmed to 50, pins kept")
+    history.clear()
+    check(history.items.allSatisfy(\.pinned), "clear keeps pins")
+    history.remove(history.items[0])
+    check(history.items.isEmpty && !FileManager.default.fileExists(atPath: saveFile.path), "removing the last pin removes the file")
+
+    for index in 1...12 { copy("menu copy \(index)") }
+    let (menu, target) = PopupMenu.makeClipboardMenu(history: history, suggestion: nil, pastes: false)
+    let numbered = menu.items.filter { !$0.keyEquivalent.isEmpty && $0.keyEquivalentModifierMask.isEmpty }
+    check(numbered.map(\.keyEquivalent) == (1...9).map(String.init), "number keys 1 to 9")
+    check(menu.items.filter(\.isSectionHeader).map(\.title) == ["Recent"], "copy header")
+    let (pasteMenu, pasteTarget) = PopupMenu.makeClipboardMenu(history: history, suggestion: nil, pastes: true)
+    check(pasteMenu.items.filter(\.isSectionHeader).map(\.title) == ["Paste Recent"], "paste header")
+    let node = LibraryItem(name: "docs.example.com", url: "https://docs.example.com")
+    let (withAdd, addTarget) = PopupMenu.makeClipboardMenu(history: history, suggestion: AddSuggestion(node: node, source: .selection), pastes: false)
+    check(withAdd.items.first?.title == "Add “docs.example.com” to Library", "suggestion first")
+    _ = (target, pasteTarget, addTarget)
+}
+
+print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
+exit(failures == 0 ? 0 : 1)
