@@ -2,13 +2,13 @@
 
 <img src="docs/AppIcon.png" width="128" height="128" alt="Library app icon">
 
-<h1 align="center">Library</h1>
+<h1>Library</h1>
 
-<p>Everything you open and copy, one shortcut away.</p>
+<p><strong>Everything you open and copy, one shortcut away.</strong></p>
 
 </div>
 
-Library is a menu bar app for macOS. Keep your bookmarks, apps, folders, and terminal commands in one place, open any of them from the menu, a shortcut, or Spotlight, and find what you copied moments ago.
+Library lives in your menu bar. Keep your bookmarks, apps, folders, and terminal commands in one place, open any of them from the menu or a shortcut, and bring back anything you copied a moment ago.
 
 <p align="center">
   <img src="docs/media/quick_open.gif" width="640" alt="Quick Open finding a bookmark as you type">
@@ -18,10 +18,91 @@ Library is a menu bar app for macOS. Keep your bookmarks, apps, folders, and ter
   <img src="docs/media/menu_bar.gif" width="640" alt="The Library menu opening and closing from the menu bar">
 </p>
 
-## Requirements
+## Features
 
-- macOS 26 or later
-- Xcode Command Line Tools
+### Open anything
+
+Bookmarks, apps, folders, and terminal commands open from the menu bar, a keyboard shortcut, or Spotlight. Hold Option while you click to open an item the other way.
+
+- **Bookmarks** open in a new tab or a new window.
+- **Apps** come to the front. Add launch arguments, such as `--profile work`, to start a new instance.
+- **Terminal commands** run in a login shell in a new Terminal window. Add only commands you trust.
+- **Folders** open all of their bookmarks and apps at once. Library asks first when there are more than five.
+
+### Find it with Quick Open
+
+Press Control-Space to search everything in your library.
+
+- Type words from a name, keyword, URL, or folder. Press ↑ or ↓, then Return.
+- Type or paste a web address to open it, or add it to your library.
+- Press Tab, or right-click a result, to open it the other way, copy its link, path, or command, or show it in Finder.
+- Press ⌘1 through ⌘9 to open the first nine results.
+
+### Keep what you copy
+
+Library remembers what you copy, including text, links, images, and files, in every format you copied them in.
+
+- Open the **Library** menu or Quick Open to see your latest copies. Choose one to copy it again.
+- Pin an item to keep it after you quit.
+- Press Control-Command-V to open the clipboard menu at the pointer. Press 1 through 9 to copy an item, or hold Option to copy it as plain text.
+- When a text field has the keyboard, choosing an item pastes it. Otherwise it copies. Turn this off with **Paste Into Text Fields** in **Settings > Clipboard**. Pasting needs Accessibility access.
+- Select an item in Quick Open and press Space to preview it in Quick Look.
+- Copy a link and Library removes tracking codes, such as `utm_source`, `fbclid`, and `gclid`, so the link you paste is clean. Turn this off in **Settings > General**. The link in your history isn't changed.
+- Copy as lower or upper case, trimmed, or with its lines joined. Copy a bookmark as a Markdown link. Both are in Quick Open, under Tab.
+- Type `from Safari` in Quick Open to see only what you copied in Safari.
+- Build a paste queue. Add several items, then paste them one at a time, in order.
+
+Library skips anything a password manager marks as private, and copies over 25 MB.
+
+### Save snippets
+
+Keep text you type often, such as an address or a standard reply, as a snippet. Add one from **File > New Snippet…** or the **Snippets** button in the Library window. Type a snippet's name or keywords in Quick Open, then press Return to copy it.
+
+### Organize your library
+
+Choose **Edit Library…** to manage everything in one window.
+
+- Add items from the **+** menu, or drag an app or a link into the window.
+- Select several rows to move, reorder, or edit them together. Changes you make in bulk are a single undo step.
+- Right-click a row to open it, show it in Finder, get info, rename, move, share, or delete it.
+- Find and merge duplicate bookmarks from **File > Find Duplicates…**.
+- Import bookmarks from Safari or Chrome with **File > Import Bookmarks…**. They go into one folder, and ⌘Z undoes the import.
+- Export and restore your whole library from **Settings > General**.
+
+Use ⌘Z to undo and ⇧⌘Z to redo.
+
+### Edit an item
+
+Select an item and press ⌘I, or choose **Edit…** from the toolbar or a right-click menu.
+
+- **Name and icon.** Pick an SF Symbol or an emoji, or keep the site's favicon or the app's icon.
+- **URL or command**, how a click opens it, and which browser to use.
+- **Keywords** help Quick Open and Spotlight find it.
+- **Color** adds a dot in the menu and the Library window.
+- **Shortcuts** can be added to any item.
+- **Open When You Log In** opens it a few seconds after you log in.
+
+### Use templates
+
+Put `{}` in a URL where a value goes, and Library asks for it when you open the bookmark. For several values, name them: `{project}` or `{id:Issue number}`. Library asks for all of them in one sheet.
+
+### Shortcuts
+
+Each shortcut can be a key combination, a modified click, a scroll, a pinch, a swipe, or a hot corner. Keys need Control, Option, or Command. An item can have several shortcuts.
+
+The defaults are Control and right-click for the menu, Control-Space for Quick Open, and Control-Command-V for the clipboard menu. Change them in **Settings > Shortcuts**.
+
+### Work with other apps
+
+- **Spotlight** finds your bookmarks, apps, and commands.
+- **Services:** select a link in any app, then choose **Services > Add to Library**. In Finder, select apps or folders and choose the same item.
+- **Share:** right-click a bookmark or app and choose **Share…**. Drag a row into any app to drop its link or file.
+- **URL scheme:** `library://open?name=Jira&value=ABC-123` opens a bookmark and fills its template. `library://menu` shows the menu, and `library://search` opens Quick Open. Terminal commands can't be opened this way, so a web page can't run one.
+- **Shortcuts app:** actions for opening and searching items, adding bookmarks and apps, Frequently Used, and the clipboard. Run Terminal Command always asks first. These appear in the Shortcuts app only in a build that includes App Intents metadata, which Xcode generates. `./build.sh` doesn't yet.
+
+### Stay up to date
+
+Library checks GitHub for a new release every hour while it runs, and when it starts if the last check was an hour or more ago. When there's a newer version, a single item appears at the top of the menu. Nothing pops up. Turn this off in **Settings > General**, or choose **Check for Updates…** at any time. See [Privacy](#privacy) for exactly what is sent.
 
 ## Install
 
@@ -31,9 +112,7 @@ Library is a menu bar app for macOS. Keep your bookmarks, apps, folders, and ter
 2. Unzip it and open the folder in Terminal.
 3. Run `./install.sh`. It builds Library on your Mac and copies it to your Applications folder.
 
-Because you build it yourself, macOS opens it without a security warning.
-
-To update, download the new zip and run `./install.sh` again. Your data is not affected.
+Because you build it yourself, macOS opens it without a security warning. To update, download the new zip and run `./install.sh` again.
 
 ### Clone the repository
 
@@ -43,207 +122,63 @@ cd library
 ./install.sh
 ```
 
-To build without installing, run `./build.sh`. The app is written to `build/Library.app`.
+To build without installing, run `./build.sh`. The app is written to `build/Library.app`. To update, run `./update.sh`. It stops if you have uncommitted changes or aren't on `main`. Otherwise it fast-forwards `main` from `origin` (it never resets or force-pushes), shows the version before and after, and runs `./install.sh`. `DRY_RUN=1 ./update.sh` shows the commands without running them.
 
-To update, run `./update.sh`. It stops if you have uncommitted changes or are not on `main`. Otherwise it fast-forwards `main` from `origin` (it never resets or force-pushes), prints the version before and after, and runs `./install.sh`. Your data is not affected. `DRY_RUN=1 ./update.sh` prints the commands without running them.
+**Requirements:** macOS 26 or later, and the Xcode Command Line Tools.
 
 ## Getting started
 
 1. Open Library. A short welcome tour explains the basics and asks for any access it needs.
-2. Click the bookmark icon in the menu bar, or press Control-Space for Quick Open.
-3. Choose **Edit Library…** to add items. You can also drag an app or a link into the window.
+2. Click the bookmark icon in the menu bar, or press Control-Space.
+3. Choose **Edit Library…** to add items.
 4. Turn on **Open at Login** in **Settings > General** to start Library when you log in.
-
-## Features
-
-### Open anything
-
-Bookmarks, applications, folders, and terminal commands open from the menu bar, a keyboard shortcut, or Spotlight. Hold Option while you click to open an item the other way.
-
-- **Bookmarks** open in a new tab or a new window.
-- **Applications** come to the front. An app with launch arguments, such as `--profile work`, starts a new instance.
-- **Terminal commands** run in a login shell in a new Terminal window. Add only commands you trust.
-
-Each item shows its URL, command, or path when you hover over it.
-
-### Find it fast with Quick Open
-
-Press Control-Space to open a search field over every item.
-
-- Type words from a name, keyword, URL, or folder. Press ↑ or ↓ to choose a result, then press Return.
-- Type or paste a web address to open it or add it to your library.
-- Press Tab, or right-click a result, to open it the other way, copy its link, path, or command, or show an app in Finder.
-- Press ⌘1 through ⌘9 to open the first nine results.
-
-### Keep what you copy
-
-Library remembers what you copy, including text, links, images, and files, in every format you copied them in.
-
-- Open the **Library** menu or Quick Open to see your latest copies. Choose one to copy it again.
-- Pin an item to keep it after you quit Library.
-- Press Control-Command-V to open the clipboard menu at the pointer. Press 1 through 9 to copy an item. Hold Option to copy it as plain text.
-- Choose an item in the clipboard menu or Quick Open while a text field has the keyboard, and Library pastes it there. Otherwise it copies the item. Menu headers say "Paste" when it will paste. Turn this off with **Paste Into Text Fields** in **Settings > Clipboard**. Pasting needs Accessibility access.
-- Select a copied item in Quick Open and press Space to preview it in Quick Look. Press Space or Escape to close the preview.
-- Library skips anything a password manager marks as private.
-- Copies over 25 MB are skipped.
-- Copying a link removes tracking codes such as `utm_source`, `fbclid`, and `gclid`, so the link you paste is clean. Other parts of the link stay as they are. Turn this off with **Remove tracking parameters when copying links** in **Settings > General**. The link saved in your history or library is not changed. **Copy Clean Link** in Quick Open removes them from any link, whatever the setting.
-
-### Save snippets
-
-Keep text you type often, such as an address or a standard reply, as a snippet. Choose **File > New Snippet…** or **Snippets** in the Library window toolbar to add, edit, and delete them. Snippets appear in Quick Open when you type their name or keywords, such as `addr`. Press Return to copy the text, or press Tab to copy it or edit the snippet. Each copy goes into clipboard history like any other copy. Snippets are saved as plain text, not encrypted.
-
-### Add from the clipboard
-
-When you select a link in the app in front, or copy a link or an app that isn't in your library, the Library menu, the clipboard menu, and Quick Open offer to add it. A selected link comes first. Reading a selection needs Accessibility access.
-
-### Organize your library
-
-Choose **Edit Library…** to manage your items in the Library window.
-
-- Add bookmarks (⌘N), folders (⇧⌘N), applications, commands, and dividers from the **+** menu.
-- Drag an app from Finder or a link from your browser into the window to add it.
-- Select several rows with ⌘-click or ⇧-click. Drag rows to reorder them or move them into a folder.
-- Right-click a row to open it, show it in Finder, get info, rename, move, share, or delete it. Press Return to rename the selected row.
-- Use ⌘Z to undo and ⇧⌘Z to redo changes. Undo history lasts until you quit.
-- Choose **File > Import Bookmarks…** to add the bookmarks from Safari or Chrome (or another Chromium browser). Pick the browser's bookmarks file. The import goes into one folder, "Imported from Safari" or "Imported from Chrome", and can be undone with ⌘Z.
-
-A divider appears as a titled section in the menu. The items below it belong to that section.
-
-### Edit an item
-
-Select an item and press ⌘I, or choose **Edit…** from the toolbar or a right-click menu. The form sets:
-
-- **Name** and **icon.** Pick an SF Symbol, choose an emoji, or keep the default icon, which is the site's favicon or the app icon.
-- **URL or command.**
-- **Opens In.** Choose how a click opens the item.
-- **Browser.** Choose which browser opens a bookmark, or keep the default.
-- **Keywords.** Extra words that help Quick Open and Spotlight find the item, such as `tix` for Jira.
-- **Color.** A colored dot appears on the icon in the menu, Quick Open, and the Library window. Type the color name in Quick Open to find tagged items.
-- **Shortcuts.** Add one or more shortcuts for the item.
-- **Open When You Log In.** Opens the item a few seconds after you log in.
-
-### Ask for a value
-
-Turn a bookmark into a template. Put `{}` where the value goes in the URL. When you open the bookmark, Library asks for the value and fills it in. For example, a ticket number. Library encodes the value for the URL.
-
-For several values, name each placeholder: `{project}` or `{id:Issue number}`. Placeholders with the same name share one value. Library asks for all of them in one sheet, with a label for each field.
-
-### Open all in a folder
-
-Choose **Open All** from a folder's right-click menu, or from its submenu in the menu bar. Library opens every bookmark and app in the folder, including those in folders inside it, about 150 ms apart. Commands and templates are skipped. Library asks first when there are more than five items.
-
-### Choose what a click does
-
-**Opens In** sets how a click opens an item.
-
-- Bookmarks open in a new tab or a new window. New window works with Firefox and Chrome-based default browsers. Other browsers open a new tab.
-- Applications come forward, or start a new instance.
-
-### Shortcuts
-
-Shortcuts work from any app. Each one can be:
-
-- A key combination. It must include Control, Option, or Command.
-- A modified click, such as Control-click or right-click with a modifier.
-- A scroll, a pinch, or a swipe, with at least one modifier.
-- A hot corner. It opens when the pointer reaches a screen corner.
-
-An item can have several shortcuts, each with its own behavior. Library shows a warning when a shortcut is already used by another app.
-
-The defaults are Control and right-click to open the menu, Control-Space for Quick Open, and Control-Command-V for the clipboard menu. Restore them at any time in **Settings > Shortcuts**.
-
-### Frequently Used
-
-After you open an item twice or more, it moves to the top of the menu and Quick Open. The five most used items appear first. Usage counts are kept in your macOS preferences.
-
-### Share and drag out
-
-Right-click a bookmark or app and choose **Share…** to use the macOS share sheet. Drag a row into any app to drop its link or app file there.
-
-### Keep your library in sync
-
-Library reloads `bookmarks.json` when another program changes it, such as an editor or `git pull`. A file Library can't read is ignored.
-
-### Use Library from other apps
-
-- **Spotlight:** Bookmarks, apps, and commands appear in Spotlight results.
-- **Services:** Select a link in any app, then choose **Services > Add to Library**. In Finder, select applications or folders and choose **Services > Add to Library** to add them. Apps already in your library are skipped. Folders are added as empty groups.
-- **URL scheme:** Use `library://open?name=Jira&value=ABC-123` to open a bookmark or app and fill in its template. Terminal commands can't be opened this way, so a web page can't run one. Use `library://menu` to show the menu. Use `library://search` to open Quick Open.
-
-From Terminal, run `open "library://open?name=Jira&value=ABC-123"`.
-
-### Shortcuts
-
-Library provides App Intents for the Shortcuts app and Spotlight:
-
-- **Open Library Item** opens a bookmark or app. It can fill a URL template's value.
-- **Search Library** returns the bookmarks and apps that match a search.
-- **Add Bookmark to Library** and **Add Application to Library** add a web link or an `.app` file.
-- **Frequently Used Library Items** returns the items you open most often.
-- **Open Clipboard Link** opens the web link on the clipboard.
-- **Copy Latest Clip** copies the newest clipboard history item back to the clipboard. It does not paste into other apps.
-- **Search Clipboard History** returns the text of clipboard items that match a search.
-- **Show Quick Open** and **Show Library Menu** open those windows.
-- **Run Terminal Command** runs a terminal command. It asks for confirmation every time, and names the command first.
-
-Shortcuts finds these actions only in a build that includes App Intents metadata. Xcode generates that metadata, and `./build.sh` does not yet.
-
-### Welcome tour
-
-The welcome tour opens the first time you launch Library. It explains the app and lets you try each shortcut. To see it again, choose **Settings > General > Welcome Screen > Show…**.
-
-## Settings
-
-**Settings** (⌘,) has three tabs.
-
-- **General:** Open at Login, Keep Library in iCloud Drive, Check for Updates Automatically, the welcome screen, removing tracking parameters from copied links, and the app version.
-- **Shortcuts:** One list of shortcuts: Show Library Menu, Show Quick Open, Show Clipboard Menu, and Open Copied Link. A picker sets whether the Library menu opens at the pointer or from the menu bar.
-- **Clipboard:** Turn clipboard history, pasting into text fields, and copied GIFs on or off, and clear the history.
 
 ## Privacy
 
-Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play. It contacts `api.github.com` only to check for a new release: when you choose **Check for Updates…** in the menu, and, unless you turn off **Check for Updates Automatically** in **Settings > General** (on by default), once an hour while Library runs and when it starts if the last check was an hour or more ago. The only request is to `https://api.github.com/repos/deansasek/library/releases/latest`. It names only the app's version, in its User-Agent header. It also sends the ETag GitHub gave on the last answer, so GitHub can reply that nothing changed. No account or other data is sent. When a newer version exists, the menu shows it at the top, and nothing pops up.
+Library keeps your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit.
 
-If you turn on **Require Touch ID or password to show pinned items** in **Settings > Clipboard** (off by default), pinned clipboard items stay hidden until you authenticate with Touch ID or your Mac password. The unlock lasts in memory until you choose **Lock Pinned Items** in the Library menu, the Mac sleeps, or Library quits, and it is never saved. Searching does not look inside locked items. If the Mac has no password and no Touch ID, Library won’t turn the lock on and explains how to add a password, and if the password is removed later, the items stay locked until you turn the lock off. The lock does not change how clipboard.json is encrypted.
+The app connects to the internet only for these:
 
-Your data is stored in `~/.library/`:
+- **Favicons** from the sites you bookmark.
+- **Copied GIFs**, only if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default). Library downloads a GIF you copied from a web page so it can play.
+- **Update checks** to `https://api.github.com/repos/deansasek/library/releases/latest`. This happens when you choose **Check for Updates…**, and every hour when automatic checks are on (the default). The request names only the app's version, in its User-Agent header, and the ETag from GitHub's last answer, so unchanged checks cost nothing. No account or other data is sent.
+
+**Touch ID or password lock.** Turn on **Require Touch ID or password to show pinned items** in **Settings > Clipboard** (off by default). Pinned items stay hidden until you authenticate. The unlock lasts in memory until you choose **Lock Pinned Items**, the Mac sleeps, or Library quits. Search doesn't look inside locked items. If the Mac has no password and no Touch ID, Library won't turn the lock on and explains how to add one.
+
+**Your files** are in `~/.library/`:
 
 | File | Contents |
 | --- | --- |
-| `bookmarks.json` | Your items, folders, shortcuts, and order. With **Keep Library in iCloud Drive** on, it is stored in iCloud Drive instead (see below). |
+| `bookmarks.json` | Your items, folders, shortcuts, and order |
 | `clipboard.json` | Pinned clipboard items, encrypted with a key kept in your Keychain |
+| `snippets.json` | Your snippets, as plain text. They are not encrypted. Don't keep passwords in a snippet. |
 | `favicons/` | Cached site icons. Library downloads them again if you delete the folder. |
-| `snippets.json` | Your snippets, as plain text. They are not encrypted, and they are not clipboard history. |
 
-**Keep Library in iCloud Drive** (**Settings > General**, off by default) moves `bookmarks.json` to `Library/bookmarks.json` in iCloud Drive and leaves a link to it at `~/.library/bookmarks.json`, so your library follows you to your other Macs. With it on, `bookmarks.json` is stored in iCloud Drive. Clipboard history never is: clipboard history stays in memory, pinned clipboard items stay in `clipboard.json` on this Mac, and their key stays in your Keychain. Changes sync through iCloud, which decides when. If two Macs change the library at once, the newer change wins for each item, and Library tells you when a change from another Mac replaced an edit you had not yet saved.
+**Keep Library in iCloud Drive** (**Settings > General**, off by default) moves `bookmarks.json` into iCloud Drive and links to it from `~/.library`, so your library follows you to your other Macs. Clipboard history never leaves your Mac. If two Macs change the library at once, the newer change wins for each item, and Library tells you when a change from another Mac replaced an edit you hadn't saved.
 
-If Library can't read `bookmarks.json`, it saves a copy as `bookmarks-damaged.json` and tells you when it launches.
-
-Snippets are saved as plain text, not encrypted, so anyone who can read your Mac's files can read them. Don't keep passwords in a snippet.
-
-Updates don't change this data.
+If Library can't read `bookmarks.json`, it saves a copy as `bookmarks-damaged.json` and tells you when it launches. Updates don't change your data.
 
 ## Permissions
 
-- **Keyboard shortcuts** and **hot corners** don't need any permission.
-- **Click, scroll, pinch, and swipe shortcuts** and **suggesting a selected link** need Accessibility access. Turn it on in **System Settings > Privacy & Security > Accessibility**. Library reads your selection only when you open one of its menus, looks for a link in it, and doesn't keep it.
+- **Keyboard shortcuts**, **hot corners**, Quick Open, and the menus don't need any permission.
+- **Click, scroll, pinch, and swipe shortcuts**, **pasting into text fields**, and **suggesting a selected link** need Accessibility access. Turn it on in **System Settings > Privacy & Security > Accessibility**. Library reads your selection only when you open one of its menus, and it doesn't keep it.
 
 ## Troubleshooting
 
-- **A shortcut doesn't work.** Another app may use the same keys. Check **Settings > Shortcuts** for a conflict. Control-Space can conflict with the macOS input source shortcut.
+- **A shortcut doesn't work.** Another app may use the same keys. Check **Settings > Shortcuts**. Control-Space can conflict with the macOS input source shortcut.
 - **Clicks stop working after a macOS update.** Remove Library from Accessibility, then add it again.
-- **Open at Login has no effect.** Move `Library.app` to `/Applications` first. The login item stores the app's location.
+- **Open at Login has no effect.** Move `Library.app` to `/Applications` first. The login item remembers the app's location.
 - **Services don't appear.** Log out and back in, or run `/System/Library/CoreServices/pbs -update`.
 
 ## Languages
 
-The app is in English for now. Its strings live in `Sources/Library/Resources/en.lproj/Localizable.strings`. A string is localized when it is written with `Text("…", bundle: L10n.bundle)` (or `String(localized: "…", bundle: L10n.bundle)` where a `String` is needed). Use that form, not a plain `Text("…")`, so the app reads the string from its resource bundle. To add a string, add a `"key" = "value";` line with a `/* comment */` above it, then use the same text as the key. Dynamic text, such as file names, counts, and clipboard contents, is not localized.
+Library is in English. Strings live in `Sources/Library/Resources/en.lproj/Localizable.strings`. Write each user-facing string as `Text("…", bundle: L10n.bundle)`, or `String(localized: "…", bundle: L10n.bundle)` where a `String` is needed. To add a string, add a `"key" = "value";` line with a `/* comment */` above it. Dynamic text, such as file names, counts, and clipboard contents, isn't localized.
 
 ## Development
 
 - `./build.sh` builds the app.
-- `./test.sh` runs the checks in `Tests/` against the app's source. They use private pasteboards and temporary files, so they never touch your clipboard or your library.
-- Every pull request, and every push to `main`, builds the app and runs the checks on GitHub Actions.
+- `./test.sh` runs the checks in `Tests/`. They use private pasteboards and temporary files, so they never touch your clipboard or your library.
+- Every pull request and every push to `main` builds the app and runs the checks on GitHub Actions.
 
 ## Releasing
 
@@ -254,6 +189,6 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-You can also run the **Release** workflow by hand and give it a version. Either way, GitHub Actions builds the app and runs the checks, to be sure the version is sound, then publishes `Library-1.2.0.zip`. The zip is the source, not a built app. It holds only what is needed to build: `Sources/`, `Resources/`, `Package.swift`, `build.sh`, `install.sh`, and this README. The tests, workflows, docs, and icon script are left out. `.gitattributes` sets that list, and GitHub's own source archives follow it too.
+Or run the **Release** workflow by hand with a version. Either way, GitHub Actions builds and checks the app, then publishes `Library-1.2.0.zip`. The zip is the source, with only what's needed to build. The tests, workflows, docs, and icon script are left out, as set in `.gitattributes`.
 
-If publishing fails with a server error, the workflow retries up to four times. Re-running it is safe: if the release already exists, it skips creating it.
+If publishing fails with a server error, the workflow retries up to four times. Re-running it is safe, because it skips creating a release that already exists.
