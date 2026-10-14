@@ -48,6 +48,18 @@ struct SettingsView: View {
                 Text("Library checks GitHub for a newer version every hour while it runs. When one is available, it appears at the top of the Library menu. Check for Updates… in the menu checks now.")
             }
             Section {
+                LabeledContent("Library") {
+                    HStack {
+                        Button("Export…") { LibraryBackupActions.export(store) }
+                        Button("Restore…") { LibraryBackupActions.restore(store) }
+                    }
+                }
+            } header: {
+                Text("Backup")
+            } footer: {
+                Text("Export saves your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at Login settings to a file. Restore replaces your library with a backup and can be undone. Clipboard items are not included, because pinned clipboard items are encrypted with a key that stays on this Mac.")
+            }
+            Section {
                 LabeledContent("Welcome Screen") {
                     Button("Show…") { Welcome.show(store: store) }
                 }
