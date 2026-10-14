@@ -38,6 +38,8 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     var note: String?
     /// Whether a bookmark is in the Reading List, and read or unread there. Nil when it is not in the list.
     var readLater: ReadLaterState?
+    /// What the last link check found, and when. Nil until a check runs, so files written before the check decode unchanged.
+    var linkStatus: LinkStatus?
 
     var isFolder: Bool { children != nil }
 

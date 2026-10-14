@@ -147,3 +147,33 @@
 
 /* Footer under the Reading List section of the manager window. */
 "Unread items are listed first. Removing an item from the Reading List leaves it in the library." = "Unread items are listed first. Removing an item from the Reading List leaves it in the library.";
+/* Settings toggle that turns on the daily check of every bookmark's address. */
+"Check Links Periodically" = "Check Links Periodically";
+/* File menu item and alert title that checks every bookmark's address now. */
+"Check Links" = "Check Links";
+/* Get Info row label for the result of the last link check. */
+"Link Status" = "Link Status";
+/* Get Info row label for the date and time of the last link check. */
+"Last Checked" = "Last Checked";
+/* Link check result for a page that loads. */
+"Working" = "Working";
+/* Link check result for a page that returned an error code. */
+"Broken" = "Broken";
+/* Link check result for a site that could not be reached. */
+"Unreachable" = "Unreachable";
+/* Tooltip on a bookmark whose page returned an error code when last checked. */
+"Broken link. The page returned an error when Library last checked it." = "Broken link. The page returned an error when Library last checked it.";
+/* Tooltip on a bookmark whose site could not be reached when last checked. */
+"Unreachable link. Library could not reach the site when it last checked it." = "Unreachable link. Library could not reach the site when it last checked it.";
+/* VoiceOver text for a bookmark whose page returned an error code. Follows the bookmark name. */
+"broken link" = "broken link";
+/* VoiceOver text for a bookmark whose site could not be reached. Follows the bookmark name. */
+"unreachable link" = "unreachable link";
+/* Alert shown when Check Links is chosen while a check is still running. */
+"Library is already checking your links." = "Library is already checking your links.";
+/* Alert shown when Check Links finds no bookmark due for a check. */
+"Every bookmark was checked in the last 24 hours, so there was nothing to check." = "Every bookmark was checked in the last 24 hours, so there was nothing to check.";
+/* Alert after Check Links. The counts are links checked, broken, and unreachable. */
+"Checked %lld links. %lld are broken, and %lld can’t be reached." = "Checked %lld links. %lld are broken, and %lld can’t be reached.";
+/* Footer under Check Links Periodically in Settings > General. */
+"Once a day while Library runs, Library requests each bookmark’s address with a HEAD request, which reads no page content. A server that refuses HEAD gets a GET request, which reads at most 64 KB. Each address is requested once per check, and one checked in the last 24 hours is skipped. Bookmarks whose page fails or can’t be reached get a warning in Edit Library. Off by default. Check Links in the File menu checks now." = "Once a day while Library runs, Library requests each bookmark’s address with a HEAD request, which reads no page content. A server that refuses HEAD gets a GET request, which reads at most 64 KB. Each address is requested once per check, and one checked in the last 24 hours is skipped. Bookmarks whose page fails or can’t be reached get a warning in Edit Library. Off by default. Check Links in the File menu checks now.";

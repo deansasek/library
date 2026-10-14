@@ -353,6 +353,10 @@ struct ManageView: View {
             node.note = LibraryItem.cleanNote(node.note)
             node.command = node.appPath == nil ? node.command.map { $0.trimmingCharacters(in: .whitespaces) } : clean(node.command)
             node.promptLabel = node.isTemplate ? clean(node.promptLabel) : nil
+            // A link check may have run while the sheet was open, so the stored status is kept. A new address has not
+            // been checked, so its old status goes.
+            let stored = store.nodes.node(withID: id)
+            node.linkStatus = stored?.url == node.url ? stored?.linkStatus : nil
             store.perform("Edit") { $0.update(id) { $0 = node } }
         case .bulkEdit, .duplicates:
             // These sheets apply their own changes.

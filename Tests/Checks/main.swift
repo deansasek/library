@@ -942,6 +942,7 @@ let runtimeSymbolUses: [(file: String, expression: String, reason: String)] = [
     ("Manage/IconPicker.swift", "name", "a name from the symbols list below, which the list's own filter has already checked"),
     ("Welcome/WelcomeView.swift", "symbol", "passed in from icon, feature and shortcutRow calls; their literals are read by the Welcome rule"),
     ("QuickOpen/QuickOpenView.swift", "icon", "the icon of a Quick Open action; its literals are read by the icon: rule in QuickOpenModel.swift"),
+    ("Manage/NodeRow.swift", "warning.symbol", "the symbol of linkWarning, which returns only the two literal names exclamationmark.triangle and wifi.exclamationmark"),
 ]
 let swiftRoot = "Sources/Library/"
 let swiftFiles = (FileManager.default.enumerator(atPath: swiftRoot)?.compactMap { $0 as? String } ?? [])
@@ -1491,6 +1492,63 @@ check((try? JSONDecoder().decode(LibraryItem.self, from: readOldJSON))?.readLate
 if let data = try? JSONEncoder().encode(readA), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
     check(back.readLater == .read && back == readA, "a Reading List state round-trips through the file")
 } else { check(false, "a Reading List state round-trips through the file") }
+// ---- link check: rules ----
+let linkNow = Date(timeIntervalSince1970: 1_800_000_000)
+func linkDate(hoursAgo: Double) -> Date { linkNow.addingTimeInterval(-hoursAgo * 3600) }
+check(LinkCheck.kind(forHTTPCode: 200) == .ok && LinkCheck.kind(forHTTPCode: 204) == .ok, "2xx is ok")
+check(LinkCheck.kind(forHTTPCode: 301) == .ok && LinkCheck.kind(forHTTPCode: 302) == .ok && LinkCheck.kind(forHTTPCode: 399) == .ok, "3xx is ok")
+check(LinkCheck.kind(forHTTPCode: 400) == .broken && LinkCheck.kind(forHTTPCode: 404) == .broken && LinkCheck.kind(forHTTPCode: 499) == .broken, "4xx is broken")
+check(LinkCheck.kind(forHTTPCode: 500) == .broken && LinkCheck.kind(forHTTPCode: 503) == .broken && LinkCheck.kind(forHTTPCode: 599) == .broken, "5xx is broken")
+check(LinkCheck.kind(forHTTPCode: 100) == .unreachable && LinkCheck.kind(forHTTPCode: 600) == .unreachable && LinkCheck.kind(forHTTPCode: 0) == .unreachable, "codes outside 200-599 give no answer")
+check(LinkCheck.outcome(statusCode: nil, redirectRefused: false) == .unreachable, "no response is unreachable, not broken")
+check(LinkCheck.outcome(statusCode: 302, redirectRefused: true) == .unreachable, "a refused redirect is unreachable, not ok")
+check(LinkCheck.outcome(statusCode: 200, redirectRefused: false) == .ok && LinkCheck.outcome(statusCode: 404, redirectRefused: false) == .broken, "a finished response uses its code")
+check(LinkCheck.retriesWithGET(afterHEAD: 403) && LinkCheck.retriesWithGET(afterHEAD: 405) && LinkCheck.retriesWithGET(afterHEAD: 501), "a HEAD refused with 403, 405, or 501 is asked again with GET")
+check(!LinkCheck.retriesWithGET(afterHEAD: 200) && !LinkCheck.retriesWithGET(afterHEAD: 302) && !LinkCheck.retriesWithGET(afterHEAD: 404) && !LinkCheck.retriesWithGET(afterHEAD: 500) && !LinkCheck.retriesWithGET(afterHEAD: nil), "other HEAD answers, and no answer, are final")
+check(LinkCheck.retriesWithGET(afterHEAD: 405) && LinkCheck.outcome(statusCode: 200, redirectRefused: false) == .ok && LinkCheck.outcome(statusCode: 404, redirectRefused: false) == .broken, "a HEAD refused with 405 takes the status of the GET that follows")
+check(LinkCheck.followsRedirect(after: 0, to: URL(string: "https://example.com/next")) && LinkCheck.followsRedirect(after: 4, to: URL(string: "http://example.com/")), "redirects up to five are followed")
+check(!LinkCheck.followsRedirect(after: 5, to: URL(string: "https://example.com/next")), "the sixth redirect is refused")
+check(!LinkCheck.followsRedirect(after: 0, to: URL(string: "file:///etc/passwd")) && !LinkCheck.followsRedirect(after: 0, to: URL(string: "ftp://example.com/")) && !LinkCheck.followsRedirect(after: 0, to: nil), "redirects to non-web addresses are refused")
+check(LinkCheck.isRecentlyChecked(linkDate(hoursAgo: 0), now: linkNow) && LinkCheck.isRecentlyChecked(linkDate(hoursAgo: 23.9), now: linkNow), "a check within 24 hours is recent")
+check(!LinkCheck.isRecentlyChecked(linkDate(hoursAgo: 24), now: linkNow) && !LinkCheck.isRecentlyChecked(linkDate(hoursAgo: 25), now: linkNow), "a check 24 hours or more ago is not recent")
+check(!LinkCheck.isRecentlyChecked(nil, now: linkNow) && !LinkCheck.isRecentlyChecked(linkNow.addingTimeInterval(3600), now: linkNow), "never checked, or checked in the future, is not recent")
+check(LinkCheck.isDailyCheckDue(now: linkNow, lastRun: nil), "a daily check with no past run is due")
+check(!LinkCheck.isDailyCheckDue(now: linkNow, lastRun: linkDate(hoursAgo: 23.9)), "a daily check less than a day after the last is not due")
+check(LinkCheck.isDailyCheckDue(now: linkNow, lastRun: linkDate(hoursAgo: 24)) && LinkCheck.isDailyCheckDue(now: linkNow, lastRun: linkNow.addingTimeInterval(60)), "a day later, or a last run in the future, is due")
+check(LinkCheck.secondsUntilDailyCheck(now: linkNow, lastRun: nil) == 0 && LinkCheck.secondsUntilDailyCheck(now: linkNow, lastRun: linkDate(hoursAgo: 1)) == 23 * 3600, "the wait is the rest of the day")
+check(LinkCheck.startCount(running: 0, pending: 10) == 4 && LinkCheck.startCount(running: 3, pending: 10) == 1 && LinkCheck.startCount(running: 4, pending: 10) == 0, "at most four requests run at once")
+check(LinkCheck.startCount(running: 0, pending: 2) == 2 && LinkCheck.startCount(running: 0, pending: 0) == 0 && LinkCheck.startCount(running: 6, pending: 3) == 0, "no more requests than are waiting")
+let linkPage = LibraryItem(name: "Page", url: "https://example.com/page")
+let linkDivider = LibraryItem(name: "Divider", isDivider: true)
+let linkApp = LibraryItem(name: "Safari", appPath: "/Applications/Safari.app")
+let linkCommand = LibraryItem(name: "Make", command: "make")
+let linkTemplate = LibraryItem(name: "Jira", url: "tickets.example.com/browse/{}")
+let linkFolder = LibraryItem(name: "Folder", children: [])
+let linkBad = LibraryItem(name: "Bad scheme", url: "file:///tmp/x")
+check(LinkCheck.isCheckable(linkPage) && LinkCheck.isCheckable(LibraryItem(name: "Bare", url: "example.com")), "a web bookmark is checkable, with or without a scheme")
+check(!LinkCheck.isCheckable(linkDivider) && !LinkCheck.isCheckable(linkApp) && !LinkCheck.isCheckable(linkCommand), "dividers, apps, and commands are not checked")
+check(!LinkCheck.isCheckable(linkTemplate) && !LinkCheck.isCheckable(linkFolder) && !LinkCheck.isCheckable(linkBad), "templates, folders, and non-web addresses are not checked")
+let linkShared = LibraryItem(name: "Again", url: "https://example.com/page", linkStatus: LinkStatus(kind: .ok, checked: linkDate(hoursAgo: 2)))
+let linkOld = LibraryItem(name: "Old", url: "https://old.example.com/", linkStatus: LinkStatus(kind: .broken, checked: linkDate(hoursAgo: 30)))
+let linkDue = LinkCheck.itemsToCheck([linkPage, linkOld, linkDivider, linkApp, linkTemplate], now: linkNow).map(\.name)
+check(linkDue == ["Page", "Old"], "due: an unchecked and an old bookmark, not dividers, apps, or templates: \(linkDue)")
+check(LinkCheck.itemsToCheck([linkPage, linkShared], now: linkNow).isEmpty, "a bookmark sharing an address checked in the last 24 hours is skipped with it")
+check(LinkCheck.itemsToCheck([linkOld], now: linkNow).count == 1, "an address checked 30 hours ago is due again")
+let linkPlain = LibraryItem(name: "Plain", url: "https://example.com/page")
+check(LinkCheck.key(for: linkPlain) == "https://example.com/page" && LinkCheck.key(for: linkApp) == nil, "the request key is the address")
+// The record decodes from a file without the field, and round-trips with it.
+let linkOldFile = Data(#"{"id":"6F1C3E2A-1B2C-4D5E-8F90-123456789ABC","name":"Old","url":"https://example.com/"}"#.utf8)
+let linkOldItem = try? JSONDecoder().decode(LibraryItem.self, from: linkOldFile)
+check(linkOldItem?.linkStatus == nil, "a file without linkStatus loads, with no status")
+var linkWithStatus = linkOldItem ?? linkPlain
+linkWithStatus.linkStatus = LinkStatus(kind: .unreachable, checked: linkNow)
+if let data = try? JSONEncoder().encode(linkWithStatus), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.linkStatus == LinkStatus(kind: .unreachable, checked: linkNow), "the status round-trips through the file")
+} else {
+    check(false, "the status round-trips through the file")
+}
+check(!String(decoding: (try? JSONEncoder().encode(linkOldItem ?? linkPlain)) ?? Data(), as: UTF8.self).contains("linkStatus"), "an item without a status writes no linkStatus key")
+check(!LinkCheck.isCheckable(LibraryItem(name: "Empty", url: "")) && !LinkCheck.isCheckable(LibraryItem(name: "Space", url: "   ")), "a blank address is not checked")
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
