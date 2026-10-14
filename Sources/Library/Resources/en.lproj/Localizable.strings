@@ -200,3 +200,14 @@
 
 /* Sort menu item that sorts the most recently opened items first. */
 "Recently Opened" = "Recently Opened";
+/* Settings toggle that saves unpinned clipboard history, encrypted, so it is there after a restart. */
+"Keep Clipboard Across Restarts" = "Keep Clipboard Across Restarts";
+
+/* Footer under Keep Clipboard Across Restarts: what is saved, what is never saved, and that turning it off deletes the history. */
+"Saves your unpinned clipboard history, encrypted with a key kept in your Keychain, so it is there after you restart. Pinned items are saved either way. Copies from password managers and copies marked private are never saved. Images over 5 MB are never saved, to keep the file small. Turning this off deletes the saved history." = "Saves your unpinned clipboard history, encrypted with a key kept in your Keychain, so it is there after you restart. Pinned items are saved either way. Copies from password managers and copies marked private are never saved. Images over 5 MB are never saved, to keep the file small. Turning this off deletes the saved history.";
+
+/* Settings toggle that copies the newest restored clipboard item when Library opens. Off unless history is kept. */
+"Put the Latest Item on the Clipboard When Library Opens" = "Put the Latest Item on the Clipboard When Library Opens";
+
+/* Footer under Put the Latest Item on the Clipboard When Library Opens, with the password warning. */
+"The newest saved item is copied to the clipboard when Library opens, so you can paste it right away. A password copied before a restart could be pasted by someone else at this Mac." = "The newest saved item is copied to the clipboard when Library opens, so you can paste it right away. A password copied before a restart could be pasted by someone else at this Mac.";

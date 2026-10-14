@@ -93,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         LibraryStore.shared.flushSave()
+        ClipboardHistory.shared.flushHistory()
     }
 
     /// `library://open?name=Jira&value=ABC-123` opens an item and fills its template.

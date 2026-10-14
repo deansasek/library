@@ -21,6 +21,7 @@ The app connects to the internet only for these:
 | --- | --- |
 | `bookmarks.json` | Your items, folders, shortcuts, and order |
 | `clipboard.json` | Pinned clipboard items, encrypted with a key kept in your Keychain |
+| `clipboard-history.json` | Unpinned clipboard history, encrypted the same way. Only exists when **Keep Clipboard Across Restarts** is on (off by default). |
 | `snippets.json` | Your snippets, as plain text. They are not encrypted. Don't keep passwords in a snippet. |
 | `favicons/` | Cached site icons. Library downloads them again if you delete the folder. |
 

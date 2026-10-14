@@ -5,7 +5,7 @@ import SwiftUI
 /// A history of what was copied, kept in memory only. It is gone when the app quits.
 @MainActor
 final class ClipboardHistory: ObservableObject {
-    static let shared = ClipboardHistory()
+    static let shared = ClipboardHistory(historyFile: defaultHistoryFile)
 
     @Published private(set) var items: [ClipItem] = []
     /// What is on the clipboard now, if history recorded it. Nil after a copy that was skipped as private.
@@ -28,9 +28,31 @@ final class ClipboardHistory: ObservableObject {
             isEnabled ? start() : stop()
         }
     }
+    /// Whether unpinned history is saved to the history file, so it returns after a restart. Off by default. Turning it
+    /// off deletes the file.
+    @Published var keepsAcrossRestarts: Bool {
+        didSet {
+            UserDefaults.standard.set(keepsAcrossRestarts, forKey: "clipboardKeepsAcrossRestarts")
+            guard keepsAcrossRestarts != oldValue else { return }
+            if keepsAcrossRestarts {
+                // A load that is already done or under way is merged by its own finish, so only a new load starts here.
+                if historyLoadStarted { scheduleHistorySave() } else { loadHistory(atLaunch: false) }
+            } else {
+                historySave?.cancel()
+                historySave = nil
+                restoresLatestAtLaunch = false
+                removeHistoryFile()
+            }
+        }
+    }
+    /// Whether the newest restored item is copied to the clipboard when Library opens. Only has an effect while
+    /// `keepsAcrossRestarts` is on, and turning that off turns this off too.
+    @Published var restoresLatestAtLaunch: Bool {
+        didSet { UserDefaults.standard.set(restoresLatestAtLaunch, forKey: "clipboardRestoresLatest") }
+    }
 
     private static let maxItems = 50
-    nonisolated private static let maxItemBytes = 25_000_000
+    nonisolated static let maxItemBytes = 25_000_000
     private static let maxTotalBytes = 200_000_000
     /// Text past this length is not indexed for search, which keeps each keystroke cheap.
     nonisolated private static let maxSearchableCharacters = 100_000
@@ -48,13 +70,27 @@ final class ClipboardHistory: ObservableObject {
 
     /// Pinned items are saved here, so text you keep survives a restart. Everything else stays in memory.
     nonisolated static let defaultFile = LibraryStore.dir.appendingPathComponent("clipboard.json")
+    /// Unpinned history, saved only when `keepsAcrossRestarts` is on. Sealed with the same key as the pinned items.
+    nonisolated static let defaultHistoryFile = LibraryStore.dir.appendingPathComponent("clipboard-history.json")
 
     private let pasteboard: NSPasteboard
     private let file: URL?
-    /// Supplies the key that encrypts pinned items. Tests pass their own, so they never touch the Keychain.
+    /// Nil saves and restores nothing, so the checks and the default history never touch the real file.
+    private let historyFile: URL?
+    /// Supplies the key that encrypts pinned items and the history. Tests pass their own, so they never touch the Keychain.
     private let loadKey: @Sendable () throws -> SymmetricKey
     /// True when clipboard.json exists but could not be opened because the key was unavailable.
     private var leavesPinnedFile = false
+    /// True when the history file exists but could not be opened because the key was unavailable. Nothing is written then.
+    private var leavesHistoryFile = false
+    /// False until the history file has been read. Until then nothing is written, so it cannot replace saved items.
+    private(set) var historyLoaded = false
+    /// Whether a history load has started, at launch or when the setting was turned on.
+    private var historyLoadStarted = false
+    /// The pending debounced save of the history file. Each new copy restarts the wait.
+    private var historySave: Task<Void, Never>?
+    /// The change count when Library opened. A copy made since then means the clipboard is not replaced at launch.
+    private let launchChangeCount: Int
     /// False until clipboard.json has been read in the background. Until then nothing is written, so a save can
     /// never replace the pinned items that are still loading.
     private(set) var pinnedLoaded = false
@@ -71,16 +107,25 @@ final class ClipboardHistory: ObservableObject {
 
     /// `pasteboard` is the system clipboard, or another one for checking the history without touching it.
     /// `file` is where pinned items are saved. Nil saves nothing. `key` encrypts that file.
-    init(pasteboard: NSPasteboard = .general, file: URL? = ClipboardHistory.defaultFile,
+    /// `historyFile` is where unpinned history is saved when it is kept across restarts. Nil saves nothing.
+    init(pasteboard: NSPasteboard = .general, file: URL? = ClipboardHistory.defaultFile, historyFile: URL? = nil,
          key: @escaping @Sendable () throws -> SymmetricKey = ClipboardKey.key) {
         self.pasteboard = pasteboard
         self.file = file
+        self.historyFile = historyFile
         self.loadKey = key
         lastChange = pasteboard.changeCount
+        launchChangeCount = pasteboard.changeCount
         isEnabled = UserDefaults.standard.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
         playsGIFs = UserDefaults.standard.object(forKey: "clipboardPlaysGIFs") as? Bool ?? false
         pastesIntoFields = UserDefaults.standard.object(forKey: "clipboardPastesIntoFields") as? Bool ?? true
+        keepsAcrossRestarts = UserDefaults.standard.object(forKey: "clipboardKeepsAcrossRestarts") as? Bool ?? false
+        restoresLatestAtLaunch = UserDefaults.standard.object(forKey: "clipboardRestoresLatest") as? Bool ?? false
         loadPinned()
+        if historyFile != nil {
+            // Off means no file: a file left from an earlier setting is removed, not read.
+            if keepsAcrossRestarts { loadHistory(atLaunch: true) } else { removeHistoryFile() }
+        }
         if isEnabled { start() }
     }
 
@@ -89,6 +134,13 @@ final class ClipboardHistory: ObservableObject {
         var items: [ClipItem]
         /// The file was plain JSON from before encryption, so it must be saved again.
         var migrated: Bool
+        /// The file exists but could not be opened with the key, so nothing may be written over it.
+        var leavesFile: Bool
+    }
+
+    /// The unpinned items read from the history file. Built off the main actor, like the pins.
+    private struct HistoryLoad: Sendable {
+        var items: [ClipItem]
         /// The file exists but could not be opened with the key, so nothing may be written over it.
         var leavesFile: Bool
     }
@@ -123,26 +175,161 @@ final class ClipboardHistory: ObservableObject {
         }
         switch PinnedFile.read(data, key: key) {
         case .clips(let clips, let migrated):
-            let items: [ClipItem] = clips.compactMap { clip in
-                let representations = clip.representations.map { representation in
-                    Dictionary(uniqueKeysWithValues: representation.map { (NSPasteboard.PasteboardType($0.key), $0.value) })
-                }
-                let bytes = representations.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } }
-                guard var item = makeItem(representations: representations, bytes: bytes, date: clip.date) else { return nil }
-                item.pinned = true
-                item.sourceApp = clip.source
-                return item
-            }
             // Without a key, the file was not verified, so nothing may overwrite or delete it until a later launch.
-            return PinnedLoad(items: items, migrated: migrated, leavesFile: key == nil)
+            return PinnedLoad(items: items(from: clips, pinned: true), migrated: migrated, leavesFile: key == nil)
         case .unreadable:
             // With no key, the file may be fine, so it is left alone. With a key, it is damaged: keep it for
             // inspection and start with no pins.
             guard key != nil else { return PinnedLoad(items: [], migrated: false, leavesFile: true) }
             NSLog("Library: clipboard.json could not be read, so it was moved to clipboard-damaged.bin")
-            quarantine(file)
+            quarantine(file, as: "clipboard-damaged.bin")
             return PinnedLoad(items: [], migrated: false, leavesFile: false)
         }
+    }
+
+    /// The items for saved clips, with their thumbnails. Off the main actor.
+    nonisolated private static func items(from clips: [PinnedFile.Clip], pinned: Bool) -> [ClipItem] {
+        clips.compactMap { clip in
+            let representations = clip.representations.map { representation in
+                Dictionary(uniqueKeysWithValues: representation.map { (NSPasteboard.PasteboardType($0.key), $0.value) })
+            }
+            let bytes = representations.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } }
+            guard var item = makeItem(representations: representations, bytes: bytes, date: clip.date) else { return nil }
+            item.pinned = pinned
+            item.sourceApp = clip.source
+            return item
+        }
+    }
+
+    /// Reads the history file in the background. Nil when there is no file. Off the main actor.
+    nonisolated private static func readHistory(file: URL, key loadKey: @Sendable () throws -> SymmetricKey) -> HistoryLoad? {
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        guard let data = try? Data(contentsOf: file) else {
+            NSLog("Library: could not read clipboard-history.json, so history was not restored")
+            return HistoryLoad(items: [], leavesFile: true)
+        }
+        let key: SymmetricKey?
+        do {
+            key = try loadKey()
+        } catch {
+            NSLog("Library: clipboard history key unavailable, so history was not restored: \(error)")
+            key = nil
+        }
+        // With no key, nothing is restored and the file is left alone until a later launch.
+        guard key != nil else { return HistoryLoad(items: [], leavesFile: true) }
+        switch HistoryFile.read(data, key: key) {
+        case .clips(let clips):
+            return HistoryLoad(items: items(from: clips, pinned: false), leavesFile: false)
+        case .unreadable:
+            NSLog("Library: clipboard-history.json could not be read, so it was moved to clipboard-history-damaged.bin")
+            quarantine(file, as: "clipboard-history-damaged.bin")
+            return HistoryLoad(items: [], leavesFile: false)
+        }
+    }
+
+    /// Reads the history file in the background, then merges it on the main actor. `atLaunch` allows the latest item to
+    /// go on the clipboard. A load started by turning the setting on never does.
+    private func loadHistory(atLaunch: Bool) {
+        historyLoadStarted = true
+        guard let historyFile else {
+            historyLoaded = true
+            return
+        }
+        let loadKey = self.loadKey
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let load = ClipboardHistory.readHistory(file: historyFile, key: loadKey)
+            await self?.finishHistoryLoading(load, atLaunch: atLaunch)
+        }
+    }
+
+    /// Merges the restored items after the copies and pins already here, applies the limits, and copies the newest
+    /// restored item when that setting is on and nothing was copied since launch.
+    private func finishHistoryLoading(_ load: HistoryLoad?, atLaunch: Bool) {
+        historyLoaded = true
+        // Turned off while loading: the file was already removed, and nothing is restored.
+        guard keepsAcrossRestarts else { return }
+        if let load {
+            leavesHistoryFile = load.leavesFile
+            items = HistoryRestart.merge(items, restored: load.items)
+            trim()
+            let latest = atLaunch ? HistoryRestart.latest(in: load.items) : nil
+            if let latest, HistoryRestart.copiesLatestAtLaunch(keeps: keepsAcrossRestarts,
+                                                               restoresLatest: restoresLatestAtLaunch,
+                                                               latest: latest,
+                                                               copiedSinceLaunch: pasteboard.changeCount != launchChangeCount) {
+                copy(latest)
+                // The copy is already in the history, so the watcher must not record it again.
+                lastChange = pasteboard.changeCount
+                current = latest
+            }
+        }
+        scheduleHistorySave()
+    }
+
+    /// Waits about a second after the last change, then saves. Copies made in quick succession share one write.
+    private func scheduleHistorySave() {
+        guard keepsAcrossRestarts, historyFile != nil else { return }
+        historySave?.cancel()
+        historySave = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            self?.writeHistory()
+        }
+    }
+
+    /// The unpinned items to save now, or nil when nothing may be written: the setting is off, the file has not been read
+    /// yet, or it could not be opened with the key. Built on the main actor, where the items live.
+    private func historyClips() -> [PinnedFile.Clip]? {
+        guard keepsAcrossRestarts, historyLoaded, !leavesHistoryFile else { return nil }
+        return items.filter {
+            HistoryRestart.saves(kind: $0.kind, byteCount: $0.byteCount, pinned: $0.pinned, keeps: true)
+        }.map { item in
+            PinnedFile.Clip(source: item.sourceApp, date: item.date, representations: item.representations.map { representation in
+                Dictionary(uniqueKeysWithValues: representation.map { ($0.key.rawValue, $0.value) })
+            })
+        }
+    }
+
+    private func writeHistory() {
+        historySave = nil
+        guard let historyFile, let clips = historyClips() else { return }
+        let loadKey = self.loadKey
+        Self.writeQueue.async { Self.persistHistory(clips, to: historyFile, key: loadKey) }
+    }
+
+    /// Writes the unpinned history before Library quits. It waits for the write, since the app may exit right after.
+    func flushHistory() {
+        historySave?.cancel()
+        historySave = nil
+        guard let historyFile, let clips = historyClips() else { return }
+        let loadKey = self.loadKey
+        Self.writeQueue.sync { Self.persistHistory(clips, to: historyFile, key: loadKey) }
+    }
+
+    /// Seals the items and writes them atomically, or removes the file when none are left. Runs on `writeQueue`.
+    /// Nothing is written when the key is unavailable, so no plain text is ever saved.
+    nonisolated private static func persistHistory(_ clips: [PinnedFile.Clip], to file: URL, key loadKey: @Sendable () throws -> SymmetricKey) {
+        guard !clips.isEmpty else {
+            try? FileManager.default.removeItem(at: file)
+            return
+        }
+        let data: Data
+        do {
+            data = try HistoryFile.encode(clips, key: loadKey())
+        } catch {
+            NSLog("Library: clipboard history was not saved, because the key is unavailable: \(error)")
+            return
+        }
+        // Same as clipboard.json: the temporary file is private from creation, then renamed over the old file.
+        let temporary = file.deletingLastPathComponent().appendingPathComponent(".clipboard-history-\(UUID().uuidString).tmp")
+        guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return }
+        if rename(temporary.path, file.path) != 0 { try? FileManager.default.removeItem(at: temporary) }
+    }
+
+    /// Deletes the history file, after any write already queued. Used when the setting is turned off.
+    private func removeHistoryFile() {
+        guard let historyFile else { return }
+        Self.writeQueue.async { try? FileManager.default.removeItem(at: historyFile) }
     }
 
     /// Publishes the loaded pins. Copies made while the file was loading stay first. A pin whose copy was made
@@ -166,9 +353,9 @@ final class ClipboardHistory: ObservableObject {
         }
     }
 
-    /// Moves a damaged clipboard.json aside, replacing any earlier copy of it.
-    nonisolated private static func quarantine(_ file: URL) {
-        let damaged = file.deletingLastPathComponent().appendingPathComponent("clipboard-damaged.bin")
+    /// Moves a damaged file aside under `name`, replacing any earlier copy of it. The file is kept for inspection.
+    nonisolated private static func quarantine(_ file: URL, as name: String) {
+        let damaged = file.deletingLastPathComponent().appendingPathComponent(name)
         try? FileManager.default.removeItem(at: damaged)
         do {
             try FileManager.default.moveItem(at: file, to: damaged)
@@ -283,11 +470,13 @@ final class ClipboardHistory: ObservableObject {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         items[index].pinned.toggle()
         savePinned()
+        scheduleHistorySave()
     }
 
     func remove(_ item: ClipItem) {
         items.removeAll { $0.id == item.id }
         if item.pinned { savePinned() }
+        scheduleHistorySave()
     }
 
     /// Downloads the GIF a copied web image points at and attaches it, so the picture can play. Browsers copy a
@@ -309,6 +498,7 @@ final class ClipboardHistory: ObservableObject {
     /// Removes everything that is not pinned.
     func clear() {
         items.removeAll { !$0.pinned }
+        scheduleHistorySave()
     }
 
     // MARK: Paste queue
@@ -392,6 +582,7 @@ final class ClipboardHistory: ObservableObject {
         items.insert(item, at: items.firstIndex { $0.date < item.date } ?? items.count)
         if generation == captureGeneration { current = item }
         trim()
+        scheduleHistorySave()
         if playsGIFs, let url = item.gifURL, !item.isAnimated { fetchGIF(digest: item.digest, from: url) }
     }
 
@@ -487,12 +678,7 @@ final class ClipboardHistory: ObservableObject {
 
     /// Keeps the newest unpinned items within the count and memory limits.
     private func trim() {
-        var unpinned = items.filter { !$0.pinned }
-        var total = items.reduce(0) { $0 + $1.byteCount }
-        while let oldest = unpinned.last, unpinned.count > Self.maxItems || total > Self.maxTotalBytes {
-            unpinned.removeLast()
-            total -= oldest.byteCount
-            items.removeAll { $0.id == oldest.id }
-        }
+        let kept = HistoryRestart.limited(items, maxItems: Self.maxItems, maxTotalBytes: Self.maxTotalBytes)
+        if kept.count != items.count { items = kept }
     }
 }
