@@ -76,19 +76,66 @@ struct ManageView: View {
                 header(pathWidth: pathWidth)
                 Divider()
                 list(pathWidth: pathWidth)
+                if let status = store.syncState {
+                    // The iCloud state, as Finder shows it for an iCloud Drive file. It is not a dialog.
+                    Divider()
+                    HStack {
+                        Text(status.label)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .accessibilityElement(children: .combine)
+                }
             }
         }
         .frame(minWidth: 680, idealWidth: 780, minHeight: 320, idealHeight: 420)
         // Remembers the window's size and position across launches.
         .background(WindowFrameAutosave(name: "ManageWindow"))
+        .onAppear { store.refreshSyncState() }
+    }
+
+    /// The library rows, then Recently Deleted when it has items.
+    @ViewBuilder
+    private func rows(_ library: [LibraryItem], trashed: [LibraryItem], pathWidth: CGFloat) -> some View {
+        OutlineGroup(library, children: \.children) { node in
+            NodeRow(pathWidth: pathWidth, node: node, store: store, state: state)
+        }
+        if !trashed.isEmpty {
+            Section {
+                OutlineGroup(trashed, children: \.children) { node in
+                    NodeRow(pathWidth: pathWidth, node: node, store: store, state: state)
+                }
+            } header: {
+                Text("Recently Deleted")
+            } footer: {
+                Text("Deleted items stay here for 30 days, then they are removed for good. Restore puts an item back in its folder.")
+            }
+        }
+    }
+
+    /// True while the Delete Immediately confirmation is asked.
+    private var purgeIsPresented: Binding<Bool> {
+        Binding(
+            get: { state.pendingPurge != nil },
+            set: { if !$0 { state.pendingPurge = nil } }
+        )
+    }
+
+    /// Whether `id` is in Recently Deleted, as a deleted item or one inside it.
+    private func isDeleted(_ id: UUID) -> Bool {
+        store.deleted.contains { $0.contains(id) }
     }
 
     private func list(pathWidth: CGFloat) -> some View {
         // The search runs once per change to the query or the library, not on every redraw.
         let found = state.searches.result(for: state.query, revision: store.revision, in: store.nodes)
+        let trashed = store.deleted.matching(state.query)
         let shown = found.count
-        return List(displayed(found.tree), children: \.children, selection: $state.selection) { node in
-            NodeRow(pathWidth: pathWidth, node: node, store: store, state: state)
+        return List(selection: $state.selection) {
+            rows(displayed(found.tree), trashed: trashed, pathWidth: pathWidth)
         }
         .listStyle(.inset(alternatesRowBackgrounds: true))
         .navigationSubtitle("\(shown) \(shown == 1 ? "item" : "items")")
@@ -96,7 +143,7 @@ struct ManageView: View {
         .focusedSceneValue(\.manageState, state)
         .onAppear { store.undoManager = undoManager }
         .overlay {
-            if store.nodes.isEmpty {
+            if store.nodes.isEmpty && trashed.isEmpty {
                 ContentUnavailableView {
                     Label("Your Library Is Empty", systemImage: "books.vertical")
                 } description: {
@@ -104,7 +151,7 @@ struct ManageView: View {
                 } actions: {
                     Button("Add Bookmark") { state.present(.bookmark) }
                 }
-            } else if found.tree.isEmpty {
+            } else if found.tree.isEmpty && trashed.isEmpty {
                 ContentUnavailableView.search(text: state.query)
             }
         }
@@ -123,9 +170,20 @@ struct ManageView: View {
             return .handled
         }
         .onKeyPress(.return) {
-            guard state.selection.count == 1 else { return .ignored }
-            state.renamingID = state.selection.first
+            guard state.selection.count == 1, let id = state.selection.first, store.nodes.node(withID: id) != nil else {
+                return .ignored
+            }
+            state.renamingID = id
             return .handled
+        }
+        .confirmationDialog("Delete Immediately?", isPresented: purgeIsPresented, titleVisibility: .visible) {
+            Button("Delete Immediately", role: .destructive) {
+                if let ids = state.pendingPurge { store.deleteImmediately(ids) }
+                state.pendingPurge = nil
+            }
+            Button("Cancel", role: .cancel) { state.pendingPurge = nil }
+        } message: {
+            Text("The items are removed for good and can’t be restored.")
         }
         .dropDestination(for: String.self) { items, _ in
             store.move(Set(items.flatMap(ids(in:))), to: nil)
@@ -286,9 +344,13 @@ struct ManageView: View {
     }
 
     /// Groups follow Finder: open, then info, then move and share, then Delete alone at the bottom.
+    /// Items in Recently Deleted get Restore and Delete Immediately only.
     @ViewBuilder
     private func contextMenu(for ids: Set<UUID>) -> some View {
-        if let id = ids.first, ids.count == 1, let node = store.nodes.node(withID: id) {
+        if !ids.isEmpty, ids.allSatisfy(isDeleted) {
+            Button("Restore") { store.restore(ids) }
+            Button("Delete Immediately", role: .destructive) { state.pendingPurge = ids }
+        } else if let id = ids.first, ids.count == 1, let node = store.nodes.node(withID: id) {
             if node.isOpenable {
                 Button("Open") { open(node) }
             }
@@ -323,8 +385,12 @@ struct ManageView: View {
         }
     }
 
+    /// Live items go to Recently Deleted. Items already there are removed for good, after the user confirms.
     private func delete(_ ids: Set<UUID>) {
-        store.perform("Delete") { nodes in ids.forEach { nodes.removeNode($0) } }
+        let live = ids.filter { store.nodes.node(withID: $0) != nil }
+        if !live.isEmpty { store.delete(live) }
+        let gone = ids.subtracting(live)
+        if !gone.isEmpty { state.pendingPurge = gone }
         state.selection.subtract(ids)
     }
 }

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// A bookmark (`url`), an application (`appPath`), a terminal command (`command`),
 /// a folder (`children`), or a titled divider (`isDivider`).
-struct LibraryItem: Codable, Identifiable {
+struct LibraryItem: Codable, Identifiable, Equatable {
     var id = UUID()
     var name: String
     var url: String?
@@ -26,6 +26,11 @@ struct LibraryItem: Codable, Identifiable {
     var keywords: String?
     /// Label for the value prompt of a URL template.
     var promptLabel: String?
+    /// When the item was deleted. Set only on the top-level items in Recently Deleted, which are removed for good
+    /// 30 days later.
+    var deletedDate: Date?
+    /// The folder the item was in when it was deleted, so Restore can put it back there.
+    var deletedFrom: UUID?
     /// The named fields a URL template declares in Get Info, each "name" or "name:Label". Only declared names are
     /// placeholders, so `{name}` is plain text in a URL without them. Nil for templates that use only `{}`.
     var templateFields: [String]?

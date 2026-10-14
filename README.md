@@ -188,7 +188,7 @@ The welcome tour opens the first time you launch Library. It explains the app an
 
 **Settings** (⌘,) has three tabs.
 
-- **General:** Open at Login, Check for Updates Automatically, the welcome screen, removing tracking parameters from copied links, and the app version.
+- **General:** Open at Login, Keep Library in iCloud Drive, Check for Updates Automatically, the welcome screen, removing tracking parameters from copied links, and the app version.
 - **Shortcuts:** One list of shortcuts: Show Library Menu, Show Quick Open, Show Clipboard Menu, and Open Copied Link. A picker sets whether the Library menu opens at the pointer or from the menu bar.
 - **Clipboard:** Turn clipboard history, pasting into text fields, and copied GIFs on or off, and clear the history.
 
@@ -202,10 +202,12 @@ Your data is stored in `~/.library/`:
 
 | File | Contents |
 | --- | --- |
-| `bookmarks.json` | Your items, folders, shortcuts, and order |
+| `bookmarks.json` | Your items, folders, shortcuts, and order. With **Keep Library in iCloud Drive** on, it is stored in iCloud Drive instead (see below). |
 | `clipboard.json` | Pinned clipboard items, encrypted with a key kept in your Keychain |
 | `favicons/` | Cached site icons. Library downloads them again if you delete the folder. |
 | `snippets.json` | Your snippets, as plain text. They are not encrypted, and they are not clipboard history. |
+
+**Keep Library in iCloud Drive** (**Settings > General**, off by default) moves `bookmarks.json` to `Library/bookmarks.json` in iCloud Drive and leaves a link to it at `~/.library/bookmarks.json`, so your library follows you to your other Macs. With it on, `bookmarks.json` is stored in iCloud Drive. Clipboard history never is: clipboard history stays in memory, pinned clipboard items stay in `clipboard.json` on this Mac, and their key stays in your Keychain. Changes sync through iCloud, which decides when. If two Macs change the library at once, the newer change wins for each item, and Library tells you when a change from another Mac replaced an edit you had not yet saved.
 
 If Library can't read `bookmarks.json`, it saves a copy as `bookmarks-damaged.json` and tells you when it launches.
 
