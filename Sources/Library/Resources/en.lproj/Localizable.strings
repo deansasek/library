@@ -54,3 +54,6 @@
 
 /* Copy as menu item that turns each line break into a space. */
 "Joined Lines" = "Joined Lines";
+
+/* Quick Open action that copies a bookmark or link as a Markdown link, [Title](url). */
+"Copy as Markdown Link" = "Copy as Markdown Link";

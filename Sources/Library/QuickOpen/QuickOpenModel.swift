@@ -321,6 +321,11 @@ final class QuickOpenModel: ObservableObject {
         if let url = node.url {
             copy("Copy Link", url)
             copy("Copy Clean Link", TrackingParameters.clean(url))
+            if !node.isTemplate {
+                list.append(QuickOpenAction(id: "markdown", title: String(localized: "Copy as Markdown Link", bundle: L10n.bundle)) {
+                    MarkdownLink.copy(title: node.name, url: url, to: .general)
+                })
+            }
         }
         if let command = node.command { copy("Copy Command", command) }
         if let path = node.appPath {
@@ -378,6 +383,12 @@ final class QuickOpenModel: ObservableObject {
             }
             list.append(QuickOpenAction(id: "copy-as", title: String(localized: "Copy as…", bundle: L10n.bundle),
                                         children: transforms) {})
+        }
+        if item.kind == .link, let link = item.link {
+            list.append(QuickOpenAction(id: "markdown", title: String(localized: "Copy as Markdown Link", bundle: L10n.bundle)) { [pastes] in
+                MarkdownLink.copy(title: link.host ?? link.absoluteString, url: link.absoluteString, to: .general)
+                if pastes { FrontApp.pasteSoon() }
+            })
         }
         list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { ClipPreview.shared.show(item) })
         list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })

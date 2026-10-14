@@ -617,6 +617,25 @@ for (transform, input, expected) in transformTable {
 }
 check(ClipTransform.allCases.map(\.title).allSatisfy { !$0.isEmpty } && ClipTransform.allCases.count == 5, "five named transforms")
 
+// ---- Markdown links ----
+check(MarkdownLink.escapedTitle("a [b] *c* _d_ `e` \\f") == "a \\[b\\] \\*c\\* \\_d\\_ \\`e\\` \\\\f", "Markdown special characters are escaped")
+check(MarkdownLink.escapedTitle("Plain (words) & #tags") == "Plain (words) & #tags", "other characters are left alone")
+check(MarkdownLink.markdown(title: "Docs", url: "https://docs.example.com/a") == "[Docs](https://docs.example.com/a)", "plain Markdown link")
+check(MarkdownLink.markdown(title: "Hi (there)", url: "https://x.example.com/a b(c)") == "[Hi (there)](https://x.example.com/a%20b%28c%29)", "destination encodes spaces and parentheses")
+check(MarkdownLink.markdown(title: "  Docs  ", url: "https://d.example.com") == "[Docs](https://d.example.com)", "title is trimmed")
+check(MarkdownLink.markdown(title: " ", url: "https://d.example.com") == "[https://d.example.com](https://d.example.com)", "a blank title uses the URL")
+check(MarkdownLink.markdown(title: "a_b [c]", url: "https://e.example.com") == "[a\\_b \\[c\\]](https://e.example.com)", "escaped title in the link")
+let mdRich = MarkdownLink.richText(title: "Docs & *more*", url: "https://docs.example.com")
+let mdBack = mdRich.flatMap { NSAttributedString(rtf: $0, documentAttributes: nil) }
+check(mdBack?.string == "Docs & *more*" && (mdBack?.attribute(.link, at: 0, effectiveRange: nil) as? URL) == URL(string: "https://docs.example.com"), "rich text holds the unescaped title as a link")
+check(MarkdownLink.richText(title: "  ", url: "https://docs.example.com") == nil && MarkdownLink.richText(title: "Docs", url: "") == nil, "no rich text without a title or valid URL")
+let mdPasteboard = NSPasteboard(name: NSPasteboard.Name("library-checks-markdown-\(UUID().uuidString)"))
+MarkdownLink.copy(title: "Docs", url: "https://docs.example.com", to: mdPasteboard)
+check(mdPasteboard.string(forType: .string) == "[Docs](https://docs.example.com)" && mdPasteboard.data(forType: .rtf) != nil, "copy writes plain text and rich text")
+MarkdownLink.copy(title: "", url: "https://docs.example.com", to: mdPasteboard)
+check(mdPasteboard.string(forType: .string) == "[https://docs.example.com](https://docs.example.com)" && mdPasteboard.data(forType: .rtf) == nil, "copy without a title writes plain text only")
+mdPasteboard.releaseGlobally()
+
 // ---- Quick Look sources ----
 func clip(_ kind: ClipItem.Kind, text: String? = nil, files: [URL] = [], reps: [[NSPasteboard.PasteboardType: Data]] = [],
           link: URL? = nil, animated: Data? = nil) -> ClipItem {
