@@ -2,7 +2,7 @@
 
 <img src="docs/AppIcon.png" width="128" height="128" alt="Library app icon">
 
-<h3 align="center">Library</h3>
+<h1 align="center">Library</h1>
 
 <p>Everything you open and copy, one shortcut away.</p>
 
