@@ -2,6 +2,10 @@
 # Builds Library.app in ./build. Set VERSION to stamp a version, as the release workflow does.
 set -euo pipefail
 cd "$(dirname "$0")"
+# The version comes from VERSION, else the latest git tag, else 0.0.0. A plain build from source must not
+# claim to be older than the latest release, or the update check would always offer one.
+version="${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)}"
+version="${version:-0.0.0}"
 
 swift build -c release
 bin="$(swift build -c release --show-bin-path)/Library"
@@ -23,7 +27,7 @@ cat > "$app/Contents/Info.plist" <<PLIST
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundleExecutable</key><string>Library</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>${VERSION:-1.0}</string>
+    <key>CFBundleShortVersionString</key><string>${version}</string>
     <key>CFBundleVersion</key><string>$(date +%Y%m%d%H%M)</string>
     <key>LSMinimumSystemVersion</key><string>26.0</string>
     <key>LSUIElement</key><true/>
