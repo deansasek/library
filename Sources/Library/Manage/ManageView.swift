@@ -138,9 +138,9 @@ struct ManageView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Edit…", systemImage: "pencil") {
-                    if let id = state.selection.first { state.edit(id, in: store) }
+                    state.editSelection(in: store)
                 }
-                .disabled(state.selection.count != 1)
+                .disabled(state.selection.isEmpty)
             }
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -157,13 +157,13 @@ struct ManageView: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {
-                    if let id = state.selection.first { state.edit(id, in: store) }
+                    state.editSelection(in: store)
                 } label: {
                     Label("Get Info", systemImage: "info.circle")
                 }
-                .help("Get Info for the selected item (⌘I)")
+                .help("Get Info for the selected items (⌘I)")
                 .accessibilityLabel("Get Info")
-                .disabled(state.selection.count != 1)
+                .disabled(state.selection.isEmpty)
             }
             ToolbarItem(placement: .primaryAction) {
                 if let url = singleShareURL {
@@ -198,6 +198,10 @@ struct ManageView: View {
                 AppPickerSheet(store: store, state: state) { commit(sheet) }
             case .edit:
                 EditSheet(store: store, state: state) { commit(sheet) }
+            case .bulkEdit:
+                BulkEditSheet(store: store, state: state)
+            case .duplicates:
+                DuplicatesSheet(store: store, state: state)
             default:
                 AddSheet(store: store, state: state) { commit(sheet) }
             }
@@ -254,6 +258,9 @@ struct ManageView: View {
             node.command = node.appPath == nil ? node.command.map { $0.trimmingCharacters(in: .whitespaces) } : clean(node.command)
             node.promptLabel = node.isTemplate ? clean(node.promptLabel) : nil
             store.perform("Edit") { $0.update(id) { $0 = node } }
+        case .bulkEdit, .duplicates:
+            // These sheets apply their own changes.
+            break
         }
     }
 
@@ -270,6 +277,10 @@ struct ManageView: View {
             Divider()
             Button("Edit…") { state.edit(id, in: store) }
             Button("Rename") { state.renamingID = id }
+            Divider()
+        }
+        if ids.count > 1 {
+            Button("Edit…") { state.editMany(ids) }
             Divider()
         }
         if !ids.isEmpty {

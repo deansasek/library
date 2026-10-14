@@ -711,5 +711,53 @@ check(!QuickOpenFocus.closes(whenKeyGoesTo: .quickOpen, previewOpen: true) && !Q
 check(QuickOpenFocus.closes(whenKeyGoesTo: .other, previewOpen: true) && QuickOpenFocus.closes(whenKeyGoesTo: .other, previewOpen: false), "another window closes Quick Open, preview or not")
 check(QuickOpenFocus.closes(whenKeyGoesTo: nil, previewOpen: true) && QuickOpenFocus.closes(whenKeyGoesTo: nil, previewOpen: false), "no key window closes Quick Open")
 
+// ---- find duplicates (pure) ----
+check(Duplicates.normalizedLink("HTTPS://Docs.Example.com/Path/") == "https://docs.example.com/Path", "scheme and host lowercase, trailing slash goes, path case stays")
+check(Duplicates.normalizedLink("docs.example.com/a") == "https://docs.example.com/a", "a missing scheme counts as https")
+check(Duplicates.normalizedLink("https://a.com/x?Q=1") != Duplicates.normalizedLink("https://a.com/x?q=1"), "query case matters")
+let dupTree = [
+    LibraryItem(name: "Docs", url: "https://docs.example.com/"),
+    LibraryItem(name: "Work", children: [
+        LibraryItem(name: "Docs copy", url: "HTTPS://DOCS.example.com", shortcuts: [Shortcut(keyCode: 2, modifiers: 256, key: "D")], keywords: "wiki handbook"),
+        LibraryItem(name: "Other", url: "https://other.example.com"),
+    ]),
+    LibraryItem(name: "Safari", appPath: "/Applications/Safari.app", keywords: "browser"),
+    LibraryItem(name: "Safari again", appPath: "/Applications/Safari.app/", keywords: "Browser web"),
+    LibraryItem(name: "Commands", command: "ls"),
+    LibraryItem(name: "Divider", isDivider: true),
+]
+let dupGroups = Duplicates.groups(in: dupTree)
+check(dupGroups.count == 2 && dupGroups[0].items.map(\.name) == ["Docs", "Docs copy"] && dupGroups[1].isApp, "groups by link and by app path, in library order")
+check(Duplicates.groups(in: [LibraryItem(name: "A", url: "https://a.com"), LibraryItem(name: "B", url: "https://b.com")]).isEmpty, "no duplicates means no groups")
+check(Duplicates.folderTitle(of: dupTree[1].children![0].id, in: dupTree) == "Work" && Duplicates.folderTitle(of: dupTree[0].id, in: dupTree) == "Top level", "folder titles")
+let merged = Duplicates.merged(dupTree)
+check(merged.leaves.map(\.name) == ["Docs", "Other", "Safari", "Commands", "Divider"], "the first item of each group is kept by default")
+check(merged.leaves.first { $0.name == "Docs" }?.keywords == "wiki handbook" && merged.leaves.first { $0.name == "Safari" }?.keywords == "browser web", "keywords join unique words, first spelling wins")
+check(merged.node(withID: dupTree[1].children![0].id) == nil, "removed item is gone")
+let chosen = Duplicates.merged(dupTree, keeping: [dupGroups[0].id: dupTree[1].children![0].id])
+check(chosen.leaves.map(\.name) == ["Docs copy", "Other", "Safari", "Commands", "Divider"] && chosen.folders().map(\.title) == ["Work"], "a chosen item is kept, in its own folder")
+check(chosen.leaves.first { $0.name == "Docs copy" }?.shortcuts?.isEmpty == false, "the kept item keeps its shortcuts")
+check(Duplicates.joinKeywords([nil, "a B", "b c", " "]) == "a B c" && Duplicates.joinKeywords([nil]) == nil, "keyword join")
+
+// ---- bulk edit (pure) ----
+let bulkTree = [
+    LibraryItem(name: "One", url: "https://one.example.com", color: "red"),
+    LibraryItem(name: "Two", appPath: "/Applications/Safari.app", openNew: true),
+    LibraryItem(name: "Folder", children: [LibraryItem(name: "Three", url: "https://three.example.com")]),
+    LibraryItem(name: "Divider", isDivider: true),
+]
+let bulkIDs: Set<UUID> = [bulkTree[0].id, bulkTree[1].id, bulkTree[3].id]
+let untouched = BulkEdit.apply(BulkEdit(), to: bulkIDs, in: bulkTree)
+check(untouched.map(\.icon) == bulkTree.map(\.icon) && untouched.map(\.color) == bulkTree.map(\.color) && untouched[1].openNew == true, "Don't Change keeps everything")
+check(BulkEdit().changesNothing && !BulkEdit(icon: .clear).changesNothing, "an empty edit changes nothing")
+let edited = BulkEdit.apply(BulkEdit(icon: .set("star.fill"), color: .set("blue"), openNew: .set(false)), to: bulkIDs, in: bulkTree)
+check(edited[0].icon == "star.fill" && edited[0].color == "blue" && edited[0].openNew == nil, "set fields change, others do not")
+check(edited[1].icon == "star.fill" && edited[1].color == "blue" && edited[1].openNew == nil, "an app takes the color; Opens In resets to existing")
+check(edited[2].icon == nil && edited[2].children?[0].icon == nil, "items outside the selection are not touched")
+check(edited[3].icon == "star.fill" && edited[3].color == nil, "dividers take an icon but no color")
+let cleared = BulkEdit.apply(BulkEdit(icon: .clear, color: .clear, openNew: .set(true)), to: bulkIDs, in: edited)
+check(cleared[0].icon == nil && cleared[0].color == nil && cleared[1].openNew == true && cleared[1].icon == nil, "clear removes, Opens In sets new")
+check(BulkEdit.apply(BulkEdit(openNew: .set(true)), to: [bulkTree[2].id], in: bulkTree)[2].children?.first?.openNew == nil, "a bookmark in a folder is not changed unless selected")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

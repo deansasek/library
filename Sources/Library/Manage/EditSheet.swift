@@ -25,7 +25,7 @@ struct EditSheet: View {
                             }
                         }
                         .popover(isPresented: $state.showIconPicker) {
-                            IconPicker(state: state)
+                            IconPicker(state: state, icon: $state.draft.icon) { state.showIconPicker = false }
                         }
                     }
                     if node.isDivider != true {

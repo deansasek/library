@@ -27,12 +27,11 @@ struct ManageCommands: Commands {
             Button("New Divider…") { state?.present(.divider) }
             Divider()
             Button("Import Bookmarks…") { BookmarkImporter.run(into: store) }
+            Button("Find Duplicates…") { state?.present(.duplicates) }
             Divider()
-            Button("Edit…") {
-                if let state, let id = state.selection.first { state.edit(id, in: store) }
-            }
-            .keyboardShortcut("i")
-            .disabled(state?.selection.count != 1)
+            Button("Edit…") { state?.editSelection(in: store) }
+                .keyboardShortcut("i")
+                .disabled(state?.selection.isEmpty != false)
         }
     }
 }

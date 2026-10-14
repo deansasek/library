@@ -3,6 +3,10 @@ import SwiftUI
 /// Popover with Symbols and Emoji tabs, each a searchable grid.
 struct IconPicker: View {
     @ObservedObject var state: ManageState
+    /// The icon that choosing a grid cell sets. Nil means the default icon.
+    let icon: Binding<String?>
+    /// Called after a choice, to close the popover.
+    let dismiss: () -> Void
 
     private static let recentsKey = "recentEmoji"
 
@@ -106,7 +110,7 @@ struct IconPicker: View {
                 } label: {
                     content(item)
                         .frame(width: 28, height: 28)
-                        .background(state.draft.icon == item ? Color.accentColor.opacity(0.25) : .clear,
+                        .background(icon.wrappedValue == item ? Color.accentColor.opacity(0.25) : .clear,
                                     in: RoundedRectangle(cornerRadius: 6))
                 }
                 .buttonStyle(.borderless)
@@ -120,7 +124,7 @@ struct IconPicker: View {
             let recents = (UserDefaults.standard.stringArray(forKey: Self.recentsKey) ?? []).filter { $0 != icon }
             UserDefaults.standard.set(Array(([icon] + recents).prefix(16)), forKey: Self.recentsKey)
         }
-        state.draft.icon = icon
-        state.showIconPicker = false
+        self.icon.wrappedValue = icon
+        dismiss()
     }
 }
