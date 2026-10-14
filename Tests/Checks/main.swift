@@ -940,6 +940,53 @@ check(edited[3].icon == "star.fill" && edited[3].color == nil, "dividers take an
 let cleared = BulkEdit.apply(BulkEdit(icon: .clear, color: .clear, openNew: .set(true)), to: bulkIDs, in: edited)
 check(cleared[0].icon == nil && cleared[0].color == nil && cleared[1].openNew == true && cleared[1].icon == nil, "clear removes, Opens In sets new")
 check(BulkEdit.apply(BulkEdit(openNew: .set(true)), to: [bulkTree[2].id], in: bulkTree)[2].children?.first?.openNew == nil, "a bookmark in a folder is not changed unless selected")
+// ---- library backup: export, restore, and refusals (pure; no panels, no files) ----
+/// The refusal a backup gets, or nil when it is read.
+func backupError(_ data: Data) -> LibraryBackup.BackupError? {
+    if case .failure(let error) = LibraryBackup.decode(data) { return error }
+    return nil
+}
+var backupTree = tree()
+backupTree[1].shortcuts = [Shortcut(keyCode: 17, modifiers: 256, key: "T", openNew: true)]
+backupTree[1].icon = "star.fill"; backupTree[1].color = "red"; backupTree[1].keywords = "term"
+backupTree[2].openAtLogin = true; backupTree[2].promptLabel = "Ticket"
+backupTree[2].children?[0].browser = "com.apple.Safari"
+let backupFixed = Date(timeIntervalSince1970: 1_800_000_000)
+if let exported = try? LibraryBackup.encode(backupTree, exportedAt: backupFixed) {
+    if case .success(let restored) = LibraryBackup.decode(exported) {
+        check(restored.allIDs == backupTree.allIDs, "backup round trip keeps every id")
+        check((try? LibraryBackup.encode(restored, exportedAt: backupFixed)) == exported, "backup round trip re-encodes byte for byte")
+        check(restored[1].shortcuts?.first?.description == "⌘T" && restored[1].icon == "star.fill" && restored[1].color == "red"
+              && restored[1].keywords == "term" && restored[2].openAtLogin == true && restored[2].children?[0].browser == "com.apple.Safari"
+              && restored[2].promptLabel == "Ticket", "backup keeps every field")
+    } else { check(false, "backup decodes") }
+    let keys = (try? JSONSerialization.jsonObject(with: exported) as? [String: Any])?.keys.sorted()
+    check(keys == ["exportedAt", "format", "items", "version"], "backup has only the versioned fields, no clipboard data")
+    let text = String(decoding: exported, as: UTF8.self)
+    check(!text.contains("clipboard") && !text.contains("pinned"), "backup text has no clipboard data")
+    check(text.contains("\"format\" : \"library-backup\"") && text.contains("\"version\" : 1"), "backup is versioned")
+    check(backupError(Data(exported.prefix(exported.count - 40))) == .malformed, "truncated backup is rejected")
+} else { check(false, "backup encodes") }
+
+if let bare = try? JSONEncoder().encode(backupTree) {
+    if case .success(let items) = LibraryBackup.decode(bare) {
+        check(items.allIDs == backupTree.allIDs, "bare bookmarks.json array restores")
+    } else { check(false, "bare array decodes") }
+    check(backupError(Data(bare.prefix(bare.count - 40))) == .malformed, "truncated bookmarks.json array is rejected")
+}
+check(backupError(Data(#"{"format":"other-app","version":1,"items":[]}"#.utf8)) == .wrongFormat, "wrong format is rejected")
+check(backupError(Data(#"{"version":1,"items":[]}"#.utf8)) == .wrongFormat, "missing format is rejected")
+check(backupError(Data(#"{"format":"library-backup","version":2,"items":[]}"#.utf8)) == .unsupportedVersion(2), "future version is rejected")
+check(backupError(Data(#"{"format":"library-backup","items":[]}"#.utf8)) == .unsupportedVersion(0), "missing version is rejected")
+check(backupError(Data("not json".utf8)) == .malformed && backupError(Data()) == .malformed, "garbage is rejected")
+check(backupError(Data(#"{"format":"library-backup","version":1,"items":"oops"}"#.utf8)) == .malformed, "bad items are rejected")
+let twin = LibraryItem(name: "Twin", url: "https://twin.example.com")
+var clash = LibraryItem(name: "Other", url: "https://other.example.com")
+clash.id = twin.id
+if let dupes = try? LibraryBackup.encode([twin, clash]) {
+    check(backupError(dupes) == .duplicateIDs, "repeated ids are rejected")
+}
+check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
