@@ -399,6 +399,9 @@ final class QuickOpenModel: ObservableObject {
         }
         list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { ClipPreview.shared.show(item) })
         list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })
+        list.append(QuickOpenAction(id: "queue", title: String(localized: "Add to Paste Queue", bundle: L10n.bundle)) {
+            history.enqueue(item)
+        })
         if item.libraryNode != nil {
             list.append(QuickOpenAction(id: "add", title: "Add to Library") { [store] in store.addToLibrary(item) })
         }

@@ -45,6 +45,23 @@ struct MenuContent: View {
                 Divider()
                 Button { history.clear() } label: { Text("Clear History", bundle: L10n.bundle) }
             }
+            if !history.pasteQueue.isEmpty {
+                Divider()
+                Section {
+                    ForEach(history.pasteQueue) { item in
+                        Button {} label: {
+                            Text(item.menuTitle)
+                        }
+                        .disabled(true)
+                    }
+                    Button { history.pasteNext() } label: {
+                        Label { Text("Paste Next", bundle: L10n.bundle) } icon: { Image(systemName: "arrow.right.doc.on.clipboard") }
+                    }
+                    Button { history.clearPasteQueue() } label: { Text("Clear Queue", bundle: L10n.bundle) }
+                } header: {
+                    Label { Text("Paste Queue (\(history.pasteQueue.count))", bundle: L10n.bundle) } icon: { Image(systemName: "list.number") }
+                }
+            }
         } label: {
             Label { Text("Clipboard", bundle: L10n.bundle) } icon: { Image(systemName: "doc.on.clipboard") }
         }

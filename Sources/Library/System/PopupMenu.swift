@@ -95,6 +95,24 @@ enum PopupMenu {
             clear.target = target
             menu.addItem(clear)
         }
+        // The queue is listed in order, with the items shown but not chosen. Paste Next copies the first one.
+        if !history.pasteQueue.isEmpty {
+            if !menu.items.isEmpty { menu.addItem(.separator()) }
+            menu.addItem(NSMenuItem.sectionHeader(title: String(localized: "Paste Queue (\(history.pasteQueue.count))", bundle: L10n.bundle)))
+            for clip in history.pasteQueue {
+                let queued = NSMenuItem(title: clip.menuTitle, action: nil, keyEquivalent: "")
+                queued.image = clip.icon
+                queued.isEnabled = false
+                menu.addItem(queued)
+            }
+            let next = NSMenuItem(title: String(localized: "Paste Next", bundle: L10n.bundle), action: #selector(ClipTarget.pasteNext(_:)), keyEquivalent: "")
+            next.target = target
+            next.image = NSImage(systemSymbolName: "arrow.right.doc.on.clipboard", accessibilityDescription: nil)
+            menu.addItem(next)
+            let clearQueue = NSMenuItem(title: String(localized: "Clear Queue", bundle: L10n.bundle), action: #selector(ClipTarget.clearPasteQueue(_:)), keyEquivalent: "")
+            clearQueue.target = target
+            menu.addItem(clearQueue)
+        }
         return (menu, target)
     }
 
@@ -192,6 +210,14 @@ enum PopupMenu {
 
         @objc func clear(_ sender: NSMenuItem) {
             ClipboardHistory.shared.clear()
+        }
+
+        @objc func pasteNext(_ sender: NSMenuItem) {
+            ClipboardHistory.shared.pasteNext()
+        }
+
+        @objc func clearPasteQueue(_ sender: NSMenuItem) {
+            ClipboardHistory.shared.clearPasteQueue()
         }
 
         private func clip(_ sender: NSMenuItem) -> ClipItem? {

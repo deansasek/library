@@ -307,6 +307,25 @@ final class ClipboardHistory: ObservableObject {
         items.removeAll { !$0.pinned }
     }
 
+    // MARK: Paste queue
+
+    /// Clips to paste one at a time, in order. Kept in memory only, so it is empty again when Library starts.
+    @Published private(set) var pasteQueue: [ClipItem] = []
+
+    func enqueue(_ item: ClipItem) {
+        pasteQueue.append(item)
+    }
+
+    /// Copies the first queued clip and takes it out of the queue. A Command-V in the app in front then pastes it.
+    func pasteNext() {
+        guard !pasteQueue.isEmpty else { return }
+        copy(pasteQueue.removeFirst())
+    }
+
+    func clearPasteQueue() {
+        pasteQueue.removeAll()
+    }
+
     // MARK: Watching
 
     /// macOS sends no event when the clipboard changes, so the change counter is checked twice a second. The
