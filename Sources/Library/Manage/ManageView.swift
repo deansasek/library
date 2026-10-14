@@ -271,6 +271,10 @@ struct ManageView: View {
             if node.isOpenable {
                 Button("Open") { open(node) }
             }
+            if let children = node.children {
+                Button("Open All") { openAll(children) }
+                    .disabled(openAllSelection(in: children).isEmpty)
+            }
             if let path = node.appPath {
                 Button("Show in Finder") { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
             }

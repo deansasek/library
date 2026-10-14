@@ -142,6 +142,12 @@ enum PopupMenu {
                 empty.isEnabled = false
                 submenu.addItem(empty)
             } else {
+                let openEach = NSMenuItem(title: "Open All", action: #selector(Target.openFolder(_:)), keyEquivalent: "")
+                openEach.target = target
+                openEach.representedObject = node.id
+                openEach.isEnabled = !openAllSelection(in: children).isEmpty
+                submenu.addItem(openEach)
+                submenu.addItem(.separator())
                 fill(submenu, with: children, target: target)
             }
             item.submenu = submenu
@@ -211,6 +217,11 @@ enum PopupMenu {
             // Holding Option flips the item's new-window or new-instance setting.
             let flip = NSEvent.modifierFlags.contains(.option)
             open(node, forceNew: flip ? node.openNew != true : nil)
+        }
+
+        @objc func openFolder(_ sender: NSMenuItem) {
+            guard let id = sender.representedObject as? UUID, let folder = store.nodes.node(withID: id) else { return }
+            openAll(folder.children ?? [])
         }
     }
 }

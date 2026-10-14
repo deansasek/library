@@ -114,6 +114,9 @@ struct MenuItems: View {
                         Button("Empty") {}
                             .disabled(true)
                     } else {
+                        Button("Open All") { openAll(children) }
+                            .disabled(openAllSelection(in: children).isEmpty)
+                        Divider()
                         MenuItems(nodes: children, store: store)
                     }
                 } label: {

@@ -62,22 +62,83 @@ func splitArguments(_ line: String) -> [String] {
     return result
 }
 
-/// Asks for the value that fills a URL template. Nil when cancelled or empty.
+/// The prompt text for a template field. A bare `{}` uses the item's prompt label, and a named field without a label
+/// uses its name.
+private func fieldLabel(_ field: TemplateField, node: LibraryItem) -> String {
+    if let label = field.label { return label }
+    if field.name.isEmpty { return node.promptLabel ?? "Value" }
+    return field.name.prefix(1).uppercased() + field.name.dropFirst()
+}
+
+/// Asks for the values that fill a URL template, one field per placeholder, in one sheet. Returns the values by
+/// placeholder name, or nil when cancelled or when a value is empty. Return opens, and Escape cancels.
 @MainActor
-private func promptValue(for node: LibraryItem) -> String? {
+private func promptValues(for node: LibraryItem) -> [String: String]? {
+    let fields = node.placeholders
     NSApp.activate(ignoringOtherApps: true)
     let alert = NSAlert()
     alert.messageText = node.name
-    alert.informativeText = node.promptLabel ?? "Value"
-    let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
-    field.placeholderString = node.promptLabel ?? "Value"
-    alert.accessoryView = field
-    alert.window.initialFirstResponder = field
+    let inputs = fields.map { field -> NSTextField in
+        let input = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        input.placeholderString = fieldLabel(field, node: node)
+        return input
+    }
+    if inputs.count == 1 {
+        alert.informativeText = fieldLabel(fields[0], node: node)
+        alert.accessoryView = inputs[0]
+        alert.window.initialFirstResponder = inputs[0]
+    } else {
+        alert.informativeText = "Fill in each value."
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        for (field, input) in zip(fields, inputs) {
+            stack.addArrangedSubview(NSTextField(labelWithString: fieldLabel(field, node: node)))
+            input.translatesAutoresizingMaskIntoConstraints = false
+            input.widthAnchor.constraint(equalToConstant: 260).isActive = true
+            stack.addArrangedSubview(input)
+        }
+        stack.layoutSubtreeIfNeeded()
+        stack.frame = NSRect(origin: .zero, size: stack.fittingSize)
+        alert.accessoryView = stack
+        alert.window.initialFirstResponder = inputs.first
+        alert.window.recalculateKeyViewLoop()
+    }
     alert.addButton(withTitle: "Open")
     alert.addButton(withTitle: "Cancel")
+    alert.buttons[1].keyEquivalent = "\u{1b}"
     guard alert.runModal() == .alertFirstButtonReturn else { return nil }
-    let value = field.stringValue.trimmingCharacters(in: .whitespaces)
-    return value.isEmpty ? nil : value
+    var values: [String: String] = [:]
+    for (field, input) in zip(fields, inputs) {
+        let value = input.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !value.isEmpty else { return nil }
+        values[field.name] = value
+    }
+    return values
+}
+
+/// Opens each item of a folder in turn, after confirming when there are many. Items are spaced about 150 ms apart,
+/// so browsers and apps are not flooded. The selection is `openAllSelection(in:)`.
+@MainActor
+func openAll(_ nodes: [LibraryItem]) {
+    let items = openAllSelection(in: nodes)
+    guard !items.isEmpty else { return }
+    if needsOpenAllConfirmation(items.count) {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = "Open \(items.count) items?"
+        alert.informativeText = "Library opens them one after another."
+        alert.addButton(withTitle: "Cancel")
+        alert.addButton(withTitle: "Open")
+        guard alert.runModal() == .alertSecondButtonReturn else { return }
+    }
+    Task { @MainActor in
+        for (index, node) in items.enumerated() {
+            if index > 0 { try? await Task.sleep(for: .milliseconds(150)) }
+            open(node)
+        }
+    }
 }
 
 /// Looked up once, since rows ask for it on every redraw. A browser installed later shows after a restart.
@@ -117,7 +178,7 @@ private func openInNewWindow(_ link: URL, in browser: URL?) {
 
 /// Opens a bookmark in the browser, or runs a terminal command. Opens an app,
 /// or brings it to the front when it already runs. `forceNew` overrides the item's own setting.
-/// `value` fills a URL template without asking.
+/// `value` fills a URL template with a single field without asking. Templates with several fields always ask.
 @MainActor
 func open(_ node: LibraryItem, forceNew: Bool? = nil, value: String? = nil) {
     let openNew = forceNew ?? (node.openNew == true)
@@ -135,8 +196,14 @@ func open(_ node: LibraryItem, forceNew: Bool? = nil, value: String? = nil) {
     } else if node.url != nil {
         var link = node.link
         if node.isTemplate {
-            guard let value = value ?? promptValue(for: node) else { return }
-            link = node.link(filling: value)
+            let values: [String: String]?
+            if let value, node.placeholders.count == 1 {
+                values = [node.placeholders[0].name: value]
+            } else {
+                values = promptValues(for: node)
+            }
+            guard let values, let filled = node.link(values: values) else { return }
+            link = filled
         }
         if let link {
             LibraryStore.shared.recordOpen(node.id)
