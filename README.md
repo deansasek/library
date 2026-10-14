@@ -76,7 +76,3 @@ Data is stored in `~/.library/`. Updates don't touch it.
 - **A shortcut does nothing.** Another app may use the same keys. Check **Settings > Shortcuts** for a conflict.
 - **Open at Login has no effect.** Move `Library.app` to `/Applications` first.
 - **Services are missing.** Log out and back in.
-
-## Contributing
-
-Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages. Run `./build.sh` before you open a pull request.
