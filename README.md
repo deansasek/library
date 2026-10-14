@@ -148,7 +148,7 @@ Library reloads `bookmarks.json` when another program changes it, such as an edi
 ### Use Library from other apps
 
 - **Spotlight:** Bookmarks, apps, and commands appear in Spotlight results.
-- **Services:** Select a link in any app, then choose **Services > Add to Library**.
+- **Services:** Select a link in any app, then choose **Services > Add to Library**. In Finder, select applications or folders and choose **Services > Add to Library** to add them. Apps already in your library are skipped. Folders are added as empty groups.
 - **URL scheme:** Use `library://open?name=Jira&value=ABC-123` to open a bookmark or app and fill in its template. Terminal commands can't be opened this way, so a web page can't run one. Use `library://menu` to show the menu. Use `library://search` to open Quick Open.
 
 From Terminal, run `open "library://open?name=Jira&value=ABC-123"`.
