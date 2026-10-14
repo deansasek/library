@@ -197,6 +197,8 @@ The welcome tour opens the first time you launch Library. It explains the app an
 
 Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play. It contacts `api.github.com` only to check for a new release: when you choose **Check for Updates…** in the menu, and, unless you turn off **Check for Updates Automatically** in **Settings > General** (on by default), once an hour while Library runs and when it starts if the last check was an hour or more ago. The only request is to `https://api.github.com/repos/deansasek/library/releases/latest`. It names only the app's version, in its User-Agent header. It also sends the ETag GitHub gave on the last answer, so GitHub can reply that nothing changed. No account or other data is sent. When a newer version exists, the menu shows it at the top, and nothing pops up.
 
+If you turn on **Require Touch ID or password to show pinned items** in **Settings > Clipboard** (off by default), pinned clipboard items stay hidden until you authenticate with Touch ID or your Mac password. The unlock lasts in memory until you choose **Lock Pinned Items** in the Library menu, the Mac sleeps, or Library quits, and it is never saved. Searching does not look inside locked items. The lock does not change how clipboard.json is encrypted.
+
 Your data is stored in `~/.library/`:
 
 | File | Contents |

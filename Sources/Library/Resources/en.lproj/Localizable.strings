@@ -10,6 +10,21 @@
 /* Menu item that opens the window for editing the library. */
 "Edit Library…" = "Edit Library…";
 
+/* Menu item that locks the pinned clipboard items again, so Touch ID or the password is asked for next time. */
+"Lock Pinned Items" = "Lock Pinned Items";
+
+/* Button in Quick Open that asks for Touch ID or the password to show a locked pinned clipboard item. */
+"Show Pinned Item" = "Show Pinned Item";
+
+/* The title shown in place of a pinned clipboard item's text while it is locked. */
+"Pinned Item" = "Pinned Item";
+
+/* Reason shown in the Touch ID or password prompt, after "Use Touch ID or enter your password to". */
+"view a pinned clipboard item" = "view a pinned clipboard item";
+
+/* Reason shown in the Touch ID or password prompt, after "Use Touch ID or enter your password to". */
+"copy a pinned clipboard item" = "copy a pinned clipboard item";
+
 /* Settings tab for general options. */
 "General" = "General";
 

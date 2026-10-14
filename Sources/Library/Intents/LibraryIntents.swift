@@ -118,7 +118,8 @@ struct PasteLatestClipIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let item = ClipboardHistory.shared.items.first else {
+        // A locked pinned item is never copied here, since a shortcut cannot ask for Touch ID or the password.
+        guard let item = ClipboardHistory.shared.items.first(where: { !ClipboardLock.shared.isHidden($0) }) else {
             throw LibraryIntentError("The clipboard history is empty.")
         }
         ClipboardHistory.shared.copy(item)

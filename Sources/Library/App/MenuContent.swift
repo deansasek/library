@@ -5,6 +5,7 @@ struct MenuContent: View {
     @ObservedObject private var loginItem = LoginItem.shared
     @ObservedObject private var history = ClipboardHistory.shared
     @ObservedObject private var updates = UpdateStatus.shared
+    @ObservedObject private var clipLock = ClipboardLock.shared
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
 
@@ -33,12 +34,12 @@ struct MenuContent: View {
             } else {
                 ForEach(history.displayOrder.prefix(10)) { item in
                     Button {
-                        history.copy(item)
+                        clipLock.perform(item, for: .copy) { history.copy(item) }
                     } label: {
                         Label {
-                            Text(item.menuTitle)
+                            Text(clipLock.menuTitle(for: item))
                         } icon: {
-                            Image(nsImage: item.icon)
+                            Image(nsImage: clipLock.icon(for: item))
                         }
                     }
                 }
@@ -47,6 +48,13 @@ struct MenuContent: View {
             }
         } label: {
             Label { Text("Clipboard", bundle: L10n.bundle) } icon: { Image(systemName: "doc.on.clipboard") }
+        }
+        // Shown only when the lock is on. It is greyed out while the pinned items are already locked.
+        if clipLock.isRequired {
+            Button { clipLock.lockPinned() } label: {
+                Label { Text("Lock Pinned Items", bundle: L10n.bundle) } icon: { Image(systemName: "lock") }
+            }
+            .disabled(!clipLock.state.isUnlocked)
         }
         // Shown only while the clipboard holds a link or application that is not in the library.
         if let suggestion = store.suggestion() {

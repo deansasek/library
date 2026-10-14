@@ -1070,6 +1070,53 @@ if let dupes = try? LibraryBackup.encode([twin, clash]) {
     check(backupError(dupes) == .duplicateIDs, "repeated ids are rejected")
 }
 check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")
+// ---- Pinned item lock: state transitions and the title and copy decisions. The Touch ID or password prompt
+// itself needs a person at the keyboard, so these checks never run it. ----
+var lockState = PinnedLock()
+check(!lockState.isUnlocked, "a new session starts locked, so quitting clears the unlock")
+let firstAttempt = lockState.generation
+lockState.finishAuthentication(succeeded: false, startedAt: firstAttempt)
+check(!lockState.isUnlocked, "a cancelled or failed prompt leaves the items locked")
+lockState.finishAuthentication(succeeded: true, startedAt: firstAttempt)
+check(lockState.isUnlocked, "a successful prompt unlocks")
+lockState.finishAuthentication(succeeded: false, startedAt: firstAttempt)
+check(lockState.isUnlocked, "unlocked stays unlocked: a cancelled prompt does not relock")
+lockState.systemWillSleep()
+check(!lockState.isUnlocked, "the Mac going to sleep locks the items")
+lockState.finishAuthentication(succeeded: true, startedAt: firstAttempt)
+check(!lockState.isUnlocked, "a prompt that began before sleep cannot unlock after it")
+lockState.finishAuthentication(succeeded: true, startedAt: lockState.generation)
+check(lockState.isUnlocked, "a prompt that begins after sleep unlocks")
+lockState.lock()
+check(!lockState.isUnlocked, "Lock Pinned Items locks again")
+check(PinnedLock.access(pinned: true, required: true, unlocked: false) == .afterAuthentication, "a locked pinned item needs authentication to copy or show")
+check(PinnedLock.access(pinned: true, required: true, unlocked: true) == .now, "an unlocked pinned item copies at once")
+check(PinnedLock.access(pinned: false, required: true, unlocked: false) == .now, "unpinned history is never locked")
+check(PinnedLock.access(pinned: true, required: false, unlocked: false) == .now, "with the setting off, pinned items are open")
+check(PinnedLock.displayed("card 4111", pinned: true, required: true, unlocked: false) == "Pinned Item", "a locked pinned item's title is replaced")
+check(PinnedLock.displayed("card 4111", pinned: true, required: true, unlocked: true) == "card 4111", "an unlocked pinned item's title is shown")
+check(PinnedLock.displayed("notes", pinned: false, required: true, unlocked: false) == "notes", "an unpinned title is shown")
+check(PinnedLock.displayed("notes", pinned: true, required: false, unlocked: false) == "notes", "the title is shown with the setting off")
+
+// The app's setting decides what the shared lock hides. It is set back to off afterwards.
+let sharedLock = ClipboardLock.shared
+sharedLock.isRequired = true
+var pinnedCopy = clip(.text, text: "a secret note")
+pinnedCopy.pinned = true
+check(sharedLock.isHidden(pinnedCopy) && sharedLock.title(for: pinnedCopy) == "Pinned Item" && sharedLock.menuTitle(for: pinnedCopy) == "Pinned Item",
+      "with the setting on, a locked pinned item is hidden in lists and menus")
+check(!sharedLock.isHidden(clip(.text, text: "an unpinned note")), "with the setting on, unpinned history is not hidden")
+// Searching the history must not reveal a locked pinned item's text.
+let searchFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-search-\(UUID().uuidString).json")
+let searchKey = SymmetricKey(size: .bits256)
+let searchPins = [PinnedFile.Clip(source: "Notes", date: Date(), representations: [["public.utf8-plain-text": Data("unlisted search words".utf8)]])]
+try? JSONEncoder().encode(searchPins).write(to: searchFile)
+let searchHistory = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-s-\(UUID().uuidString)")), file: searchFile, key: { searchKey })
+check(searchHistory.items.first?.pinned == true, "the pinned search fixture loads")
+check(searchHistory.search("unlisted").isEmpty, "a locked pinned item is not found by search")
+sharedLock.isRequired = false
+check(searchHistory.search("unlisted").count == 1 && !sharedLock.isHidden(pinnedCopy), "with the setting off, the pinned item is found and shown")
+try? FileManager.default.removeItem(at: searchFile)
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

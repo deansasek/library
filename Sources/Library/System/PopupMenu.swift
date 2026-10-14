@@ -76,11 +76,12 @@ enum PopupMenu {
                 number += 1
                 // A key with no modifier, so pressing the digit while the menu is open chooses the item.
                 let key = number <= 9 ? "\(number)" : ""
-                let item = NSMenuItem(title: clip.menuTitle, action: #selector(ClipTarget.copy(_:)), keyEquivalent: key)
+                let lock = ClipboardLock.shared
+                let item = NSMenuItem(title: lock.menuTitle(for: clip), action: #selector(ClipTarget.copy(_:)), keyEquivalent: key)
                 item.keyEquivalentModifierMask = []
                 item.target = target
                 item.representedObject = clip.id
-                item.image = clip.icon
+                item.image = lock.icon(for: clip)
                 item.toolTip = clip.subtitle
                 menu.addItem(item)
                 // Holding Option swaps the item for Copy as Plain Text, as Mac menus do for such pairs.
@@ -174,15 +175,19 @@ enum PopupMenu {
 
         @objc func copy(_ sender: NSMenuItem) {
             if let item = clip(sender) {
-                ClipboardHistory.shared.copy(item)
-                if pastes { FrontApp.pasteSoon() }
+                ClipboardLock.shared.perform(item, for: .copy) { [pastes] in
+                    ClipboardHistory.shared.copy(item)
+                    if pastes { FrontApp.pasteSoon() }
+                }
             }
         }
 
         @objc func copyPlain(_ sender: NSMenuItem) {
             if let item = clip(sender) {
-                ClipboardHistory.shared.copyPlainText(item)
-                if pastes { FrontApp.pasteSoon() }
+                ClipboardLock.shared.perform(item, for: .copy) { [pastes] in
+                    ClipboardHistory.shared.copyPlainText(item)
+                    if pastes { FrontApp.pasteSoon() }
+                }
             }
         }
 
