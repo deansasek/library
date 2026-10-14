@@ -28,6 +28,8 @@ enum LinkCheck {
     static let recheckInterval: TimeInterval = 24 * 60 * 60
     /// The background check runs at most once in this interval.
     static let dailyInterval: TimeInterval = 24 * 60 * 60
+    /// The most body bytes a GET reads, when a server refuses HEAD. The rest of the page is never downloaded.
+    static let getBodyLimit = 64 * 1024
 
     /// The status for an HTTP status code. 2xx and 3xx are ok, 4xx and 5xx broken. Anything else is no usable answer.
     static func kind(forHTTPCode code: Int) -> LinkStatus.Kind {
@@ -39,7 +41,8 @@ enum LinkCheck {
     }
 
     /// The status of a finished request. No response, or a redirect that was refused, is unreachable: the page never
-    /// answered, so a 3xx that stopped a redirect loop does not count as a working page.
+    /// answered, so a 3xx that stopped a redirect loop does not count as a working page. This is the documented rule:
+    /// a redirect loop, a redirect past `maxRedirects`, and a redirect to a non-web address are all unreachable.
     static func outcome(statusCode: Int?, redirectRefused: Bool) -> LinkStatus.Kind {
         guard let statusCode, !redirectRefused else { return .unreachable }
         return kind(forHTTPCode: statusCode)
@@ -49,6 +52,12 @@ enum LinkCheck {
     /// are followed, and only up to `maxRedirects`.
     static func followsRedirect(after followed: Int, to target: URL?) -> Bool {
         followed < maxRedirects && target.map(WebFetch.isWeb) == true
+    }
+
+    /// Whether a HEAD answer means the server does not accept HEAD, so the check asks again with GET: 403, 405, or 501.
+    /// Any other answer, or none, is final.
+    static func retriesWithGET(afterHEAD statusCode: Int?) -> Bool {
+        statusCode.map { [403, 405, 501].contains($0) } ?? false
     }
 
     /// True when `checked` is within the last 24 hours. A date in the future (the clock was set back) is not recent,
