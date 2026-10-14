@@ -361,7 +361,24 @@ final class QuickOpenModel: ObservableObject {
                 NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
             })
         }
+        if node.canReadLater {
+            list += readingListActions(for: node)
+        }
         return list
+    }
+
+    /// The Reading List actions for a bookmark: add it, or mark it read or unread, and remove it when it is listed.
+    private func readingListActions(for node: LibraryItem) -> [QuickOpenAction] {
+        let store = self.store
+        let id = node.id
+        func action(_ change: ReadingList.Action) -> QuickOpenAction {
+            QuickOpenAction(id: "reading-\(change)", title: change.title) { store.changeReadingList([id], change) }
+        }
+        switch node.readLater {
+        case nil: return [action(.add)]
+        case .unread?: return [action(.markRead), action(.remove)]
+        case .read?: return [action(.markUnread), action(.remove)]
+        }
     }
 
     /// A link typed into Quick Open: copy it without its tracking parameters.

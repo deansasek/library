@@ -48,7 +48,7 @@ struct EditSheet: View {
                 }
                 if node.isOpenable {
                     Section {
-                        LabeledContent("Notes") {
+                        LabeledContent(String(localized: "Notes", bundle: L10n.bundle)) {
                             TextEditor(text: Binding(
                                 get: { node.note ?? "" },
                                 set: { state.draft.note = $0 }
@@ -56,7 +56,7 @@ struct EditSheet: View {
                             .frame(minHeight: 72)
                         }
                     } footer: {
-                        Text("Notes appear under the name in Quick Open and in Spotlight.")
+                        Text("Notes appear under the name in Quick Open and in Spotlight.", bundle: L10n.bundle)
                     }
                 }
                 details

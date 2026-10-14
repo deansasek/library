@@ -139,6 +139,14 @@ struct MenuItems: View {
                 rows(frequent)
             }
         }
+        let reading = topLevel ? ReadingList.ordered(nodes.leaves) : []
+        if !reading.isEmpty {
+            Section {
+                rows(reading)
+            } header: {
+                Text("Reading List", bundle: L10n.bundle)
+            }
+        }
         ForEach(Array(nodes.sections.enumerated()), id: \.offset) { _, section in
             if let title = section.title {
                 Section(title) {

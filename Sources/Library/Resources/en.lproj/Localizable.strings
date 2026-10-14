@@ -117,3 +117,33 @@
 
 /* Clipboard menu item that removes every clip from the paste queue. */
 "Clear Queue" = "Clear Queue";
+
+/* Label of the notes field in Get Info. */
+"Notes" = "Notes";
+
+/* Footer under the notes field in Get Info. */
+"Notes appear under the name in Quick Open and in Spotlight." = "Notes appear under the name in Quick Open and in Spotlight.";
+
+/* Section title of the Reading List in the manager window, and in the menus. */
+"Reading List" = "Reading List";
+
+/* Context menu and Quick Open action that adds a bookmark to the Reading List. */
+"Add to Reading List" = "Add to Reading List";
+
+/* Context menu and Quick Open action that marks a Reading List bookmark read. */
+"Mark as Read" = "Mark as Read";
+
+/* Context menu and Quick Open action that marks a Reading List bookmark unread. */
+"Mark as Unread" = "Mark as Unread";
+
+/* Context menu and Quick Open action that removes a bookmark from the Reading List. */
+"Remove from Reading List" = "Remove from Reading List";
+
+/* Tooltip for a Reading List bookmark that has been read. */
+"Read" = "Read";
+
+/* Tooltip for a Reading List bookmark that is unread. */
+"Unread" = "Unread";
+
+/* Footer under the Reading List section of the manager window. */
+"Unread items are listed first. Removing an item from the Reading List leaves it in the library." = "Unread items are listed first. Removing an item from the Reading List leaves it in the library.";

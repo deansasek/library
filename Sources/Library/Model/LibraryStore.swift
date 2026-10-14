@@ -559,6 +559,19 @@ final class LibraryStore: ObservableObject {
         undoManager?.setActionName("Rename")
     }
 
+    /// Changes the Reading List state of the items, as one undo step named for the action. Only bookmarks can be listed,
+    /// so an action that would list anything else does nothing to it.
+    func changeReadingList(_ ids: Set<UUID>, _ action: ReadingList.Action) {
+        perform(action.title) { nodes in
+            for id in ids {
+                nodes.update(id) { item in
+                    let next = ReadingList.state(after: action, from: item.readLater)
+                    if next == nil || item.canReadLater { item.readLater = next }
+                }
+            }
+        }
+    }
+
     /// Moves nodes into folder `folderID`, or to the top level when `nil`.
     func move(_ ids: Set<UUID>, to folderID: UUID?) {
         if let folderID, !nodes.folders(skipping: ids).contains(where: { $0.id == folderID }) {

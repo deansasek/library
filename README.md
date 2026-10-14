@@ -114,6 +114,14 @@ Select an item and press ⌘I, or choose **Edit…** from the toolbar or a right
 
 Put `{}` in a URL where a value goes, and Library asks for it when you open the bookmark. For several values, name them: `{project}` or `{id:Issue number}`.
 
+### Add notes
+
+Write a note on any item in Get Info. Quick Open shows the note under the item's name, and Spotlight includes it in the description. Notes are plain text and stay in your library.
+
+### Read later
+
+Add a bookmark to the Reading List from its right-click menu, or from Tab in Quick Open. The list appears in the Library window and in the menu, with unread bookmarks first. Mark a bookmark as read or unread, or remove it from the list. Removing it from the list keeps the bookmark in your library.
+
 ### Shortcuts
 
 Each shortcut can be a key combination, a modified click, a scroll, a pinch, a swipe, or a hot corner. Keys need Control, Option, or Command. An item can have several shortcuts.
