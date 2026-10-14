@@ -490,6 +490,42 @@ check(searchTree.matching("release").leaves.map(\.name) == ["Build"], "search by
 check(searchTree.matching("apps").isEmpty, "dividers do not match")
 check(searchTree.matching("work").leaves.map(\.name) == ["Jira", "Docs"], "folder name match keeps contents")
 check(searchTree.matching("zzz").isEmpty, "no match is empty")
+// ---- Work after an edit: renames do no icon or hot key work ----
+let fpTree = tree()
+let fpBase = TreeFingerprint(fpTree)
+var fpRenamed = fpTree; fpRenamed[1].name = "Firefox"; fpRenamed[2].children![0].name = "Jira 2"; fpRenamed[2].name = "Projects"
+check(!needsIconFetch(old: fpBase, new: TreeFingerprint(fpRenamed)) && !needsHotKeyRegistration(old: fpBase, new: TreeFingerprint(fpRenamed)), "renames alone do no follow-up work")
+var fpURL = fpTree; fpURL[1].url = "https://new.example.com"
+check(needsIconFetch(old: fpBase, new: TreeFingerprint(fpURL)) && !needsHotKeyRegistration(old: fpBase, new: TreeFingerprint(fpURL)), "a URL change fetches icons, not hot keys")
+var fpKeywords = fpTree; fpKeywords[1].keywords = "browser"
+check(needsIconFetch(old: fpBase, new: TreeFingerprint(fpKeywords)), "a keyword change counts as a change")
+var fpShortcut = fpTree; fpShortcut[1].shortcuts = [Shortcut(keyCode: 1, modifiers: 256, key: "S")]
+check(needsHotKeyRegistration(old: fpBase, new: TreeFingerprint(fpShortcut)), "a shortcut change registers hot keys")
+var fpMoved = fpTree; fpMoved.swapAt(1, 2)
+check(needsIconFetch(old: fpBase, new: TreeFingerprint(fpMoved)), "a move counts as a change")
+var fpAdded = fpTree; fpAdded.append(LibraryItem(name: "New", url: "https://n.example.com"))
+check(needsIconFetch(old: fpBase, new: TreeFingerprint(fpAdded)), "an addition counts as a change")
+check(TreeFingerprint(fpShortcut).bindings.count == 1 && fpBase.bindings.isEmpty, "bindings list shortcuts of items only")
+
+// ---- Icon modification dates: read from disk at most once in five seconds ----
+let dateCache = ModificationDateCache()
+var dateReads = 0
+let readDate: () -> Date? = { dateReads += 1; return Date(timeIntervalSince1970: Double(dateReads)) }
+_ = dateCache.modified(at: "/a.app", now: 0, read: readDate)
+check(dateCache.modified(at: "/a.app", now: 4_000_000_000, read: readDate) == Date(timeIntervalSince1970: 1) && dateReads == 1, "a date is not read again within five seconds")
+_ = dateCache.modified(at: "/a.app", now: 5_000_000_001, read: readDate)
+check(dateReads == 2, "a date is read again after five seconds")
+_ = dateCache.modified(at: "/b.app", now: 5_000_000_001, read: readDate)
+check(dateReads == 3, "each path has its own date")
+
+// ---- Search result kept between redraws ----
+let searchCache = SearchCache()
+let searchedTree = tree()
+check(searchCache.result(for: "jira", revision: 1, in: searchedTree).count == 1, "cached search counts bookmarks")
+check(searchCache.result(for: "jira", revision: 1, in: []).count == 1, "same query and library reuse the search")
+check(searchCache.result(for: "jira", revision: 2, in: []).count == 0, "a changed library searches again")
+check(searchCache.result(for: "docs", revision: 2, in: searchedTree).tree.leaves.map(\.name) == ["Docs"], "a changed query searches again")
+
 // ---- App Intents logic: no Shortcuts needed ----
 let intentNodes = [
     LibraryItem(name: "Jira", url: "https://jira.example.com"),
@@ -531,6 +567,7 @@ let commandFiles: [(name: String, modified: Date)] = [
     ("library-old.txt", commandNow.addingTimeInterval(-7200)),
 ]
 check(staleCommandFiles(among: commandFiles, now: commandNow) == ["library-old.command"], "only old library command files are stale")
+runBenchmark()
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

@@ -26,6 +26,8 @@ final class ManageState: ObservableObject {
     @Published var sheet: Sheet?
     /// The text in the window's search field. Separate from `search`, which filters the app picker.
     @Published var query = ""
+    /// The search result for `query`, kept between redraws.
+    let searches = SearchCache()
 
     // Add sheets.
     @Published var name = ""
