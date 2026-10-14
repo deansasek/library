@@ -2,6 +2,11 @@ import SwiftUI
 
 enum Favicon {
     private static let cacheDir = LibraryStore.dir.appendingPathComponent("favicons")
+    /// Responses larger than this are rejected. A favicon is small, so a bigger response is not one.
+    static let maxBytes = 512 * 1024
+    /// A host that gave no icon is not asked again for this long, so a dead site is not retried on every launch.
+    static let failureWindow: TimeInterval = 24 * 60 * 60
+    private static let failuresKey = "faviconFailures"
 
     static func load(for url: URL) async -> NSImage? {
         guard let host = url.host else { return nil }
@@ -9,9 +14,14 @@ enum Favicon {
         if let data = try? Data(contentsOf: cached), let image = sized(NSImage(data: data)) {
             return image
         }
+        guard !hasRecentFailure(host: host) else { return nil }
         guard let data = await fetch(from: url),
               let image = NSImage(data: data),
-              let png = pngData(image) else { return nil }
+              let png = pngData(image) else {
+            // A cancelled load says nothing about the site, so it is not remembered.
+            if !Task.isCancelled { recordFailure(host: host) }
+            return nil
+        }
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         try? png.write(to: cached)
         return sized(image)
@@ -33,8 +43,60 @@ enum Favicon {
         return data
     }
 
+    /// Streams the body with `URLSession.bytes` and stops as soon as it passes `maxBytes`, so an oversized
+    /// response is never held in memory in full. A declared Content-Length over the cap is refused before reading.
+    /// The 10 s timeout is unchanged.
     private static func get(_ url: URL) async -> (Data, URLResponse)? {
-        try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 10))
+        guard let (bytes, response) = try? await URLSession.shared.bytes(for: URLRequest(url: url, timeoutInterval: 10)),
+              declaredLengthAllowed(response.expectedContentLength) else { return nil }
+        var data = Data()
+        do {
+            for try await byte in bytes {
+                data.append(byte)
+                guard byteCountAllowed(data.count) else { return nil }
+            }
+        } catch {
+            return nil
+        }
+        return (data, response)
+    }
+
+    /// Whether a response may be read, from its declared length. -1 means the server did not say, so the streamed count decides.
+    static func declaredLengthAllowed(_ length: Int64) -> Bool {
+        length < 0 || length <= Int64(maxBytes)
+    }
+
+    /// Whether the bytes read so far are still within the cap.
+    static func byteCountAllowed(_ count: Int) -> Bool {
+        count <= maxBytes
+    }
+
+    /// The failure timestamps still inside the window. Timestamps in the future (after a clock change) are dropped too.
+    static func pruned(_ failures: [String: TimeInterval], now: TimeInterval) -> [String: TimeInterval] {
+        failures.filter { entry in
+            let age = now - entry.value
+            return age >= 0 && age < failureWindow
+        }
+    }
+
+    /// Reads the stored failures, drops expired ones, and writes back only when something was dropped.
+    private static func recentFailures(now: Date = .now) -> [String: TimeInterval] {
+        let stored = UserDefaults.standard.dictionary(forKey: failuresKey) as? [String: TimeInterval] ?? [:]
+        let kept = pruned(stored, now: now.timeIntervalSince1970)
+        if kept.count != stored.count {
+            UserDefaults.standard.set(kept, forKey: failuresKey)
+        }
+        return kept
+    }
+
+    private static func hasRecentFailure(host: String) -> Bool {
+        recentFailures()[host] != nil
+    }
+
+    private static func recordFailure(host: String) {
+        var failures = recentFailures()
+        failures[host] = Date.now.timeIntervalSince1970
+        UserDefaults.standard.set(failures, forKey: failuresKey)
     }
 
     private static func iconHref(in html: String) -> String? {

@@ -3,6 +3,7 @@ import SwiftUI
 /// Runs `command` in a new Terminal window, then leaves a shell open.
 /// A throwaway `.command` file avoids the Automation permission that AppleScript needs.
 private func runInTerminal(_ command: String) {
+    removeStaleCommandFiles()
     let file = FileManager.default.temporaryDirectory
         .appendingPathComponent("library-\(UUID().uuidString).command")
     let script = "#!/bin/zsh -il\nrm -f -- \"$0\"\n\(command)\nexec zsh -il\n"
@@ -11,6 +12,29 @@ private func runInTerminal(_ command: String) {
           let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal")
     else { return }
     NSWorkspace.shared.open([file], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration())
+}
+
+/// Deletes `library-*.command` files in the temporary folder that are over an hour old. The script deletes
+/// itself when Terminal runs it, so any left behind were never run. Called each time a new one is written.
+private func removeStaleCommandFiles(now: Date = .now) {
+    let folder = FileManager.default.temporaryDirectory
+    let keys: Set<URLResourceKey> = [.contentModificationDateKey]
+    guard let urls = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: Array(keys)) else { return }
+    let entries = urls.compactMap { url -> (name: String, modified: Date)? in
+        guard let modified = (try? url.resourceValues(forKeys: keys))?.contentModificationDate else { return nil }
+        return (url.lastPathComponent, modified)
+    }
+    let stale = Set(staleCommandFiles(among: entries, now: now))
+    for url in urls where stale.contains(url.lastPathComponent) {
+        try? FileManager.default.removeItem(at: url)
+    }
+}
+
+/// The names, among `files`, of this app's `.command` files that are more than an hour old at `now`.
+func staleCommandFiles(among files: [(name: String, modified: Date)], now: Date) -> [String] {
+    files.filter { file in
+        file.name.hasPrefix("library-") && file.name.hasSuffix(".command") && now.timeIntervalSince(file.modified) > 3600
+    }.map(\.name)
 }
 
 /// Splits a command line into arguments. Single or double quotes group words.
