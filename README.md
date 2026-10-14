@@ -40,6 +40,10 @@ Press Control-Space to search everything in your library.
 
 ### Keep what you copy
 
+<p align="center">
+  <img src="docs/media/clipboard_menu.png" width="640" alt="The Library clipboard menu listing recent copies, with numbered shortcuts">
+</p>
+
 Library remembers what you copy, including text, links, images, and files, in every format you copied them in.
 
 - Open the **Library** menu or Quick Open to see your latest copies. Choose one to copy it again.
@@ -60,6 +64,10 @@ Keep text you type often, such as an address or a standard reply, as a snippet. 
 
 ### Organize your library
 
+<p align="center">
+  <img src="docs/media/manager_window.png" width="640" alt="The Edit Library window with folders, apps, and a bookmark">
+</p>
+
 Choose **Edit Library…** to manage everything in one window.
 
 - Add items from the **+** menu, or drag an app or a link into the window.
@@ -72,6 +80,10 @@ Choose **Edit Library…** to manage everything in one window.
 Use ⌘Z to undo and ⇧⌘Z to redo.
 
 ### Edit an item
+
+<p align="center">
+  <img src="docs/media/get_info.png" width="640" alt="The Get Info sheet for a bookmark, with name, URL, and template settings">
+</p>
 
 Select an item and press ⌘I, or choose **Edit…** from the toolbar or a right-click menu.
 
@@ -105,6 +117,10 @@ The defaults are Control and right-click for the menu, Control-Space for Quick O
 Library checks GitHub for a new release every hour while it runs, and when it starts if the last check was an hour or more ago. When there's a newer version, a single item appears at the top of the menu. Nothing pops up. Turn this off in **Settings > General**, or choose **Check for Updates…** at any time. See [Privacy](#privacy) for exactly what is sent.
 
 ## Install
+
+<p align="center">
+  <img src="docs/media/settings_general.png" width="640" alt="Settings, General tab, with storage, updates, backup, and tracking options">
+</p>
 
 ### Download the source
 
