@@ -54,7 +54,13 @@ final class LibraryStore: ObservableObject {
     }
 
     /// All of Library's data lives here, apart from the app, so updating or replacing the app never touches it.
-    nonisolated static let dir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".library")
+    /// `LIBRARY_HOME` moves this folder elsewhere. The render harness (Tests/render.sh) uses it so it never reads or
+    /// writes your library. Normally it is unset.
+    nonisolated static let dir: URL = {
+        let home = ProcessInfo.processInfo.environment["LIBRARY_HOME"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        return (home ?? FileManager.default.homeDirectoryForCurrentUser).appendingPathComponent(".library")
+    }()
+    nonisolated static var redirected: Bool { ProcessInfo.processInfo.environment["LIBRARY_HOME"] != nil }
     static let file = dir.appendingPathComponent("bookmarks.json")
 
     private static func symbol(_ name: String) -> NSImage {
@@ -434,6 +440,8 @@ final class LibraryStore: ObservableObject {
         fetchTask = Task {
             try? await Task.sleep(nanoseconds: 800_000_000)
             if Task.isCancelled { return }
+            // A redirected library (LIBRARY_HOME) is a test copy: it neither indexes Spotlight nor fetches icons.
+            if Self.redirected { return }
             let leaves = nodes.leaves
             indexInSpotlight(leaves)
             // Icons are collected and published once, since every publish redraws the menu. A site with no

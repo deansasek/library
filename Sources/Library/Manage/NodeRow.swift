@@ -32,6 +32,7 @@ struct NodeRow: View {
                 if let shortcuts = node.shortcuts {
                     if store.failedShortcuts.contains(node.id) {
                         Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
                             .help("A shortcut is in use by another app")
                             .accessibilityLabel("Shortcut in use by another app")
                     }
