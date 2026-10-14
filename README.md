@@ -30,13 +30,13 @@ Because you build it yourself, macOS opens it without a security warning. To upd
 
 ### One command
 
-Paste this into Terminal. It downloads Library to `~/Developer/Library`, builds it, and installs it in Applications:
+Paste this into Terminal. It builds Library and installs `Library.app` in your Applications folder. The source is kept out of the way, in Application Support:
 
 ```bash
-git clone https://github.com/deansasek/library.git ~/Developer/Library && ~/Developer/Library/install.sh
+git clone https://github.com/deansasek/library.git "$HOME/Library/Application Support/Library/Source" && "$HOME/Library/Application Support/Library/Source/install.sh"
 ```
 
-Run it again any time to update, or run `~/Developer/Library/update.sh`. Your library is kept.
+Library checks for updates itself, and **Check for Updates…** installs them. Your library and clipboard history are kept.
 
 ### Clone the repository
 
