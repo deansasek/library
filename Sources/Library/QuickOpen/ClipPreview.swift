@@ -32,16 +32,25 @@ enum ClipPreviewSource {
         }
     }
 
-    /// Writes the data to a new uniquely named file. Returns nil if the file could not be written.
+    /// Writes the data to a new uniquely named file. Returns nil if the file could not be written. The file is only
+    /// readable by you, since a copy can hold text that was never meant for other users.
     static func write(_ data: Data, extension ext: String, in directory: URL) -> URL? {
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let file = directory.appendingPathComponent("\(UUID().uuidString).\(ext)")
-            try data.write(to: file, options: .atomic)
+            guard FileManager.default.createFile(atPath: file.path, contents: data, attributes: [.posixPermissions: 0o600])
+            else { return nil }
             return file
         } catch {
             return nil
         }
+    }
+
+    /// Deletes the preview folder with whatever a previous run left in it. A preview is removed when its panel
+    /// closes, but a quit or a crash while one is open leaves its copy behind. Called once at launch, when no
+    /// preview can be open.
+    static func removeLeftovers(in directory: URL = ClipPreviewSource.directory) {
+        try? FileManager.default.removeItem(at: directory)
     }
 }
 
