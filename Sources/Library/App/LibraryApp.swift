@@ -5,6 +5,11 @@ struct LibraryApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     private let store = LibraryStore.shared
 
+    init() {
+        // Before any view reads the setting, so a launch with no stored choice starts with the automatic checks on.
+        UpdateCheck.registerDefaults()
+    }
+
     var body: some Scene {
         MenuBarExtra("Library", systemImage: "bookmark") {
             MenuContent(store: store)

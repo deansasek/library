@@ -2,9 +2,14 @@ import Foundation
 
 /// Answers for Quick Open: arithmetic such as `12*8`, and unit conversions such as `5 km in miles`.
 enum QuickAnswers {
+    /// The longest text that is looked at. Longer text gets no answer.
+    static let maxLength = 300
+
     static func answer(for query: String) -> (value: String, detail: String)? {
         let text = query.trimmingCharacters(in: .whitespaces)
-        guard text.contains(where: \.isNumber) else { return nil }
+        // The parser recurses once per bracket or operator, so a long pasted line could overflow the stack. Nothing
+        // longer than this is a calculation a person types.
+        guard text.count <= maxLength, text.contains(where: \.isNumber) else { return nil }
         if let converted = convert(text) { return (converted, text) }
         var calculator = Calculator(text)
         return calculator.evaluate().map { (format($0), text) }

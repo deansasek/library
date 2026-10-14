@@ -37,7 +37,7 @@ cd library
 
 To build without installing, run `./build.sh`. The app is written to `build/Library.app`.
 
-To update, run `git pull`, then `./install.sh` again. Your data is not affected.
+To update, run `./update.sh`. It stops if you have uncommitted changes or are not on `main`. Otherwise it fast-forwards `main` from `origin` (it never resets or force-pushes), prints the version before and after, and runs `./install.sh`. Your data is not affected. `DRY_RUN=1 ./update.sh` prints the commands without running them.
 
 ## Getting started
 
@@ -184,13 +184,13 @@ The welcome tour opens the first time you launch Library. It explains the app an
 
 **Settings** (⌘,) has three tabs.
 
-- **General:** Open at Login, the welcome screen, and the app version.
+- **General:** Open at Login, Check for Updates Automatically, the welcome screen, and the app version.
 - **Shortcuts:** One list of shortcuts: Show Library Menu, Show Quick Open, Show Clipboard Menu, and Open Copied Link. A picker sets whether the Library menu opens at the pointer or from the menu bar.
 - **Clipboard:** Turn clipboard history, pasting into text fields, and copied GIFs on or off, and clear the history.
 
 ## Privacy
 
-Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play.
+Library stores your library and clipboard history on your Mac. Unpinned clipboard history stays in memory and is cleared when you quit. It connects to the internet only to load favicons from your bookmarked sites, to search Google when you ask, and, if you turn on **Play Copied GIFs** in **Settings > Clipboard** (off by default), to download a GIF you copied from a web page so it can play. It contacts `api.github.com` only to check for a new release: when you choose **Check for Updates…** in the menu, and, unless you turn off **Check for Updates Automatically** in **Settings > General** (on by default), once an hour while Library runs and when it starts if the last check was an hour or more ago. The only request is to `https://api.github.com/repos/deansasek/library/releases/latest`. It names only the app's version, in its User-Agent header. It also sends the ETag GitHub gave on the last answer, so GitHub can reply that nothing changed. No account or other data is sent. When a newer version exists, the menu shows it at the top, and nothing pops up.
 
 Your data is stored in `~/.library/`:
 

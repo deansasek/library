@@ -371,15 +371,23 @@ do {
 // ---- clipboard history and menu, on a private pasteboard ----
 MainActor.assumeIsolated {
     let testKey = SymmetricKey(size: .bits256)
+    // The pinned file is read in the background, so a check waits until the history has published its pins.
+    @MainActor func waitForLoad(_ loading: ClipboardHistory) {
+        let deadline = Date().addingTimeInterval(5)
+        while !loading.pinnedLoaded, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
     let board = NSPasteboard(name: NSPasteboard.Name("library-checks-\(UUID().uuidString)"))
     let saveFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-\(UUID().uuidString).json")
     let history = ClipboardHistory(pasteboard: board, file: saveFile, key: { testKey })
+    waitForLoad(history)
 
     // A plain-text pinned file from before encryption is migrated on load, leaving no plain text behind.
     let legacyFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-legacy-\(UUID().uuidString).json")
     let legacy = [PinnedFile.Clip(source: "Notes", date: Date(), representations: [["public.utf8-plain-text": Data("legacy pin".utf8)]])]
     try? JSONEncoder().encode(legacy).write(to: legacyFile)
     let migrated = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-m-\(UUID().uuidString)")), file: legacyFile, key: { testKey })
+    waitForLoad(migrated)
+    ClipboardHistory.waitForSaves()
     check(migrated.items.map(\.title) == ["legacy pin"] && migrated.items.first?.pinned == true, "a plain-text file loads its pins")
     let migratedBytes = (try? Data(contentsOf: legacyFile)) ?? Data()
     check(migratedBytes.range(of: Data("legacy pin".utf8)) == nil, "a migrated file hides the text")
@@ -393,6 +401,7 @@ MainActor.assumeIsolated {
     try? Data(repeating: 0x42, count: 80).write(to: damagedFile)
     let damagedHistory = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-d-\(UUID().uuidString)")), file: damagedFile, key: { testKey })
     let movedAside = damagedFile.deletingLastPathComponent().appendingPathComponent("clipboard-damaged.bin")
+    waitForLoad(damagedHistory)
     check(damagedHistory.items.isEmpty && !FileManager.default.fileExists(atPath: damagedFile.path) && FileManager.default.fileExists(atPath: movedAside.path), "a damaged file is kept aside")
     try? FileManager.default.removeItem(at: movedAside)
 
@@ -401,6 +410,7 @@ MainActor.assumeIsolated {
     let sealedBytes = (try? PinnedFile.encode(legacy, key: testKey)) ?? Data()
     try? sealedBytes.write(to: lockedFile)
     let locked = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-l-\(UUID().uuidString)")), file: lockedFile, key: { throw ClipboardKey.KeychainError(status: -1) })
+    waitForLoad(locked)
     check(locked.items.isEmpty && (try? Data(contentsOf: lockedFile)) == sealedBytes, "no key leaves the sealed file untouched")
     try? FileManager.default.removeItem(at: lockedFile)
 
@@ -409,6 +419,50 @@ MainActor.assumeIsolated {
         let deadline = Date().addingTimeInterval(5)
         while history.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     }
+
+    // A copy made while the pinned file is still loading is kept. The loaded pins merge in after the newer copies,
+    // a pin whose copy was made again is not added twice, and nothing is written over the file until it has loaded.
+    let mergeFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-merge-\(UUID().uuidString).json")
+    let seedBoard = NSPasteboard(name: NSPasteboard.Name("library-checks-seed-\(UUID().uuidString)"))
+    let seed = ClipboardHistory(pasteboard: seedBoard, file: mergeFile, key: { testKey })
+    waitForLoad(seed)
+    @MainActor func copyText(_ text: String, on pasteboard: NSPasteboard, into target: ClipboardHistory) {
+        pasteboard.clearContents()
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        pasteboard.writeObjects([item])
+        target.poll()
+        let deadline = Date().addingTimeInterval(5)
+        while target.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+    copyText("pinned one", on: seedBoard, into: seed)
+    copyText("pinned two", on: seedBoard, into: seed)
+    seed.togglePin(seed.items[0])
+    seed.togglePin(seed.items[1])
+    ClipboardHistory.waitForSaves()
+    let gate = DispatchSemaphore(value: 0)
+    let mergeBoard = NSPasteboard(name: NSPasteboard.Name("library-checks-merge-\(UUID().uuidString)"))
+    // The first caller waits for the gate, then the gate is opened again for later callers, as the Keychain key would be.
+    let merging = ClipboardHistory(pasteboard: mergeBoard, file: mergeFile, key: { gate.wait(); gate.signal(); return testKey })
+    check(!merging.pinnedLoaded, "the pinned file waits for its key")
+    copyText("pinned two", on: mergeBoard, into: merging)
+    copyText("fresh copy", on: mergeBoard, into: merging)
+    check(merging.items.map(\.title) == ["fresh copy", "pinned two"] && merging.items.allSatisfy { !$0.pinned }, "copies made during the load are kept")
+    let beforeLoad = (try? Data(contentsOf: mergeFile)) ?? Data()
+    merging.togglePin(merging.items[0])
+    ClipboardHistory.waitForSaves()
+    check((try? Data(contentsOf: mergeFile)) == beforeLoad, "nothing is written before the pinned file has loaded")
+    gate.signal()
+    waitForLoad(merging)
+    check(merging.items.map(\.title) == ["fresh copy", "pinned two", "pinned one"], "loaded pins follow the newer copies, a repeat is merged")
+    check(merging.items.allSatisfy(\.pinned), "pins are kept after the merge")
+    check(zip(merging.items, merging.items.dropFirst()).allSatisfy { $0.date >= $1.date }, "merged order is newest first")
+    check(Set(merging.items.map(\.digest)).count == merging.items.count, "no item appears twice")
+    ClipboardHistory.waitForSaves()
+    if case .clips(let saved, _) = PinnedFile.read((try? Data(contentsOf: mergeFile)) ?? Data(), key: testKey) {
+        check(saved.count == 3, "the merged pins are saved")
+    } else { check(false, "the merged pins are saved") }
+    try? FileManager.default.removeItem(at: mergeFile)
 
     @MainActor func copy(_ text: String, extra: [String: Data] = [:]) {
         board.clearContents()
@@ -426,6 +480,7 @@ MainActor.assumeIsolated {
     copy("first copy")
     check(history.items.count == 3 && history.items[0].title == "first copy", "a repeat moves to the top")
     history.togglePin(history.items[2])
+    ClipboardHistory.waitForSaves()
     check(FileManager.default.fileExists(atPath: saveFile.path), "pinning saves the file")
     check(((try? FileManager.default.attributesOfItem(atPath: saveFile.path))?[.posixPermissions] as? Int) == 0o600, "private file")
     let pinnedBytes = (try? Data(contentsOf: saveFile)) ?? Data()
@@ -434,6 +489,7 @@ MainActor.assumeIsolated {
         check(pinnedBytes.range(of: Data(pinnedText.utf8)) == nil, "the pinned file hides the pinned text")
     } else { check(false, "an item is pinned") }
     let reloaded = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-2-\(UUID().uuidString)")), file: saveFile, key: { testKey })
+    waitForLoad(reloaded)
     check(reloaded.items.count == history.items.filter(\.pinned).count, "pinned items reload")
     copy("secret", extra: ["org.nspasteboard.ConcealedType": Data()])
     check(!history.items.contains { $0.title == "secret" }, "private copies skipped")
@@ -449,6 +505,7 @@ MainActor.assumeIsolated {
     history.clear()
     check(history.items.allSatisfy(\.pinned), "clear keeps pins")
     history.remove(history.items[0])
+    ClipboardHistory.waitForSaves()
     check(history.items.isEmpty && !FileManager.default.fileExists(atPath: saveFile.path), "removing the last pin removes the file")
 
     for index in 1...12 { copy("menu copy \(index)") }
@@ -661,9 +718,6 @@ check(IntentLogic.app(atPath: "/Applications/Safari.app")?.appPath == "/Applicat
 check(IntentLogic.app(atPath: "/tmp/notes.txt") == nil, "a non-app file is not an app")
 
 // ---- favicon limits and failure memory (pure; no network or defaults) ----
-check(Favicon.declaredLengthAllowed(Int64(Favicon.maxBytes)) && !Favicon.declaredLengthAllowed(Int64(Favicon.maxBytes) + 1), "declared length cap is 512 KB")
-check(Favicon.declaredLengthAllowed(-1), "unknown length is allowed, the streamed count decides")
-check(Favicon.byteCountAllowed(512 * 1024) && !Favicon.byteCountAllowed(512 * 1024 + 1), "streamed byte cap")
 let nowStamp: TimeInterval = 1_800_000_000
 let kept = Favicon.pruned([
     "recent.example.com": nowStamp - 3600,
@@ -762,9 +816,94 @@ for use in symbolNames {
     let resolves = NSImage(systemSymbolName: use.name, accessibilityDescription: nil) != nil
     check(resolves, "SF Symbol \"\(use.name)\" does not resolve (\(use.file):\(use.line))")
 }
+// ---- update check (pure; no network) ----
+let updateNow = Date(timeIntervalSince1970: nowStamp)
+check(UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: nil), "a first automatic check is due")
+check(!UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(-1800)), "half an hour after a check is not due")
+check(!UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(-3599)), "just under an hour after a check is not due")
+check(UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(-3600)), "an hour after a check is due")
+check(UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(-86400)), "a day after a check is due")
+check(UpdateRules.automaticCheckIsDue(now: updateNow, lastCheck: updateNow.addingTimeInterval(7200)), "a check in the future (clock set back) is due")
+check(UpdateRules.secondsUntilAutomaticCheck(now: updateNow, lastCheck: nil) == 0, "no wait when a check is due at once")
+check(UpdateRules.secondsUntilAutomaticCheck(now: updateNow, lastCheck: updateNow.addingTimeInterval(-600)) == 3000, "the wait is the rest of the hour")
+check(UpdateRules.secondsUntilAutomaticCheck(now: updateNow, lastCheck: updateNow.addingTimeInterval(-3600)) == 0, "no wait once an hour has passed")
+check(UpdateRules.automaticInterval == 3600, "automatic checks run every hour")
+check(UpdateRules.displayVersion("v1.10.0") == "1.10.0" && UpdateRules.displayVersion("2.0") == "2.0", "the display version drops a leading v")
 
+let etagJSON = Data(#"{"tag_name":"v1.6.0","name":"Release"}"#.utf8)
+check(UpdateRules.fetch(status: 200, etag: "\"abc\"", data: etagJSON, storedTag: nil) == .release(tag: "v1.6.0", etag: "\"abc\""), "a 200 answer gives its tag and ETag")
+check(UpdateRules.fetch(status: 200, etag: nil, data: etagJSON, storedTag: "v1.5.0") == .release(tag: "v1.6.0", etag: nil), "a 200 answer replaces the stored tag")
+check(UpdateRules.fetch(status: 304, etag: nil, data: Data(), storedTag: "v1.6.0") == .unchanged, "a 304 with a stored tag means unchanged")
+check(UpdateRules.fetch(status: 304, etag: nil, data: Data(), storedTag: nil) == .failed, "a 304 with no stored tag is a failure")
+check(UpdateRules.fetch(status: 403, etag: nil, data: Data(), storedTag: "v1.6.0") == .failed, "a rate limit or other error is a failure")
+check(UpdateRules.fetch(status: 200, etag: "\"abc\"", data: Data("oops".utf8), storedTag: nil) == .failed, "a 200 answer without a tag is a failure")
+check(UpdateRules.fetch(status: 200, etag: nil, data: Data(#"{"tag_name":"latest"}"#.utf8), storedTag: nil) == .failed, "a tag that is not a version is a failure")
+check(UpdateRules.conditionalETag(storedETag: "\"abc\"", storedTag: "v1.6.0") == "\"abc\"", "the stored ETag is sent with its stored tag")
+check(UpdateRules.conditionalETag(storedETag: "\"abc\"", storedTag: nil) == nil, "no ETag is sent without a stored tag")
+check(UpdateRules.conditionalETag(storedETag: nil, storedTag: "v1.6.0") == nil && UpdateRules.conditionalETag(storedETag: "", storedTag: "v1.6.0") == nil, "no ETag is sent when none is stored")
+check(UpdateRules.availableVersion(latestTag: "v1.6.0", current: "1.5.0") == "v1.6.0", "a newer release is offered")
+check(UpdateRules.availableVersion(latestTag: "v1.5.0", current: "1.5.0") == nil, "the same version is not offered")
+check(UpdateRules.availableVersion(latestTag: "v1.4.0", current: "1.5.0") == nil, "an older release is not offered")
+check(UpdateRules.availableVersion(latestTag: nil, current: "1.5.0") == nil, "no tag offers nothing, so the menu item goes away")
+check(UpdateRules.availableVersion(latestTag: "latest", current: "1.5.0") == nil, "a tag that is not a version offers nothing")
+
+// ---- audit: inputs from outside the app ----
+check(WebFetch.isWeb(URL(string: "https://a.example.com")!) && WebFetch.isWeb(URL(string: "HTTP://a.example.com")!), "web addresses are http or https")
+check(!WebFetch.isWeb(URL(fileURLWithPath: "/etc/hosts")) && !WebFetch.isWeb(URL(string: "file://localhost/etc/hosts")!)
+      && !WebFetch.isWeb(URL(string: "httpx://a.example.com")!) && !WebFetch.isWeb(URL(string: "vscode://file/x")!), "other schemes are not web addresses")
+check(AppDelegate.webLink(from: " https://example.com/a ")?.host == "example.com", "a web link selection is accepted")
+check(AppDelegate.webLink(from: "file:///etc/hosts") == nil && AppDelegate.webLink(from: "httpx://example.com") == nil
+      && AppDelegate.webLink(from: "hello") == nil, "non-web selections are refused")
+check(AppDelegate.webLink(from: "https://e.com/" + String(repeating: "a", count: 5_000)) == nil, "a selection over 4,096 characters is refused")
+var bodyLimit = WebFetch.BodyLimit(limit: 1_000)
+check(bodyLimit.add(600) && bodyLimit.add(400) && !bodyLimit.add(1) && bodyLimit.count == 1_001, "a body is refused one byte past its limit")
+check(Favicon.maxBytes == 512 * 1024, "favicon limit is 512 KB")
+check(blockingRun { await WebFetch.fetch(URL(fileURLWithPath: "/etc/hosts"), limit: 10) == nil }, "a file address is never read")
+check(blockingRun { await WebFetch.fetch(URL(string: "ftp://example.com/x")!, limit: 10) == nil }, "an ftp address is never read")
+check(Favicon.pixelSizeAllowed(width: 16, height: 16) && Favicon.pixelSizeAllowed(width: 4_096, height: 4_096)
+      && !Favicon.pixelSizeAllowed(width: 4_097, height: 16) && !Favicon.pixelSizeAllowed(width: 0, height: 16), "favicon pixel size cap")
+if let small = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 8, pixelsHigh: 8, bitsPerSample: 8, samplesPerPixel: 4,
+                                hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 32),
+   let smallPNG = small.representation(using: .png, properties: [:]) {
+    check(Favicon.pixelsAllowed(smallPNG), "a small favicon is allowed")
+}
+if let huge = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 4_200, pixelsHigh: 4_200, bitsPerSample: 8, samplesPerPixel: 1,
+                               hasAlpha: false, isPlanar: false, colorSpaceName: .calibratedWhite, bytesPerRow: 0, bitsPerPixel: 8),
+   let hugePNG = huge.representation(using: .png, properties: [:]) {
+    check(!Favicon.pixelsAllowed(hugePNG), "a favicon that declares a picture over 4,096 pixels is refused before it decodes")
+}
+let commandFolder = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-cmd-\(UUID().uuidString)", isDirectory: true)
+try? FileManager.default.createDirectory(at: commandFolder, withIntermediateDirectories: true)
+let commandText = commandScript("echo hi")
+if let written = writeCommandFile(commandText, in: commandFolder) {
+    let mode = (try? FileManager.default.attributesOfItem(atPath: written.path))?[.posixPermissions] as? Int
+    check(mode == 0o700, "a command file is readable and runnable by you only (mode \(String(describing: mode)))")
+    check((try? String(contentsOf: written, encoding: .utf8)) == commandText && commandText.hasPrefix("#!/bin/zsh -il\nrm -f -- \"$0\"\necho hi\n"),
+          "the command file removes itself, then runs the command")
+} else { check(false, "the command file is written") }
+try? FileManager.default.removeItem(at: commandFolder)
+let previewChecks = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-preview-\(UUID().uuidString)", isDirectory: true)
+if let written = ClipPreviewSource.write(Data("secret".utf8), extension: "txt", in: previewChecks) {
+    let mode = (try? FileManager.default.attributesOfItem(atPath: written.path))?[.posixPermissions] as? Int
+    check(mode == 0o600, "a preview file is readable by you only")
+    ClipPreviewSource.removeLeftovers(in: previewChecks)
+    check(!FileManager.default.fileExists(atPath: written.path), "preview files left by an earlier run are removed")
+} else { check(false, "the preview file is written") }
+check(answer(String(repeating: "(", count: 100_000) + "1") == nil, "a huge pasted line gets no answer and does not crash")
+check(answer("(((1+2)))") == "3", "brackets still calculate")
+let boundedIcons = IconCache(capacity: 10)
+for index in 0..<25 { _ = boundedIcons.icon(at: "/copied/\(index)", modified: nil) { NSImage() } }
+check(boundedIcons.count <= 10, "the icon cache is bounded")
+let boundedDates = ModificationDateCache(capacity: 10)
+for index in 0..<25 { _ = boundedDates.modified(at: "/copied/\(index)", now: 0) { nil } }
+check(boundedDates.count <= 10, "the modification date cache is bounded")
+check(retainedIcons(["live.example.com": NSImage(), "gone.example.com": NSImage()], live: ["live.example.com"]).keys.sorted() == ["live.example.com"],
+      "icons of deleted bookmarks are dropped")
+
+blockingRun { await runAuditBenchmark() }
 runBenchmark()
 QuickOpenBench.main()
+ClipboardBench.main()
 
 // ---- Quick Open focus (pure; no windows) ----
 check(!QuickOpenFocus.closes(whenKeyGoesTo: .preview, previewOpen: true), "clicking the open preview keeps Quick Open")

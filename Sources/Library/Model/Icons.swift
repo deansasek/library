@@ -19,10 +19,20 @@ private let modificationDates = ModificationDateCache()
 
 /// Modification dates by path, read again only after `maxAge`. Times come from the monotonic clock, so a
 /// change to the wall clock does not matter. An app updated within the window keeps its old icon until it ends.
+/// Holds at most `capacity` paths. Copying files adds a path each, so it starts over when full.
 final class ModificationDateCache: @unchecked Sendable {
     static let maxAge: UInt64 = 5_000_000_000
+    static let defaultCapacity = 2_000
     private let lock = NSLock()
+    private let capacity: Int
     private var stamps: [String: (checked: UInt64, modified: Date?)] = [:]
+
+    init(capacity: Int = ModificationDateCache.defaultCapacity) {
+        self.capacity = capacity
+    }
+
+    /// The number of paths held.
+    var count: Int { lock.withLock { stamps.count } }
 
     /// The cached date when it was read less than `maxAge` before `now` (in nanoseconds), else `read()`.
     func modified(at path: String, now: UInt64, read: () -> Date?) -> Date? {
@@ -34,16 +44,27 @@ final class ModificationDateCache: @unchecked Sendable {
         lock.unlock()
         let modified = read()
         lock.lock()
+        if stamps[path] == nil, stamps.count >= capacity { stamps.removeAll() }
         stamps[path] = (now, modified)
         lock.unlock()
         return modified
     }
 }
 
-/// Icons by path. A lock lets lists on any thread read it.
-private final class IconCache: @unchecked Sendable {
+/// Icons by path. A lock lets lists on any thread read it. Holds at most `capacity` icons, and starts over when full,
+/// because every file copied to the clipboard adds one.
+final class IconCache: @unchecked Sendable {
+    static let defaultCapacity = 1_000
     private let lock = NSLock()
+    private let capacity: Int
     private var icons: [String: (modified: Date?, icon: NSImage)] = [:]
+
+    init(capacity: Int = IconCache.defaultCapacity) {
+        self.capacity = capacity
+    }
+
+    /// The number of icons held.
+    var count: Int { lock.withLock { icons.count } }
 
     func icon(at path: String, modified: Date?, make: () -> NSImage) -> NSImage {
         lock.lock()
@@ -54,10 +75,16 @@ private final class IconCache: @unchecked Sendable {
         lock.unlock()
         let icon = make()
         lock.lock()
+        if icons[path] == nil, icons.count >= capacity { icons.removeAll() }
         icons[path] = (modified, icon)
         lock.unlock()
         return icon
     }
+}
+
+/// The favicon cache entries still in use: those for a live link. Icons for deleted bookmarks are dropped.
+func retainedIcons(_ icons: [String: NSImage], live: Set<String>) -> [String: NSImage] {
+    icons.filter { live.contains($0.key) }
 }
 
 /// The 16 pt image for a custom icon: an SF Symbol name or a single emoji. Nil when `text` is neither.

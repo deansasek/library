@@ -2,16 +2,26 @@ import SwiftUI
 
 /// Runs `command` in a new Terminal window, then leaves a shell open.
 /// A throwaway `.command` file avoids the Automation permission that AppleScript needs.
-private func runInTerminal(_ command: String) {
+func runInTerminal(_ command: String) {
     removeStaleCommandFiles()
-    let file = FileManager.default.temporaryDirectory
-        .appendingPathComponent("library-\(UUID().uuidString).command")
-    let script = "#!/bin/zsh -il\nrm -f -- \"$0\"\n\(command)\nexec zsh -il\n"
-    guard (try? script.write(to: file, atomically: true, encoding: .utf8)) != nil,
-          (try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)) != nil,
+    guard let file = writeCommandFile(commandScript(command), in: FileManager.default.temporaryDirectory),
           let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal")
     else { return }
     NSWorkspace.shared.open([file], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration())
+}
+
+/// The script Terminal runs. It deletes itself first, then runs the command, then leaves a shell open.
+func commandScript(_ command: String) -> String {
+    "#!/bin/zsh -il\nrm -f -- \"$0\"\n\(command)\nexec zsh -il\n"
+}
+
+/// Writes the script to a new executable file in `folder` and returns its address. The mode is set when the file is
+/// created, so it is never readable or runnable by anyone else, not even briefly. Nil when it could not be written.
+func writeCommandFile(_ script: String, in folder: URL) -> URL? {
+    let file = folder.appendingPathComponent("library-\(UUID().uuidString).command")
+    let created = FileManager.default.createFile(atPath: file.path, contents: Data(script.utf8),
+                                                 attributes: [.posixPermissions: 0o700])
+    return created ? file : nil
 }
 
 /// Deletes `library-*.command` files in the temporary folder that are over an hour old. The script deletes

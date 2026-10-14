@@ -422,6 +422,8 @@ final class LibraryStore: ObservableObject {
         }
         do {
             try data.write(to: Self.file, options: .atomic)
+            // An atomic write creates the file with the default mode (0644). Only you can read it.
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.file.path)
         } catch {
             return reportSaveFailure(error.localizedDescription)
         }
@@ -481,6 +483,10 @@ final class LibraryStore: ObservableObject {
                 }
             }
             if !found.isEmpty { icons.merge(found) { $1 } }
+            // Icons for bookmarks that were deleted or re-addressed are dropped, so the dictionary does not grow
+            // for the whole session. Published only when something was removed, since each publish redraws.
+            let live = Set(nodes.leaves.compactMap(\.url))
+            if icons.keys.contains(where: { !live.contains($0) }) { icons = retainedIcons(icons, live: live) }
         }
     }
 

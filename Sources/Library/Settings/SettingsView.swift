@@ -12,6 +12,7 @@ struct SettingsView: View {
     @ObservedObject private var loginItem = LoginItem.shared
     @ObservedObject private var history = ClipboardHistory.shared
     @StateObject private var recording = RecordingState()
+    @AppStorage(UpdateCheck.automaticKey) private var checksForUpdates = true
 
     var body: some View {
         TabView {
@@ -37,6 +38,14 @@ struct SettingsView: View {
                 ))
             } footer: {
                 Text("Library lives in the menu bar and opens its items from there.")
+            }
+            Section {
+                Toggle(isOn: $checksForUpdates) {
+                    Text("Check for Updates Automatically", bundle: L10n.bundle)
+                }
+                .onChange(of: checksForUpdates) { _, _ in UpdateCheck.startAutomaticChecks() }
+            } footer: {
+                Text("Library checks GitHub for a newer version every hour while it runs. When one is available, it appears at the top of the Library menu. Check for Updates… in the menu checks now.")
             }
             Section {
                 LabeledContent("Welcome Screen") {
