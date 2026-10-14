@@ -24,26 +24,45 @@ check(jira.isTemplate && jira.link(filling: "ABC-123")?.absoluteString == "https
 check(jira.link(filling: "a b/c")?.absoluteString == "https://x.example.com/browse/a%20b%2Fc", "template encodes")
 
 // ---- URL templates with named fields ----
-check(templateFields(in: "x.example.com/{}") == [TemplateField(name: "", label: nil)], "bare placeholder is one unnamed field")
-check(templateFields(in: "a/{}/{}") == [TemplateField(name: "", label: nil)], "repeated bare placeholder is one field")
-check(templateFields(in: "a/{ticket:Ticket number}/{user}/{ticket}") == [
+check(templateFieldList(in: "x.example.com/{}") == [TemplateField(name: "", label: nil)], "bare placeholder is one unnamed field")
+check(templateFieldList(in: "a/{}/{}") == [TemplateField(name: "", label: nil)], "repeated bare placeholder is one field")
+check(templateFieldList(in: "a/{ticket:Ticket number}/{user}/{ticket}", declared: ["ticket", "user"]) == [
     TemplateField(name: "ticket", label: "Ticket number"), TemplateField(name: "user", label: nil),
-], "named fields share a name and keep the first label")
-check(templateFields(in: "a/{ticket}/{ticket:Later}").first?.label == "Later", "a label given later fills in a bare name")
-check(templateFields(in: "a/{:Only label}").first == TemplateField(name: "", label: "Only label"), "a label without a name")
-check(templateFields(in: "a/{ticket:}").first == TemplateField(name: "ticket", label: nil), "empty label is no label")
-check(templateFields(in: "a/{open").isEmpty && templateFields(in: "a/{x{}").map(\.name) == [""], "unclosed braces are text")
-check(!LibraryItem(name: "Plain", url: "a.example.com/{open").isTemplate && LibraryItem(name: "N", url: "a/{id}").isTemplate, "isTemplate for named fields")
-
-let bug = LibraryItem(name: "Bug", url: "bugs.example.com/{project}/{id:Issue}?q={project}")
+], "declared fields share a name and keep the first label")
+check(templateFieldList(in: "a/{ticket}/{ticket:Later}", declared: ["ticket"]).first?.label == "Later", "a label given later fills in a bare name")
+check(templateFieldList(in: "a/{:Only label}").first == TemplateField(name: "", label: "Only label"), "a label without a name")
+check(templateFieldList(in: "a/{ticket:}", declared: ["ticket"]).first == TemplateField(name: "ticket", label: nil), "empty label is no label")
+check(templateFieldList(in: "a/{open", declared: ["open"]).isEmpty && templateFieldList(in: "a/{x{}").map(\.name) == [""], "unclosed braces are text")
+check(!LibraryItem(name: "Plain", url: "a.example.com/{open").isTemplate && !LibraryItem(name: "N", url: "a/{id}").isTemplate, "undeclared named braces are plain text")
+let oldJSON = Data(#"{"id":"6F1C3E2A-1B2C-4D5E-8F90-123456789ABC","name":"Jira","url":"x.example.com/{}"}"#.utf8)
+let oldItem = try? JSONDecoder().decode(LibraryItem.self, from: oldJSON)
+check(oldItem?.templateFields == nil && oldItem?.isTemplate == true, "a file without templateFields loads, and {} still asks")
+if let declared = oldItem.map({ var item = $0; item.templateFields = ["q:Query"]; return item }),
+   let data = try? JSONEncoder().encode(declared), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.templateFields == ["q:Query"], "declared fields round-trip through the file")
+} else {
+    check(false, "declared fields round-trip through the file")
+}
+check(LibraryItem(name: "N", url: "a/{id}").placeholders.isEmpty && templatePreview("a/{id}") == "a/{id}" && withoutPlaceholders("a/{id}") == "a/{id}", "undeclared braces are not a template, preview or removal")
+check(LibraryItem(name: "N", url: "a/{id}", templateFields: ["id"]).isTemplate, "declared named field is a template")
+check(templateFieldList(in: "a/{id}/{x}", declared: ["id"]).map(\.name) == ["id"] && templateFieldList(in: "a/{id}/{x}", declared: ["id"]).count == 1, "undeclared names in a template stay text")
+check(parseTemplateFields("query:Search terms, sort , ,:NoName, query:Again, ,") == ["query:Search terms", "sort"], "Fields text: names, labels, blanks and repeats")
+check(parseTemplateFields("  ") == nil && parseTemplateFields("a{b, c}d, e") == ["e"] && parseTemplateFields("x:") == ["x"], "Fields text: empty and braces dropped")
+let declaredBug = LibraryItem(name: "Declared", url: "a.example.com/{q}?x={q:Other}", templateFields: parseTemplateFields("q:Search"))
+check(declaredBug.placeholders == [TemplateField(name: "q", label: "Search")], "declared label beats the URL label")
+check(declaredBug.link(values: ["q": "a b&c"])?.absoluteString == "https://a.example.com/a%20b%26c?x=a%20b%26c", "declared fields fill and encode as before")
+check(declaredBug.link(values: [:]) == nil, "declared values are required")
+check(fillTemplate("a/{q}", values: ["q": "x"]) == "a/{q}" && fillTemplate("a/{q}/{}", values: ["": "x"]) == "a/{q}/x", "undeclared braces are untouched by a fill")
+let bug = LibraryItem(name: "Bug", url: "bugs.example.com/{project}/{id:Issue}?q={project}", templateFields: ["project", "id"])
 check(bug.placeholders.map(\.name) == ["project", "id"], "two fields, project shared")
 check(bug.link(values: ["project": "WEB", "id": "12 3"])?.absoluteString == "https://bugs.example.com/WEB/12%203?q=WEB", "several values fill every placeholder")
 check(bug.link(values: ["project": "WEB"]) == nil && bug.link(values: [:]) == nil, "a missing value is rejected")
 check(bug.link(values: ["project": "a b/c", "id": "1"])?.absoluteString == "https://bugs.example.com/a%20b%2Fc/1?q=a%20b%2Fc", "named values encode the same way")
 check(jira.link(values: ["": "ABC-123"])?.absoluteString == "https://x.example.com/browse/ABC-123", "bare value by its empty name")
 check(bug.link(values: ["project": "", "id": ""])?.absoluteString == "https://bugs.example.com//?q=", "empty values still fill, the caller rejects them")
-check(templatePreview("a/{id:Issue}/{}/{id}/{user}") == "a/‹Issue›/‹value›/‹Issue›/‹user›", "preview labels")
-check(withoutPlaceholders("a/{}/{x:Y}/b") == "a///b", "placeholders removed")
+check(templatePreview("a/{id:Issue}/{}/{id}/{user}", declared: ["id", "user"]) == "a/‹Issue›/‹value›/‹Issue›/‹user›", "preview labels")
+check(templatePreview("a/{id:Issue}/{}/{id}/{user}") == "a/{id:Issue}/‹value›/{id}/{user}", "preview leaves undeclared braces")
+check(withoutPlaceholders("a/{}/{x:Y}/b", declared: ["x"]) == "a///b" && withoutPlaceholders("a/{}/{x:Y}/b") == "a//{x:Y}/b", "placeholders removed, undeclared kept")
 check(LibraryItem(name: "Plain", url: "x.example.com/a").placeholders.isEmpty, "no placeholders for a plain URL")
 
 // ---- Open All selection ----

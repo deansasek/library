@@ -45,6 +45,8 @@ final class ManageState: ObservableObject {
     @Published var showIconPicker = false
     @Published var iconSearch = ""
     @Published var iconTab = IconTab.symbols
+    /// The Fields text as typed, such as "query:Search, sort". The draft's `templateFields` is parsed from it.
+    @Published var fieldsText = ""
 
     // Bulk edit sheet: the items it applies to, and the changes so far.
     @Published var bulkIDs: Set<UUID> = []
@@ -83,6 +85,7 @@ final class ManageState: ObservableObject {
         guard let node = store.nodes.node(withID: id) else { return }
         present(.edit(id))
         draft = node
+        fieldsText = (node.templateFields ?? []).joined(separator: ", ")
         let isSymbol = node.icon.map { NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil } ?? true
         iconTab = isSymbol ? .symbols : .emoji
     }
@@ -127,6 +130,7 @@ final class ManageState: ObservableObject {
         recordingIndex = nil
         showIconPicker = false
         iconSearch = ""
+        fieldsText = ""
         self.sheet = sheet
     }
 }
