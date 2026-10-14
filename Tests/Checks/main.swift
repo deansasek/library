@@ -636,6 +636,22 @@ MarkdownLink.copy(title: "", url: "https://docs.example.com", to: mdPasteboard)
 check(mdPasteboard.string(forType: .string) == "[https://docs.example.com](https://docs.example.com)" && mdPasteboard.data(forType: .rtf) == nil, "copy without a title writes plain text only")
 mdPasteboard.releaseGlobally()
 
+// ---- from <app> filter ----
+let fromApps = ["Safari", "Google", "Google Chrome", "Notes", "Safari Technology Preview"]
+check(SourceFilter.parse("from safari", apps: fromApps) == SourceFilter.Match(app: "Safari", rest: ""), "from an app alone")
+check(SourceFilter.parse("FROM safari hello world", apps: fromApps) == SourceFilter.Match(app: "Safari", rest: "hello world"), "case-insensitive, words after the app")
+check(SourceFilter.parse("from google chrome docs", apps: fromApps) == SourceFilter.Match(app: "Google Chrome", rest: "docs"), "the longest app name wins")
+check(SourceFilter.parse("from google docs", apps: fromApps) == SourceFilter.Match(app: "Google", rest: "docs"), "a shorter app name when the longer one does not match")
+check(SourceFilter.parse("from  notes   meeting ", apps: fromApps) == SourceFilter.Match(app: "Notes", rest: "meeting"), "extra spaces are ignored")
+check(SourceFilter.parse("from safari technology", apps: fromApps) == SourceFilter.Match(app: "Safari", rest: "technology"), "a name is not taken from a longer name not typed")
+check(SourceFilter.parse("from safari technology preview", apps: fromApps) == SourceFilter.Match(app: "Safari Technology Preview", rest: ""), "the full name matches")
+check(SourceFilter.parse("from", apps: fromApps) == nil && SourceFilter.parse("from zzz", apps: fromApps) == nil, "from alone is a word")
+check(SourceFilter.parse("from safari", apps: []) == nil && SourceFilter.parse("from notes", apps: ["Google"]) == nil, "no app in the history, no filter")
+check(SourceFilter.parse("from google chrome", apps: ["Google"]) == SourceFilter.Match(app: "Google", rest: "chrome"), "a shorter name leaves the rest as text")
+check(SourceFilter.parse("hello from safari", apps: fromApps) == nil && SourceFilter.parse("fromage cheese", apps: fromApps) == nil, "from must start the query")
+check(SourceFilter.parse("from safari", apps: ["", "  "]) == nil, "blank app names never match")
+check(SourceFilter.includes("Safari", app: "safari") && !SourceFilter.includes("Notes", app: "Safari") && !SourceFilter.includes(nil, app: "Safari"), "clips match their source app, case-insensitively")
+
 // ---- Quick Look sources ----
 func clip(_ kind: ClipItem.Kind, text: String? = nil, files: [URL] = [], reps: [[NSPasteboard.PasteboardType: Data]] = [],
           link: URL? = nil, animated: Data? = nil) -> ClipItem {

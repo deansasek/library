@@ -134,7 +134,10 @@ final class QuickOpenModel: ObservableObject {
 
     private func computeResults() -> [QuickOpenResult] {
         let text = query.trimmingCharacters(in: .whitespaces)
-        var list = searchIndex().search(text, counts: store.openCounts)
+        let history = ClipboardHistory.shared
+        // "from <app>" shows only the clips copied while that app was in front, so the library is not searched.
+        let source = text.isEmpty ? nil : SourceFilter.parse(text, apps: history.sourceApps)
+        var list = source == nil ? searchIndex().search(text, counts: store.openCounts) : []
         guard !text.isEmpty else {
             // The same Frequently Used section the menu has, first. Its ids differ from the library rows' ids,
             // so an item can sit in both without clashing.
@@ -143,14 +146,18 @@ final class QuickOpenModel: ObservableObject {
             return suggestion(section: "Suggested") + frequent + list
                 + clipboardResults(ClipboardHistory.shared.displayOrder.prefix(5))
         }
-        list += clipboardResults(ClipboardHistory.shared.search(text).prefix(8))
-        // Typing "add" or part of "add to library" also offers the copied link or application.
-        if text.count >= 2, "add to library".contains(text.lowercased()) {
-            list = suggestion(section: nil) + list
-        }
-        if let link = QuickOpenResult.link(from: text) {
-            list.insert(QuickOpenResult(kind: .openLink(link), id: "open"), at: 0)
-            list.append(QuickOpenResult(kind: .addLink(link), id: "add"))
+        if let source {
+            list += clipboardResults(history.search(source.rest, from: source.app))
+        } else {
+            list += clipboardResults(history.search(text).prefix(8))
+            // Typing "add" or part of "add to library" also offers the copied link or application.
+            if text.count >= 2, "add to library".contains(text.lowercased()) {
+                list = suggestion(section: nil) + list
+            }
+            if let link = QuickOpenResult.link(from: text) {
+                list.insert(QuickOpenResult(kind: .openLink(link), id: "open"), at: 0)
+                list.append(QuickOpenResult(kind: .addLink(link), id: "add"))
+            }
         }
         // Headers as Spotlight has them: the first result is the Top Hit, and each kind of result after it
         // gets its own header the first time it appears.
@@ -181,7 +188,7 @@ final class QuickOpenModel: ObservableObject {
     }
 
     /// Clipboard history rows, under a Clipboard header.
-    private func clipboardResults(_ items: ArraySlice<ClipItem>) -> [QuickOpenResult] {
+    private func clipboardResults<Items: Sequence>(_ items: Items) -> [QuickOpenResult] where Items.Element == ClipItem {
         var rows = items.map { QuickOpenResult(kind: .clip($0), id: "clip-\($0.id)") }
         if !rows.isEmpty { rows[0].section = "Clipboard" }
         return rows

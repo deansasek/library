@@ -225,11 +225,16 @@ final class ClipboardHistory: ObservableObject {
         items.filter(\.pinned) + items.filter { !$0.pinned }
     }
 
-    /// Items whose text contains every word.
-    func search(_ query: String) -> [ClipItem] {
+    /// The apps that copied something in the history, each once, in name order.
+    var sourceApps: [String] {
+        Array(Set(items.compactMap(\.sourceApp))).sorted()
+    }
+
+    /// Items whose text contains every word. With `app`, only the items copied while that app was in front.
+    func search(_ query: String, from app: String? = nil) -> [ClipItem] {
         let words = query.lowercased().split(separator: " ").map(String.init)
         // Built once for this search. Each item's text was capped at maxSearchableCharacters when it was copied.
-        let order = displayOrder
+        let order = displayOrder.filter { item in app.map { SourceFilter.includes(item.sourceApp, app: $0) } ?? true }
         guard !words.isEmpty else { return order }
         return order.filter { item in words.allSatisfy(item.searchText.contains) }
     }
