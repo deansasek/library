@@ -136,6 +136,15 @@ The defaults are Control and right-click for the menu, Control-Space for Quick O
 - **URL scheme:** `library://open?name=Jira&value=ABC-123` opens a bookmark and fills its template. `library://menu` shows the menu, and `library://search` opens Quick Open.
 - **Shortcuts app:** actions for opening and searching items, adding bookmarks and apps, and the clipboard.
 
+## Smart features
+
+Library works out what you copied and what you are doing, so the next step is one choice away.
+
+- **Smart actions.** Text with an address, a phone number, or a date gets **Open in Maps**, **Copy Phone Number**, or **Add to Calendar** in Quick Open, under Tab. Detection happens on your Mac.
+- **Smart Punctuation.** In **Copy as**, turn straight quotes and dashes into curly quotes, apostrophes, em dashes, and ellipses.
+- **Smart titles.** Turn on **Name New Bookmarks from Their Pages** in **Settings > General** (off by default), and a new bookmark takes the title of its page. Library reads only the start of the page, and it requests each new bookmark's page once.
+- **Smart sorting.** In the Edit Library window, sort by **Most Used** or **Recently Opened** from the sort menu in the header.
+
 ## Settings
 
 Press ⌘, to open Settings.
