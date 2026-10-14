@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.servicesProvider = self
         NSUpdateDynamicServices()
         _ = ClipboardHistory.shared  // starts watching the clipboard
+        ClipPreviewSource.removeLeftovers()
         if UserDefaults.standard.bool(forKey: "reenableLoginItemAfterMove") {
             UserDefaults.standard.removeObject(forKey: "reenableLoginItemAfterMove")
             LoginItem.shared.set(true)
@@ -119,14 +120,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Services menu item "Add to Library": turns a selected web link into a bookmark.
     @objc func addBookmark(_ pasteboard: NSPasteboard, userData: String,
                            error: AutoreleasingUnsafeMutablePointer<NSString>) {
-        guard let text = pasteboard.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
-              let url = URL(string: text), let host = url.host, url.scheme?.hasPrefix("http") == true else {
+        guard let text = pasteboard.string(forType: .string), let url = Self.webLink(from: text), let host = url.host else {
             error.pointee = "The selection is not a web link."
             return
         }
+        let address = text.trimmingCharacters(in: .whitespacesAndNewlines)
         LibraryStore.shared.perform("Add Bookmark") {
-            $0.append(LibraryItem(name: host, url: text), to: nil)
+            $0.append(LibraryItem(name: host, url: address), to: nil)
         }
+    }
+
+    /// The web link a Services selection names: an `http` or `https` address, at most 4,096 characters. Other
+    /// schemes are refused, so a selection cannot add an address that opens another app.
+    static func webLink(from text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count <= 4_096, let url = URL(string: trimmed), WebFetch.isWeb(url) else { return nil }
+        return url
     }
 
     /// Services menu item "Add to Library" for files: adds applications and folders selected in Finder.
