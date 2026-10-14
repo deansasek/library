@@ -166,7 +166,22 @@ struct SettingsView: View {
                 Button("Clear History") { history.clear() }
                     .disabled(history.items.allSatisfy(\.pinned))
             } footer: {
-                Text("History stays in memory and is gone when Library quits. With Paste Into Text Fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps.")
+                Text("History stays in memory and is gone when Library quits, unless Keep Clipboard Across Restarts is on. With Paste Into Text Fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps.")
+            }
+            Section {
+                Toggle(isOn: $history.keepsAcrossRestarts) {
+                    Text("Keep Clipboard Across Restarts", bundle: L10n.bundle)
+                }
+            } footer: {
+                Text("Saves your unpinned clipboard history, encrypted with a key kept in your Keychain, so it is there after you restart. Pinned items are saved either way. Copies from password managers and copies marked private are never saved. Images over 5 MB are never saved, to keep the file small. Turning this off deletes the saved history.", bundle: L10n.bundle)
+            }
+            Section {
+                Toggle(isOn: $history.restoresLatestAtLaunch) {
+                    Text("Put the Latest Item on the Clipboard When Library Opens", bundle: L10n.bundle)
+                }
+                .disabled(!history.keepsAcrossRestarts)
+            } footer: {
+                Text("The newest saved item is copied to the clipboard when Library opens, so you can paste it right away. A password copied before a restart could be pasted by someone else at this Mac.", bundle: L10n.bundle)
             }
         }
         .formStyle(.grouped)

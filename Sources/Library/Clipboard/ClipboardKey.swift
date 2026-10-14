@@ -3,7 +3,7 @@ import Foundation
 import os
 import Security
 
-/// The key that encrypts pinned clipboard items. It is made once, the first time it is needed, and kept in the
+/// The key that encrypts pinned clipboard items and the saved clipboard history. It is made once, the first time it is needed, and kept in the
 /// login Keychain, where only this app can read it on this Mac. It is read from the Keychain once per launch and
 /// kept in memory after that, so later callers never touch the Keychain again.
 enum ClipboardKey {

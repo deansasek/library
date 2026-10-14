@@ -1619,6 +1619,227 @@ let opened: [String: Date] = [
 check(names(UsageOrder.recentlyOpened(treeOrder, opened: opened)) == ["C", "B", "D", "A", "E"],
       "recently opened: most recent first, equal dates keep tree order, never opened last")
 check(names(UsageOrder.recentlyOpened(treeOrder, opened: [:])) == ["A", "B", "C", "D", "E"], "nothing opened keeps the tree order by date too")
+// ---- clipboard history kept across restarts. The pure rules first, then a private pasteboard, a temporary folder and a test key ----
+func historyFixture(_ digest: String, _ kind: ClipItem.Kind = .text, bytes: Int = 10, date: Date, pinned: Bool = false) -> ClipItem {
+    ClipItem(representations: [], digest: digest, kind: kind, title: digest, plainText: nil, link: nil, thumbnail: nil,
+             gifURL: nil, fileURLs: [], byteCount: bytes, date: date, pinned: pinned)
+}
+do {
+    // The save decision: the setting, pinned items, and the image size limits.
+    check(!HistoryRestart.saves(kind: .text, byteCount: 10, pinned: false, keeps: false), "a copy is not saved when the setting is off")
+    check(HistoryRestart.saves(kind: .text, byteCount: 10, pinned: false, keeps: true), "an unpinned copy is saved when the setting is on")
+    check(!HistoryRestart.saves(kind: .text, byteCount: 10, pinned: true, keeps: true), "a pinned item is left to clipboard.json")
+    check(HistoryRestart.saves(kind: .image, byteCount: HistoryRestart.maxSavedImageBytes, pinned: false, keeps: true), "an image of 5 MB is saved")
+    check(!HistoryRestart.saves(kind: .image, byteCount: HistoryRestart.maxSavedImageBytes + 1, pinned: false, keeps: true), "an image over 5 MB is not saved")
+    check(HistoryRestart.saves(kind: .text, byteCount: HistoryRestart.maxSavedImageBytes + 1, pinned: false, keeps: true), "the 5 MB limit is for images only")
+    check(!HistoryRestart.saves(kind: .file, byteCount: ClipboardHistory.maxItemBytes + 1, pinned: false, keeps: true), "an item over 25 MB is not saved")
+    check(!HistoryRestart.saves(kind: .image, byteCount: ClipboardHistory.maxItemBytes + 1, pinned: false, keeps: true), "an image over 25 MB is not saved")
+
+    // The merge: pins first, then the restored items newest first, each digest once.
+    let base = Date(timeIntervalSince1970: 1_000)
+    let pin = historyFixture("pin", date: base.addingTimeInterval(100), pinned: true)
+    let newCopy = historyFixture("copy", date: base.addingTimeInterval(300))
+    let restoredA = historyFixture("a", date: base.addingTimeInterval(200))
+    let restoredB = historyFixture("b", date: base.addingTimeInterval(50))
+    let restoredPin = historyFixture("pin", date: base.addingTimeInterval(400))
+    let merged = HistoryRestart.merge([newCopy, pin], restored: [restoredB, restoredPin, restoredA])
+    check((merged.filter(\.pinned) + merged.filter { !$0.pinned }).map(\.digest) == ["pin", "copy", "a", "b"],
+          "restored items follow the pins, newest first, and a pinned digest is not restored again")
+    check(merged.count == 4, "a restored item already present is skipped")
+
+    // The limits: the oldest unpinned items go first, and pins are never removed.
+    var many: [ClipItem] = (0..<52).map { historyFixture("n\($0)", date: base.addingTimeInterval(Double(100 - $0))) }
+    many.append(historyFixture("old pin", date: base, pinned: true))
+    let counted = HistoryRestart.limited(many, maxItems: 50, maxTotalBytes: 1_000_000)
+    check(counted.filter { !$0.pinned }.count == 50 && counted.first?.digest == "n0" && counted.last?.digest == "old pin",
+          "the newest 50 unpinned items are kept and the pin stays")
+    let sized = [historyFixture("x", bytes: 100, date: base.addingTimeInterval(20)),
+                 historyFixture("y", bytes: 100, date: base.addingTimeInterval(10)),
+                 historyFixture("z", bytes: 100, date: base)]
+    check(HistoryRestart.limited(sized, maxItems: 50, maxTotalBytes: 250).map(\.digest) == ["x", "y"], "the size limit drops the oldest")
+
+    // The launch decision: the newest restored item, only with both settings on and no copy since launch.
+    check(HistoryRestart.latest(in: [restoredB, restoredA])?.digest == "a", "the newest restored item is the latest")
+    check(HistoryRestart.latest(in: []) == nil, "with nothing restored there is no latest item")
+    check(HistoryRestart.copiesLatestAtLaunch(keeps: true, restoresLatest: true, latest: restoredA, copiedSinceLaunch: false),
+          "the latest item is copied at launch when both settings are on")
+    check(!HistoryRestart.copiesLatestAtLaunch(keeps: false, restoresLatest: true, latest: restoredA, copiedSinceLaunch: false), "not copied when history is not kept")
+    check(!HistoryRestart.copiesLatestAtLaunch(keeps: true, restoresLatest: false, latest: restoredA, copiedSinceLaunch: false), "not copied when the option is off")
+    check(!HistoryRestart.copiesLatestAtLaunch(keeps: true, restoresLatest: true, latest: nil, copiedSinceLaunch: false), "not copied when nothing was restored")
+    check(!HistoryRestart.copiesLatestAtLaunch(keeps: true, restoresLatest: true, latest: restoredA, copiedSinceLaunch: true), "a copy made since launch is not replaced")
+
+    // The file: sealed with the key, never read as plain text, and damage is reported rather than read.
+    let historyKey = SymmetricKey(size: .bits256)
+    let historySample = [PinnedFile.Clip(source: "Notes", date: base, representations: [["public.utf8-plain-text": Data("history secret".utf8)]])]
+    if let sealed = try? HistoryFile.encode(historySample, key: historyKey) {
+        check(sealed.range(of: Data("history secret".utf8)) == nil && sealed.range(of: Data("public.utf8-plain-text".utf8)) == nil,
+              "the history file hides text and type names")
+        if case .clips(let back) = HistoryFile.read(sealed, key: historyKey) {
+            check(back.count == 1 && back[0].source == "Notes", "the history file reads back with its key")
+        } else { check(false, "the history file reads back with its key") }
+        if case .unreadable = HistoryFile.read(sealed, key: SymmetricKey(size: .bits256)) {} else { check(false, "the history file needs its own key") }
+        if case .unreadable = HistoryFile.read(sealed, key: nil) {} else { check(false, "the history file is unreadable with no key") }
+    } else { check(false, "encode the history file") }
+    if case .unreadable = HistoryFile.read((try? JSONEncoder().encode(historySample)) ?? Data(), key: historyKey) {} else {
+        check(false, "plain JSON is never read as history")
+    }
+    if case .unreadable = HistoryFile.read(Data(repeating: 0x43, count: 80), key: historyKey) {} else { check(false, "a damaged history file is unreadable") }
+}
+
+// The history on disk: a private pasteboard, a folder in the temporary directory and a test key. The Keychain and
+// ~/.library are never touched.
+MainActor.assumeIsolated {
+    let keyH = SymmetricKey(size: .bits256)
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-history-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let historyURL = folder.appendingPathComponent("clipboard-history.json")
+    let damagedURL = folder.appendingPathComponent("clipboard-history-damaged.bin")
+    let pinnedURL = folder.appendingPathComponent("clipboard.json")
+    let otherPinnedURL = folder.appendingPathComponent("other-clipboard.json")
+    @MainActor func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
+    @MainActor func waitFor(_ done: () -> Bool) {
+        let deadline = Date().addingTimeInterval(5)
+        while !done(), Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+    @MainActor func makeBoard() -> NSPasteboard { NSPasteboard(name: NSPasteboard.Name("library-checks-h-\(UUID().uuidString)")) }
+    @MainActor func copyText(_ text: String, on pasteboard: NSPasteboard, into target: ClipboardHistory) {
+        pasteboard.clearContents()
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        pasteboard.writeObjects([item])
+        target.poll()
+        waitFor { target.pendingCaptures == 0 }
+    }
+    @MainActor func savedClips(_ url: URL, key: SymmetricKey?) -> [PinnedFile.Clip]? {
+        guard let data = try? Data(contentsOf: url), case .clips(let clips) = HistoryFile.read(data, key: key) else { return nil }
+        return clips
+    }
+    @MainActor func keepOn(_ on: Bool) { UserDefaults.standard.set(on, forKey: "clipboardKeepsAcrossRestarts") }
+
+    // The defaults are off, so the checks start from them.
+    UserDefaults.standard.removeObject(forKey: "clipboardKeepsAcrossRestarts")
+    UserDefaults.standard.removeObject(forKey: "clipboardRestoresLatest")
+
+    // Off: nothing is saved.
+    keepOn(false)
+    let offBoard = makeBoard()
+    let off = ClipboardHistory(pasteboard: offBoard, file: pinnedURL, historyFile: historyURL, key: { keyH })
+    copyText("off copy", on: offBoard, into: off)
+    off.flushHistory()
+    ClipboardHistory.waitForSaves()
+    check(!exists(historyURL), "with the setting off, no history file is written")
+
+    // On: a copy is saved about a second later, sealed and private. A pinned item is left out of the history file.
+    keepOn(true)
+    let firstBoard = makeBoard()
+    let first = ClipboardHistory(pasteboard: firstBoard, file: pinnedURL, historyFile: historyURL, key: { keyH })
+    waitFor { first.historyLoaded && first.pinnedLoaded }
+    check(first.keepsAcrossRestarts && first.historyLoaded, "a launch with the setting on loads the history")
+    first.restoresLatestAtLaunch = true
+    copyText("keep me", on: firstBoard, into: first)
+    copyText("second copy", on: firstBoard, into: first)
+    RunLoop.main.run(until: Date().addingTimeInterval(1.5))
+    ClipboardHistory.waitForSaves()
+    check(exists(historyURL), "a copy is saved about a second later, without quitting")
+    let mode = (try? FileManager.default.attributesOfItem(atPath: historyURL.path))?[.posixPermissions] as? NSNumber
+    check(mode?.intValue == 0o600, "the history file is readable only by this user")
+    let savedBytes = (try? Data(contentsOf: historyURL)) ?? Data()
+    check(savedBytes.range(of: Data("keep me".utf8)) == nil, "the saved history hides the text")
+    check(savedClips(historyURL, key: keyH)?.count == 2, "both unpinned copies are saved")
+    if let kept = first.items.first(where: { $0.title == "keep me" }) { first.togglePin(kept) }
+    ClipboardHistory.waitForSaves()
+    let pinnedBytes = (try? Data(contentsOf: pinnedURL)) ?? Data()
+    check(!pinnedBytes.isEmpty, "pinning writes clipboard.json")
+    first.flushHistory()
+    ClipboardHistory.waitForSaves()
+    check(savedClips(historyURL, key: keyH)?.count == 1, "a pinned item is left out of the history file")
+
+    // Restart: the history comes back after the pins, and the newest unpinned item goes on the clipboard.
+    let secondBoard = makeBoard()
+    keepOn(true)
+    UserDefaults.standard.set(true, forKey: "clipboardRestoresLatest")
+    let restarted = ClipboardHistory(pasteboard: secondBoard, file: pinnedURL, historyFile: historyURL, key: { keyH })
+    waitFor { restarted.historyLoaded && restarted.pinnedLoaded }
+    check(restarted.displayOrder.map(\.title) == ["keep me", "second copy"], "history returns after the pins, pins first")
+    check(restarted.items.count == 2, "the restored items are not doubled")
+    check(secondBoard.string(forType: .string) == "second copy", "the newest restored item is on the clipboard at launch")
+    RunLoop.main.run(until: Date().addingTimeInterval(0.6))
+    check(restarted.items.count == 2, "the launch copy is not recorded a second time")
+
+    // Turning the setting off deletes the history and stops saving. The latest-item option turns off with it.
+    restarted.keepsAcrossRestarts = false
+    ClipboardHistory.waitForSaves()
+    check(!exists(historyURL), "turning the setting off deletes the saved history")
+    check(!restarted.restoresLatestAtLaunch, "turning the setting off also turns off the latest item")
+    copyText("after off", on: secondBoard, into: restarted)
+    restarted.flushHistory()
+    ClipboardHistory.waitForSaves()
+    check(!exists(historyURL), "with the setting off, copies are not saved")
+
+    // Turning it on again does not change the pinned items.
+    restarted.keepsAcrossRestarts = true
+    restarted.flushHistory()
+    ClipboardHistory.waitForSaves()
+    check((try? Data(contentsOf: pinnedURL)) == pinnedBytes, "turning the setting on does not change pinned items")
+    check(savedClips(historyURL, key: keyH)?.count == 2, "turning it on saves the unpinned history again")
+
+    // A missing key: nothing is restored, and nothing is written over the saved file.
+    let sealedBefore = (try? Data(contentsOf: historyURL)) ?? Data()
+    keepOn(true)
+    let lockedBoard = makeBoard()
+    let locked = ClipboardHistory(pasteboard: lockedBoard, file: otherPinnedURL, historyFile: historyURL, key: { throw ClipboardKey.KeychainError(status: -1) })
+    waitFor { locked.historyLoaded }
+    check(locked.items.isEmpty, "with no key, no history is restored")
+    copyText("locked copy", on: lockedBoard, into: locked)
+    locked.flushHistory()
+    ClipboardHistory.waitForSaves()
+    check((try? Data(contentsOf: historyURL)) == sealedBefore, "with no key, the history file is left as it was")
+    locked.keepsAcrossRestarts = false
+    ClipboardHistory.waitForSaves()
+
+    // A damaged history file is moved aside, not read, and the app starts with no history.
+    try? Data(repeating: 0x44, count: 80).write(to: historyURL)
+    keepOn(true)
+    let damagedBoard = makeBoard()
+    let damaged = ClipboardHistory(pasteboard: damagedBoard, file: otherPinnedURL, historyFile: historyURL, key: { keyH })
+    waitFor { damaged.historyLoaded }
+    check(damaged.items.isEmpty && !exists(historyURL) && exists(damagedURL), "a damaged history file is moved aside")
+    damaged.keepsAcrossRestarts = false
+    ClipboardHistory.waitForSaves()
+
+    // Private copies and images over 5 MB are never saved, and the rest is.
+    keepOn(true)
+    let privateBoard = makeBoard()
+    let privateHistory = ClipboardHistory(pasteboard: privateBoard, file: otherPinnedURL, historyFile: historyURL, key: { keyH })
+    waitFor { privateHistory.historyLoaded }
+    privateBoard.clearContents()
+    let secret = NSPasteboardItem()
+    secret.setString("private secret", forType: .string)
+    secret.setData(Data(), forType: NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType"))
+    privateBoard.writeObjects([secret])
+    privateHistory.poll()
+    check(privateHistory.items.isEmpty, "a private copy is never recorded")
+    copyText("visible copy", on: privateBoard, into: privateHistory)
+    privateBoard.clearContents()
+    let picture = NSPasteboardItem()
+    picture.setData(Data(repeating: 0x2A, count: HistoryRestart.maxSavedImageBytes + 1_000_000), forType: .png)
+    privateBoard.writeObjects([picture])
+    privateHistory.poll()
+    waitFor { privateHistory.pendingCaptures == 0 }
+    check(privateHistory.items.contains { $0.kind == .image }, "a large picture is in the list while it is open")
+    privateHistory.flushHistory()
+    ClipboardHistory.waitForSaves()
+    let privateSaved = savedClips(historyURL, key: keyH) ?? []
+    check(privateSaved.count == 1 && privateSaved.first?.representations.first?["public.utf8-plain-text"] == Data("visible copy".utf8),
+          "only the visible text is saved, not the private copy or the large picture")
+
+    // Nothing from these checks stays on: every history is turned off, and the folder is removed.
+    for history in [off, first, restarted, locked, damaged, privateHistory] { history.keepsAcrossRestarts = false }
+    ClipboardHistory.waitForSaves()
+    UserDefaults.standard.removeObject(forKey: "clipboardKeepsAcrossRestarts")
+    UserDefaults.standard.removeObject(forKey: "clipboardRestoresLatest")
+    try? FileManager.default.removeItem(at: folder)
+}
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
