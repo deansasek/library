@@ -149,3 +149,13 @@ Your library and clipboard history stay on your Mac. Library connects to the int
 - [Guide](docs/guide.md): every feature, setting, and permission
 - [Privacy](docs/privacy.md): what is stored, where, and what is sent
 - [Development and releasing](docs/development.md): building, testing, and publishing
+
+## Support
+
+Library is free and built in the open. If it saves you time, you can support its development.
+
+<p>
+  <a href="https://buymeacoffee.com/deansasek">
+    <img src="docs/media/buy_me_a_coffee.png" width="217" alt="Buy me a coffee">
+  </a>
+</p>
