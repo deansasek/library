@@ -198,7 +198,7 @@ struct QuickOpenView: View {
             LazyVStack(alignment: .leading, spacing: 0) {
                 header("Actions for “\(model.selected?.title ?? "")”")
                 ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
-                    Text(action.title)
+                    actionLabel(action)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -223,6 +223,16 @@ struct QuickOpenView: View {
             .padding(8)
         }
         .frame(minHeight: 200, maxHeight: 340)
+    }
+
+    /// The action's title, with its symbol when it has one. Actions without a symbol keep plain text.
+    @ViewBuilder
+    private func actionLabel(_ action: QuickOpenAction) -> some View {
+        if let icon = action.icon {
+            Label(action.title, systemImage: icon)
+        } else {
+            Text(action.title)
+        }
     }
 
     private func row(_ result: QuickOpenResult, index: Int, selected: Bool) -> some View {
@@ -272,9 +282,11 @@ struct QuickOpenView: View {
             // Right-click shows the same actions as Tab.
             ForEach(model.actions(for: result)) { action in
                 if action.children.isEmpty {
-                    Button(action.title) {
+                    Button {
                         close()
                         action.run()
+                    } label: {
+                        actionLabel(action)
                     }
                 } else {
                     Menu(action.title) {

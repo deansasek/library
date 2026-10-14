@@ -631,11 +631,53 @@ let transformTable: [(ClipTransform, String, String)] = [
     (.joinedLines, "a\n\nb", "a  b"),
     (.joinedLines, "single", "single"),
     (.joinedLines, "trailing\n", "trailing "),
+    (.smartPunctuation, "\"Hi\" there", "“Hi” there"),
+    (.smartPunctuation, "He said \"don't\"", "He said “don’t”"),
+    (.smartPunctuation, "don't stop", "don’t stop"),
+    (.smartPunctuation, "The dogs' bowls", "The dogs’ bowls"),
+    (.smartPunctuation, "'quoted' word", "‘quoted’ word"),
+    (.smartPunctuation, "'90s music", "’90s music"),
+    (.smartPunctuation, "wait -- what", "wait — what"),
+    (.smartPunctuation, "one... two", "one… two"),
+    (.smartPunctuation, "wait....", "wait…."),
+    (.smartPunctuation, "5\" screen", "5” screen"),
+    (.smartPunctuation, "(\"parens\")\n\"next line\"", "(“parens”)\n“next line”"),
+    (.smartPunctuation, "plain text, nothing: 1 < 2 & 3 > 2.", "plain text, nothing: 1 < 2 & 3 > 2."),
+    (.smartPunctuation, "already “curly” and ‘too’ — …", "already “curly” and ‘too’ — …"),
+    (.smartPunctuation, "", ""),
 ]
 for (transform, input, expected) in transformTable {
     check(transform.apply(input) == expected, "\(transform) of \(input.debugDescription) gives \(expected.debugDescription)")
 }
-check(ClipTransform.allCases.map(\.title).allSatisfy { !$0.isEmpty } && ClipTransform.allCases.count == 5, "five named transforms")
+check(ClipTransform.allCases.map(\.title).allSatisfy { !$0.isEmpty } && ClipTransform.allCases.count == 6, "six named transforms")
+
+// ---- smart text: address, phone, and date in a text clip (on-device detection) ----
+let smartTable: [(text: String, address: Bool, phone: String?, date: Bool)] = [
+    ("Ship to 1 Infinite Loop, Cupertino, CA 95014", true, nil, false),
+    ("Call +1 (415) 555-0132 after lunch", false, "+14155550132", false),
+    ("Call 415.555.0199 anytime", false, "4155550199", false),
+    ("Meeting on December 25, 2026 at 2:30 PM", false, nil, true),
+    ("Just some plain words here", false, nil, false),
+    ("Lunch at 1 Infinite Loop on December 25, 2026 at noon, call 415.555.0199", true, "4155550199", true),
+]
+for row in smartTable {
+    let found = SmartText.detect(row.text)
+    check((found.address != nil) == row.address, "address in \(row.text.debugDescription): \(found.address ?? "none")")
+    check(found.phone.map(SmartText.phoneDigits) == row.phone, "phone in \(row.text.debugDescription): \(found.phone ?? "none")")
+    check((found.date != nil) == row.date, "date in \(row.text.debugDescription)")
+}
+check(SmartText.detect("Ship to 1 Infinite Loop, Cupertino, CA 95014").address?.contains("Infinite Loop") == true, "the address is the matched text")
+check(SmartText.detect("Call 415.555.0199 or 415.555.0100").phone.map(SmartText.phoneDigits) == "4155550199", "the first phone number wins")
+check(SmartText.detect("").address == nil && SmartText.detect("").phone == nil && SmartText.detect("").date == nil, "empty text has no matches")
+check(SmartText.phoneDigits("+1 (415) 555-0132") == "+14155550132" && SmartText.phoneDigits("415.555.0199 ext.") == "4155550199", "phone digits keep only digits and plus")
+check(SmartText.mapsURL(for: "1 Infinite Loop, Cupertino")?.host == "maps.apple.com"
+      && URLComponents(url: SmartText.mapsURL(for: "1 Infinite Loop, Cupertino")!, resolvingAgainstBaseURL: false)?.queryItems?.first?.value == "1 Infinite Loop, Cupertino", "Maps opens the address as the query")
+let icsStart = SmartText.DetectedDate(start: Date(timeIntervalSince1970: 0), duration: 0)
+let ics = SmartText.calendarEvent(text: "  Lunch; rooms, 2\nsecond line", date: icsStart, created: Date(timeIntervalSince1970: 0), uid: "T1")
+check(ics.hasPrefix("BEGIN:VCALENDAR\r\n") && ics.hasSuffix("END:VCALENDAR\r\n"), "the event is a calendar file with CRLF lines")
+check(ics.contains("DTSTART:19700101T000000Z\r\n") && ics.contains("DTEND:19700101T010000Z\r\n"), "no length gives a one-hour event")
+check(ics.contains("SUMMARY:Lunch\\; rooms\\, 2\r\n") && !ics.contains("second line"), "summary is the first line, with commas and semicolons escaped")
+check(ics.contains("UID:T1@library\r\n"), "the event has its UID")
 
 // ---- Markdown links ----
 check(MarkdownLink.escapedTitle("a [b] *c* _d_ `e` \\f") == "a \\[b\\] \\*c\\* \\_d\\_ \\`e\\` \\\\f", "Markdown special characters are escaped")
@@ -899,6 +941,7 @@ let runtimeSymbolUses: [(file: String, expression: String, reason: String)] = [
     ("Manage/IconPicker.swift", "$0", "filters the symbols list below, so only names that resolve are shown"),
     ("Manage/IconPicker.swift", "name", "a name from the symbols list below, which the list's own filter has already checked"),
     ("Welcome/WelcomeView.swift", "symbol", "passed in from icon, feature and shortcutRow calls; their literals are read by the Welcome rule"),
+    ("QuickOpen/QuickOpenView.swift", "icon", "the icon of a Quick Open action; its literals are read by the icon: rule in QuickOpenModel.swift"),
 ]
 let swiftRoot = "Sources/Library/"
 let swiftFiles = (FileManager.default.enumerator(atPath: swiftRoot)?.compactMap { $0 as? String } ?? [])
