@@ -869,7 +869,7 @@ final class LibraryStore: ObservableObject {
     /// Updates Spotlight only when what it shows changed, including since the last launch.
     private func indexInSpotlight(_ leaves: [LibraryItem]) {
         let signature = leaves.filter(\.isOpenable).map {
-            "\($0.id)|\($0.name)|\($0.url ?? "")|\($0.command ?? "")|\($0.appPath ?? "")|\($0.keywords ?? "")|\($0.color ?? "")"
+            "\($0.id)|\($0.name)|\($0.url ?? "")|\($0.command ?? "")|\($0.appPath ?? "")|\($0.keywords ?? "")|\($0.color ?? "")|\($0.noteText ?? "")"
         }.joined(separator: "\n")
         let digest = SHA256.hash(data: Data(signature.utf8)).map { String(format: "%02x", $0) }.joined()
         guard digest != UserDefaults.standard.string(forKey: "spotlightDigest") else { return }

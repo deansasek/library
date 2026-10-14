@@ -9,7 +9,7 @@ enum Spotlight {
         let items = nodes.filter(\.isOpenable).map { node -> CSSearchableItem in
             let attributes = CSSearchableItemAttributeSet(contentType: .item)
             attributes.title = node.name
-            attributes.contentDescription = node.url ?? node.command ?? node.appPath
+            attributes.contentDescription = node.spotlightDescription
             attributes.keywords = "\(node.keywords ?? "") \(node.color ?? "")".split(separator: " ").map(String.init)
             return CSSearchableItem(uniqueIdentifier: node.id.uuidString, domainIdentifier: "library",
                                     attributeSet: attributes)

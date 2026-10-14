@@ -1446,6 +1446,30 @@ do {
     check(rowDrop(moving: [other.id], onto: inner.id, in: rows, listSorted: false) == .moveBefore(inner.id), "a row dropped on a folder's child goes before the child")
     check(rowDrop(moving: [other.id], onto: UUID(), in: rows, listSorted: false) == .ignore, "a target that is not in the library is ignored")
 }
+// ---- notes ----
+check(LibraryItem(name: "N", url: "x.example.com").note == nil, "a new item has no note")
+let noteOldJSON = Data(#"{"id":"6F1C3E2A-1B2C-4D5E-8F90-123456789ABC","name":"Jira","url":"x.example.com"}"#.utf8)
+check((try? JSONDecoder().decode(LibraryItem.self, from: noteOldJSON))?.note == nil, "a file without a note loads")
+check(LibraryItem.cleanNote("  first line\nsecond  \n") == "first line\nsecond", "a note is trimmed, keeping its inner lines")
+check(LibraryItem.cleanNote(" \n\t ") == nil && LibraryItem.cleanNote(nil) == nil, "a blank note is no note")
+var noted = LibraryItem(name: "Docs", url: "https://docs.example.com")
+noted.note = "  Read section 3\nthen the FAQ "
+check(noted.noteText == "Read section 3\nthen the FAQ", "noteText trims the note")
+check(noted.spotlightDescription == "https://docs.example.com\nRead section 3\nthen the FAQ", "Spotlight shows the note after the target")
+noted.note = "   "
+check(noted.noteText == nil && noted.spotlightDescription == "https://docs.example.com", "a blank note is left out of Spotlight")
+check(LibraryItem(name: "Ask", command: "make").spotlightDescription == "make", "a command's Spotlight description is its command")
+check(LibraryItem(name: "Folder", children: []).spotlightDescription == nil, "no target and no note gives no Spotlight description")
+var notedTrip = LibraryItem(name: "Docs", url: "https://docs.example.com", note: "a\nb")
+if let data = try? JSONEncoder().encode(notedTrip), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.note == "a\nb" && back == notedTrip, "a note round-trips through the file")
+} else { check(false, "a note round-trips through the file") }
+notedTrip.note = nil
+check(notedTrip.noteText == nil, "clearing the note clears it")
+let noteSearch = [LibraryItem(name: "Docs", url: "https://docs.example.com", note: "Read section 3\nthen the FAQ")]
+check(QuickOpenResult.search("docs", in: noteSearch, counts: [:]).first?.noteLine == "Read section 3 then the FAQ", "Quick Open shows the note on one line")
+check(QuickOpenResult.search("docs", in: [LibraryItem(name: "Docs", url: "https://docs.example.com")], counts: [:]).first?.noteLine == nil, "Quick Open shows no note line without a note")
+check(QuickOpenResult.search("", in: noteSearch, counts: [:]).first?.noteLine != nil, "a note shows in the browse list too")
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

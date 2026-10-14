@@ -336,6 +336,7 @@ struct ManageView: View {
             node.url = node.url.map { $0.trimmingCharacters(in: .whitespaces) }
             node.arguments = clean(node.arguments)
             node.keywords = clean(node.keywords)
+            node.note = LibraryItem.cleanNote(node.note)
             node.command = node.appPath == nil ? node.command.map { $0.trimmingCharacters(in: .whitespaces) } : clean(node.command)
             node.promptLabel = node.isTemplate ? clean(node.promptLabel) : nil
             store.perform("Edit") { $0.update(id) { $0 = node } }
