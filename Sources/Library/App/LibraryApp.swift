@@ -18,7 +18,10 @@ struct LibraryApp: App {
         .defaultLaunchBehavior(.suppressed)
         // Opening a library:// link must not open the window. The app delegate handles it.
         .handlesExternalEvents(matching: [])
-        .commands { ManageCommands(store: store) }
+        .commands {
+            ManageCommands(store: store)
+            HelpCommands(store: store)
+        }
         Settings {
             SettingsView(store: store)
         }
