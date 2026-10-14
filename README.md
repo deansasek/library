@@ -95,9 +95,9 @@ Choose **Edit Library…** to manage your items in the Library window.
 
 A divider appears as a titled section in the menu. The items below it belong to that section.
 
-### Get Info
+### Edit an item
 
-Select an item and press ⌘I, or choose **Get Info** from the toolbar or a right-click menu. The form sets:
+Select an item and press ⌘I, or choose **Edit…** from the toolbar or a right-click menu. The form sets:
 
 - **Name** and **icon.** Pick an SF Symbol, choose an emoji, or keep the default icon, which is the site's favicon or the app icon.
 - **URL or command.**
