@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if byLoginItem || ProcessInfo.processInfo.systemUptime < 120 {
             openLoginItems()
         }
+        UpdateCheck.checkAutomaticallyIfDue()
     }
 
     /// Opens the items marked "Open When You Log In", a few seconds after login so the desktop is ready.
