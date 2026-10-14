@@ -141,6 +141,60 @@ qoGrown.append(LibraryItem(name: "Jiraffe", url: "https://zoo.example.com"))
 check(QuickOpenIndex(nodes: qoGrown).search("jira", counts: [:]).map(\.title).contains("Jiraffe")
       && !qoIndex.search("jiraffe", counts: [:]).contains { $0.title == "Jiraffe" }, "a rebuilt index sees the change, the old one does not")
 check(keys(QuickOpenIndex(nodes: qoGrown).search("jira", counts: [:])) == keys(referenceSearch("jira", in: qoGrown, counts: [:])), "rebuilt index equals the uncached search")
+// A generated library with ASCII, non-ASCII, carriage-return, and Kelvin-sign text, so both the byte path and its
+// String fallback run. One index per sequence: typing extends the previous query (the narrowing path), backspace
+// and edits start over, and each query is checked against the uncached search, with and without counts.
+var qoSeed: UInt64 = 42
+@MainActor func qoNext(_ bound: Int) -> Int {
+    qoSeed = qoSeed &* 6364136223846793005 &+ 1442695040888963407
+    return Int((qoSeed >> 33) % UInt64(bound))
+}
+let qoPieces = ["jira", "Build", "café", "ÉTÉ", "Straße", "k", "docs", "a\r", "x y", "zz", "Ka\u{212A}", "example", "browse", "ci", "é"]
+let qoBig: [LibraryItem] = (0..<8).map { folder in
+    LibraryItem(name: "Folder \(folder)", children: (0..<40).map { _ in
+        let name = (0..<(1 + qoNext(3))).map { _ in qoPieces[qoNext(qoPieces.count)] }.joined(separator: " ")
+        let url = qoNext(2) == 0 ? "https://\(qoPieces[qoNext(qoPieces.count)]).example.com/\(qoNext(100))" : nil
+        return LibraryItem(name: name, url: url, command: url == nil ? "run \(qoPieces[qoNext(qoPieces.count)])" : nil,
+                           color: qoNext(4) == 0 ? "blue" : nil,
+                           keywords: qoNext(3) == 0 ? qoPieces[qoNext(qoPieces.count)] : nil)
+    })
+}
+let qoBigCounts = Dictionary(uniqueKeysWithValues: qoBig.leaves.prefix(60).enumerated().map { ($0.element.id.uuidString, $0.offset % 4) })
+var qoBigMismatch: [String] = []
+@MainActor func qoCompare(_ index: QuickOpenIndex, _ query: String) {
+    for counts in [[String: Int](), qoBigCounts]
+    where keys(index.search(query, counts: counts)) != keys(referenceSearch(query, in: qoBig, counts: counts)) {
+        qoBigMismatch.append("\(query)|\(counts.isEmpty ? "no counts" : "counts")")
+    }
+}
+let qoPhrases = qoBig.leaves.prefix(25).map(\.name) + ["Ka\u{212A}", "é", "ÉTÉ jira", "a\r b", "k", "x y z", "CAFÉ docs"]
+for phrase in qoPhrases {
+    let index = QuickOpenIndex(nodes: qoBig)
+    var typed = ""
+    var steps: [String] = []
+    for character in phrase {
+        typed.append(character)
+        steps.append(typed)
+    }
+    steps += steps.dropLast().reversed()
+    steps += ["", phrase, phrase + " ", phrase.uppercased(), phrase.lowercased() + "zz", phrase]
+    for query in steps { qoCompare(index, query) }
+}
+let qoAlphabet = Array("jiraCbuoxkeésZ ".map(String.init))
+for _ in 0..<20 {
+    let index = QuickOpenIndex(nodes: qoBig)
+    var query = ""
+    for _ in 0..<60 {
+        switch qoNext(4) {
+        case 0 where !query.isEmpty: query.removeLast()
+        case 1 where !query.isEmpty && qoNext(3) == 0: query.append(" ")
+        default: query += qoAlphabet[qoNext(qoAlphabet.count)]
+        }
+        qoCompare(index, query)
+    }
+}
+check(qoBigMismatch.isEmpty, "generated library: index equals the uncached search: \(qoBigMismatch.prefix(5))")
+check(QuickOpenIndex(nodes: qoBig).search("e", counts: [:]).count > 20, "generated library has matches, so the equality checks are not vacuous")
 // The debounce decision: a blank query recomputes at once, a typed one waits one frame. Coalescing itself
 // (cancelling the pending recompute on each keystroke) is in QuickOpenModel.scheduleResults and is not run here.
 check(QuickOpenModel.recomputeDelay(for: "") == nil && QuickOpenModel.recomputeDelay(for: "   ") == nil, "blank query recomputes at once")
@@ -568,6 +622,7 @@ let commandFiles: [(name: String, modified: Date)] = [
 ]
 check(staleCommandFiles(among: commandFiles, now: commandNow) == ["library-old.command"], "only old library command files are stale")
 runBenchmark()
+QuickOpenBench.main()
 
 // ---- Quick Open focus (pure; no windows) ----
 check(!QuickOpenFocus.closes(whenKeyGoesTo: .preview, previewOpen: true), "clicking the open preview keeps Quick Open")
