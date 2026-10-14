@@ -11,7 +11,8 @@ enum MenuMode: String {
 final class LibraryStore: ObservableObject {
     static let shared = LibraryStore()
 
-    @Published var nodes: [LibraryItem] = [] {
+    /// The library and Recently Deleted together, so one undo step can change both.
+    @Published private(set) var contents = LibrarySync.Contents() {
         didSet {
             revision += 1
             if !undoSuppressed {
@@ -27,7 +28,14 @@ final class LibraryStore: ObservableObject {
             if needsHotKeyRegistration(old: previous, new: fingerprint) { registerHotKeys() }
         }
     }
-    /// Counts every change to `nodes`, so a cached search knows when the library changed.
+    /// The live items: what the menus, Quick Open, the hot keys, and Spotlight use.
+    var nodes: [LibraryItem] {
+        get { contents.live }
+        set { contents.live = newValue }
+    }
+    /// Items deleted in the last 30 days, top level only, each with its subtree. Shown in Recently Deleted.
+    var deleted: [LibraryItem] { contents.deleted }
+    /// Counts every change to `nodes` and `deleted`, so a cached search knows when the library changed.
     private(set) var revision = 0
     /// The fields of `nodes` that the follow-up work depends on. Matches `nodes` at all times.
     private var fingerprint = TreeFingerprint([])
@@ -44,6 +52,8 @@ final class LibraryStore: ObservableObject {
     @Published private(set) var keepsInICloud = LibrarySync.isLinked(LibraryStore.file)
     /// True when bookmarks.json is linked to an iCloud copy that is gone. Library changes nothing until it is back.
     private(set) var cloudFileMissing = false
+    /// The iCloud copy's state for the manager footer. Nil when the library is not in iCloud Drive.
+    @Published private(set) var syncState: LibrarySync.SyncState?
 
     /// App preferences live in UserDefaults, not in bookmarks.json.
     /// What Restore Defaults sets: Control and right click for the menu, Control-Space for Quick Open, and
@@ -90,6 +100,7 @@ final class LibraryStore: ObservableObject {
     private var fetchTask: Task<Void, Never>?
     private var spotlightTask: Task<Void, Never>?
     private var accessTask: Task<Void, Never>?
+    private var syncStateTask: Task<Void, Never>?
     private var watchers: [DispatchSourceFileSystemObject] = []
     /// True when bookmarks.json existed but could not be read, so the app can say so.
     private(set) var hadUnreadableFile = false
@@ -100,17 +111,17 @@ final class LibraryStore: ObservableObject {
     private var saveTask: Task<Void, Never>?
     private var hotKeyLayout: HotKeyLayout?
     private var failedIcons: Set<String> = []
-    private var lastSavedData: Data?
     /// Modification date and size of bookmarks.json when it was last read or written.
     private var lastFileStamp: String?
-    /// When the file was last read or written. Edits stamped after this are not in the file yet.
-    private var lastSyncDate = Date.distantPast
-    /// The ids the file had when it was last read or written. A merge uses them to tell new items from deleted ones.
-    private var syncedIDs: Set<UUID> = []
-    private var replacedNoticeShown = false
+    /// The bytes of bookmarks.json when it was last read or written. A different file on disk is another Mac's version.
+    private var lastSavedData: Data?
+    /// Reports changes to the iCloud copy. Registered only while the library is in iCloud Drive.
+    private var presenter: LibraryFilePresenter?
+    /// True while a conflict is on screen, so a second one does not open over it.
+    private var presentingConflict = false
     private var undoSuppressed = false
     private var loadingFromDisk = false
-    private var renameBase: [LibraryItem]?
+    private var renameBase: LibrarySync.Contents?
 
     /// The shortcuts that register: the extras, and each item's shortcuts with the item they open.
     private struct HotKeyLayout: Equatable {
@@ -176,8 +187,9 @@ final class LibraryStore: ObservableObject {
         } else {
             switch BookmarkFile.load(from: Self.file) {
             case .loaded(let items):
-                nodes = items
+                contents = LibrarySync.Contents(file: items)
                 lastFileStamp = fileStamp()
+                lastSavedData = try? LibrarySync.read(Self.dataFile)
             case .missing:
                 // A new install starts with the project's page, so the library shows how a bookmark looks and works.
                 nodes = [LibraryItem(name: "Library on GitHub", url: "https://github.com/deansasek/library", keywords: "library help")]
@@ -194,8 +206,6 @@ final class LibraryStore: ObservableObject {
                 try? FileManager.default.copyItem(at: Self.file, to: damaged)
             }
         }
-        syncedIDs = Set(nodes.allIDs)
-        lastSyncDate = Date()
         HotKeys.onTapLost = { [weak self] in self?.registerHotKeys(force: true) }
         // Property observers do not run for assignments inside init.
         fingerprint = TreeFingerprint(nodes)
@@ -203,6 +213,11 @@ final class LibraryStore: ObservableObject {
         scheduleIconFetch()
         scheduleSpotlightIndex()
         watchFile()
+        if LibrarySync.isLinked(Self.file), !cloudFileMissing {
+            startPresenting()
+            refreshSyncState()
+            scheduleConflictCheck()
+        }
     }
 
     /// Sets the menu, Quick Open, and clipboard menu shortcuts back to their defaults. Open Link stays.
@@ -213,16 +228,11 @@ final class LibraryStore: ObservableObject {
 
     /// Reloads when bookmarks.json changes outside the app. The folder is watched because
     /// editors and git replace the file instead of writing into it. Other files in the folder are ignored.
-    /// With iCloud Drive on, the iCloud folder is watched too, since that is where another Mac's change arrives.
-    /// Nothing polls.
+    /// With iCloud Drive on, changes to the iCloud copy come through `presenter` instead. Nothing polls.
     private func watchFile() {
         watchers.forEach { $0.cancel() }
         watchers = []
-        var folders = [Self.dir]
-        if LibrarySync.isLinked(Self.file) {
-            folders.append(Self.dataFile.deletingLastPathComponent())
-        }
-        for folder in folders {
+        for folder in [Self.dir] {
             let descriptor = Darwin.open(folder.path, O_EVTONLY)
             guard descriptor >= 0 else { continue }
             let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: .write, queue: .main)
@@ -238,15 +248,17 @@ final class LibraryStore: ObservableObject {
     private func reloadIfChanged() {
         // Most events are for other files in the folder, so the file's stamp is checked before its contents.
         let stamp = fileStamp()
-        guard saveTask == nil, stamp != lastFileStamp, let data = try? Data(contentsOf: Self.dataFile), data != lastSavedData,
-              let decoded = try? JSONDecoder().decode([LibraryItem].self, from: data) else { return }
+        guard saveTask == nil, !presentingConflict, stamp != lastFileStamp,
+              LibrarySync.unresolvedConflicts(at: Self.dataFile).isEmpty,
+              let data = try? LibrarySync.read(Self.dataFile, presenter: presenter), data != lastSavedData,
+              let decoded = LibrarySync.decode(data) else { return }
         lastFileStamp = stamp
         adopt(decoded, data: data)
     }
 
     /// Makes `items`, read from disk, the library. Old undo steps are dropped, since they would restore the file
     /// from before the outside change.
-    private func adopt(_ items: [LibraryItem], data: Data) {
+    private func adopt(_ items: LibrarySync.Contents, data: Data) {
         lastSavedData = data
         fileReadFailed = false
         cloudFileMissing = false
@@ -255,20 +267,132 @@ final class LibraryStore: ObservableObject {
         saveFailureShown = false
         undoSuppressed = true
         loadingFromDisk = true
-        nodes = items
+        contents = items
         loadingFromDisk = false
         undoSuppressed = false
         undoManager?.removeAllActions()
-        lastSyncDate = Date()
-        syncedIDs = Set(items.allIDs)
     }
 
     /// Records that the file now matches the library, so later edits are the only unsynced changes.
     private func markSynced() {
         lastFileStamp = fileStamp()
-        lastSavedData = try? Data(contentsOf: Self.dataFile)
-        lastSyncDate = Date()
-        syncedIDs = Set(nodes.allIDs)
+        lastSavedData = try? LibrarySync.read(Self.dataFile, presenter: presenter)
+        refreshSyncState()
+    }
+
+    /// Starts reporting changes to the iCloud copy. Called once the library is linked to iCloud Drive.
+    private func startPresenting() {
+        guard presenter == nil else { return }
+        let presenter = LibraryFilePresenter(url: Self.dataFile)
+        presenter.onChange = { [weak self] in self?.fileChangedElsewhere() }
+        self.presenter = presenter
+        NSFileCoordinator.addFilePresenter(presenter)
+    }
+
+    private func stopPresenting() {
+        guard let presenter else { return }
+        NSFileCoordinator.removeFilePresenter(presenter)
+        self.presenter = nil
+    }
+
+    /// Another Mac, or iCloud, changed the file. The file is read unless a save or a conflict is pending, and a
+    /// conflict is shown when there is one.
+    private func fileChangedElsewhere() {
+        reloadIfChanged()
+        refreshSyncState()
+        scheduleConflictCheck()
+    }
+
+    /// Checks for a conflict after the current event, so an alert does not open inside the file coordinator's callback.
+    private func scheduleConflictCheck() {
+        Task { @MainActor in
+            _ = checkForConflicts()
+        }
+    }
+
+    /// Shows the conflict when there is one. Returns true when it did, or when a conflict is pending but unreadable.
+    @discardableResult
+    private func checkForConflicts() -> Bool {
+        guard !presentingConflict, !saveBlocked, let others = otherVersions() else { return false }
+        guard !others.isEmpty else { return false }
+        resolveConflicts(others)
+        return true
+    }
+
+    /// Asks what to keep, and keeps it. Each choice is written before the conflict versions are marked resolved.
+    private func resolveConflicts(_ others: [(contents: LibrarySync.Contents, date: Date)]) {
+        guard !presentingConflict else { return }
+        presentingConflict = true
+        defer { presentingConflict = false }
+        let versions = LibrarySync.unresolvedConflicts(at: Self.dataFile)
+        let other = others[0].contents
+        while true {
+            switch askWhichVersionToKeep() {
+            case .thisMac:
+                return finishConflict(LibrarySync.resolve(local: contents, other: other, preferring: .thisMac, choices: [:]), versions)
+            case .other:
+                return finishConflict(LibrarySync.resolve(local: contents, other: other, preferring: .other, choices: [:]), versions)
+            case .review:
+                let differences = LibrarySync.differences(local: contents, other: other)
+                if let picks = ConflictReview.run(differences) {
+                    return finishConflict(LibrarySync.resolve(local: contents, other: other, preferring: .thisMac, choices: picks), versions)
+                }
+            }
+        }
+    }
+
+    private func finishConflict(_ resolved: LibrarySync.Contents, _ versions: [NSFileVersion]) {
+        undoSuppressed = true
+        loadingFromDisk = true
+        contents = resolved
+        loadingFromDisk = false
+        undoSuppressed = false
+        undoManager?.removeAllActions()
+        guard writeLibrary() else { return }
+        guard !versions.isEmpty else { return }
+        do {
+            try LibrarySync.resolveConflicts(versions, at: Self.dataFile)
+        } catch {
+            reportSaveFailure("The other version of bookmarks.json in iCloud Drive couldn’t be cleared. Library will ask again. \(error.localizedDescription)")
+        }
+    }
+
+    /// The versions that differ from this Mac's library and are not resolved: iCloud's unresolved conflict versions,
+    /// and a file on disk that another Mac wrote after this Mac's last read or write. Nil when a version exists
+    /// but cannot be read yet.
+    private func otherVersions() -> [(contents: LibrarySync.Contents, date: Date)]? {
+        guard LibrarySync.isLinked(Self.file) else { return [] }
+        var others: [(contents: LibrarySync.Contents, date: Date)] = []
+        for version in LibrarySync.unresolvedConflicts(at: Self.dataFile) {
+            guard let data = try? LibrarySync.read(version.url), let decoded = LibrarySync.decode(data) else { return nil }
+            others.append((decoded, version.modificationDate ?? .distantPast))
+        }
+        if let data = try? LibrarySync.read(Self.dataFile, presenter: presenter), data != lastSavedData {
+            guard let decoded = LibrarySync.decode(data) else { return nil }
+            if decoded != contents { others.append((decoded, Date())) }
+        }
+        return others.sorted { $0.date > $1.date }
+    }
+
+    private enum VersionChoice {
+        case thisMac, other, review
+    }
+
+    /// The standard document conflict alert. Keep This Mac's Version is the default.
+    private func askWhichVersionToKeep() -> VersionChoice {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Two versions of your library were edited on different Macs"
+        alert.informativeText = "Keep one version. Review lists each item that differs, so you can choose for each one."
+        alert.addButton(withTitle: "Keep This Mac’s Version")
+        alert.addButton(withTitle: "Keep the Other Version")
+        alert.addButton(withTitle: "Review")
+        switch alert.runModal() {
+        case .alertFirstButtonReturn: return .thisMac
+        case .alertSecondButtonReturn: return .other
+        default: return .review
+        }
     }
 
     private func fileStamp() -> String? {
@@ -391,22 +515,40 @@ final class LibraryStore: ObservableObject {
     func perform(_ actionName: String, _ change: (inout [LibraryItem]) -> Void) {
         var edited = nodes
         change(&edited)
-        assignLocal(edited)
+        nodes = edited
         undoManager?.setActionName(actionName)
     }
 
-    /// Makes `new` the library after an edit on this Mac. The items it changed are stamped, so a merge knows they are newer.
-    private func assignLocal(_ new: [LibraryItem]) {
-        nodes = LibrarySync.stamped(new, against: nodes, at: Date())
+    /// Applies an edit to the library and Recently Deleted as one undoable step named `actionName`.
+    private func edit(_ actionName: String, _ change: (inout LibrarySync.Contents) -> Void) {
+        var edited = contents
+        change(&edited)
+        contents = edited
+        undoManager?.setActionName(actionName)
+    }
+
+    /// Moves items to Recently Deleted. Folders take their contents with them.
+    func delete(_ ids: Set<UUID>) {
+        edit("Delete") { LibrarySync.tombstone(ids, in: &$0, at: Date()) }
+    }
+
+    /// Puts deleted items back: into their folder when it still exists, else to the top level.
+    func restore(_ ids: Set<UUID>) {
+        edit("Restore") { LibrarySync.restore(ids, in: &$0) }
+    }
+
+    /// Removes deleted items for good. The caller confirms first.
+    func deleteImmediately(_ ids: Set<UUID>) {
+        edit("Delete Immediately") { LibrarySync.deleteImmediately(ids, in: &$0) }
     }
 
     /// Renames without one undo step per keystroke. `endRename` records a single step.
     func rename(_ id: UUID, to name: String) {
-        renameBase = renameBase ?? nodes
+        renameBase = renameBase ?? contents
         undoSuppressed = true
         var edited = nodes
         edited.update(id) { $0.name = name }
-        assignLocal(edited)
+        nodes = edited
         undoSuppressed = false
     }
 
@@ -444,9 +586,9 @@ final class LibraryStore: ObservableObject {
     }
 
     /// Undoing assigns `nodes`, which registers the inverse step, so redo needs no extra code.
-    private func registerUndo(restoring snapshot: [LibraryItem]) {
+    private func registerUndo(restoring snapshot: LibrarySync.Contents) {
         undoManager?.registerUndo(withTarget: self) { store in
-            MainActor.assumeIsolated { store.assignLocal(snapshot) }
+            MainActor.assumeIsolated { store.contents = snapshot }
         }
     }
 
@@ -474,67 +616,66 @@ final class LibraryStore: ObservableObject {
         guard !saveBlocked else {
             return reportSaveFailure("bookmarks.json can’t be read, so your changes aren’t saved. Check the file’s permissions. Library saves again once the file can be read.")
         }
-        guard adoptRemoteChanges() else { return }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        guard let data = try? encoder.encode(nodes) else {
-            return reportSaveFailure("Library couldn’t prepare your library for saving.")
+        guard !presentingConflict else { return }
+        // Nothing is written over another version. A conflict is resolved first, with the user's choice.
+        guard let others = otherVersions() else {
+            return reportSaveFailure("bookmarks.json in iCloud Drive can’t be read yet, so your changes aren’t saved. Library saves again when iCloud has the file.")
         }
-        do {
-            try data.write(to: Self.dataFile, options: .atomic)
-            // An atomic write creates the file with the default mode (0644). Only you can read it.
-            // dataFile is the iCloud copy when the library is linked, otherwise the local file.
-            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.dataFile.path)
-        } catch {
-            return reportSaveFailure(error.localizedDescription)
-        }
-        lastSavedData = data
-        lastFileStamp = fileStamp()
-        lastSyncDate = Date()
-        syncedIDs = Set(nodes.allIDs)
-        saveFailureShown = false
+        guard others.isEmpty else { return resolveConflicts(others) }
+        writeLibrary()
     }
 
-    /// With iCloud Drive on, merges a change another Mac saved since this Mac last read or wrote the file. Returns
-    /// false, so nothing is written, when the file exists but cannot be read yet. See LibrarySync.merge for the rule.
-    private func adoptRemoteChanges() -> Bool {
-        guard LibrarySync.isLinked(Self.file), let stamp = fileStamp(), stamp != lastFileStamp else { return true }
-        guard let data = try? Data(contentsOf: Self.dataFile) else {
-            reportSaveFailure("bookmarks.json in iCloud Drive can’t be read yet, so your changes aren’t saved. Library saves again when iCloud has the file.")
+    /// Writes the library through NSFileCoordinator. Returns false, after an alert, when the write fails.
+    @discardableResult
+    private func writeLibrary() -> Bool {
+        purgeExpired()
+        let encoded: Data
+        do {
+            encoded = try LibrarySync.encode(contents)
+        } catch {
+            reportSaveFailure("Library couldn’t prepare your library for saving.")
             return false
         }
-        lastFileStamp = stamp
-        guard data != lastSavedData else { return true }
-        guard let remote = try? JSONDecoder().decode([LibraryItem].self, from: data) else {
-            reportSaveFailure("bookmarks.json in iCloud Drive can’t be read, so your changes aren’t saved. Fix or remove the file. Library saves again once it can be read.")
+        do {
+            try LibrarySync.write(encoded, to: Self.dataFile, presenter: presenter)
+            // An atomic write creates the file with the default mode (0644). Only you can read it.
+            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.dataFile.path)
+        } catch {
+            reportSaveFailure(error.localizedDescription)
             return false
         }
-        let merged = LibrarySync.merge(local: nodes, remote: remote, lastSynced: lastSyncDate, knownIDs: syncedIDs)
-        lastSavedData = data
-        undoSuppressed = true
-        loadingFromDisk = true
-        nodes = merged.items
-        loadingFromDisk = false
-        undoSuppressed = false
-        undoManager?.removeAllActions()
-        if !merged.replacedEdits.isEmpty { reportReplacedEdits(merged.replacedEdits) }
+        lastSavedData = encoded
+        lastFileStamp = fileStamp()
+        saveFailureShown = false
+        refreshSyncState()
         return true
     }
 
-    /// Says once per launch that a change from another Mac replaced an edit made here.
-    private func reportReplacedEdits(_ names: [String]) {
-        NSLog("Library merged a change from iCloud Drive over an unsaved local edit: \(names)")
-        guard !replacedNoticeShown else { return }
-        replacedNoticeShown = true
-        let listed = names.prefix(3).map { "“\($0)”" }.joined(separator: ", ")
-        let more = names.count > 3 ? " and \(names.count - 3) more" : ""
-        DispatchQueue.main.async {
-            NSApp.activate(ignoringOtherApps: true)
-            let alert = NSAlert()
-            alert.alertStyle = .informational
-            alert.messageText = "Another Mac Replaced a Change"
-            alert.informativeText = "\(listed)\(more) changed on another Mac at about the same time as here. Library kept the other Mac’s version."
-            alert.runModal()
+    /// Removes the Recently Deleted items older than 30 days. Not an undo step.
+    private func purgeExpired() {
+        var purged = contents
+        LibrarySync.purge(&purged, now: Date())
+        guard purged != contents else { return }
+        undoSuppressed = true
+        loadingFromDisk = true
+        contents = purged
+        loadingFromDisk = false
+        undoSuppressed = false
+    }
+
+    /// Re-reads the iCloud copy's state now, and again shortly while it is still uploading or waiting, so the footer
+    /// catches up without a watcher. Stops after about a minute.
+    func refreshSyncState() {
+        syncState = keepsInICloud ? LibrarySync.syncState(of: Self.dataFile) : nil
+        guard let state = syncState, state != .upToDate else { return }
+        syncStateTask?.cancel()
+        syncStateTask = Task { @MainActor [weak self] in
+            for _ in 0..<30 {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                guard !Task.isCancelled, let self else { return }
+                self.syncState = self.keepsInICloud ? LibrarySync.syncState(of: Self.dataFile) : nil
+                if self.syncState == nil || self.syncState == .upToDate { return }
+            }
         }
     }
 
@@ -570,7 +711,7 @@ final class LibraryStore: ObservableObject {
             guard let picked = askWhichLibraryToKeep(), picked != .cancel else { return }
             choice = picked
         }
-        if choice == .useICloud, (try? JSONDecoder().decode([LibraryItem].self, from: Data(contentsOf: cloud))) == nil {
+        if choice == .useICloud, LibrarySync.decode((try? LibrarySync.read(cloud)) ?? Data()) == nil {
             showSyncAlert("Library Can’t Read the iCloud Library", "The bookmarks.json in iCloud Drive can’t be read, so Library keeps this Mac’s library. Nothing was changed.")
             return
         }
@@ -586,13 +727,14 @@ final class LibraryStore: ObservableObject {
             showSyncAlert("Library Couldn’t Turn On iCloud Drive", error.localizedDescription)
             return
         }
-        if choice == .useICloud, let data = try? Data(contentsOf: Self.dataFile),
-           let items = try? JSONDecoder().decode([LibraryItem].self, from: data) {
+        if choice == .useICloud, let data = try? LibrarySync.read(Self.dataFile), let items = LibrarySync.decode(data) {
             adopt(items, data: data)
         }
         keepsInICloud = true
         markSynced()
         watchFile()
+        startPresenting()
+        scheduleConflictCheck()
     }
 
     private func turnOffICloud() {
@@ -607,10 +749,13 @@ final class LibraryStore: ObservableObject {
             showSyncAlert("Library Couldn’t Turn Off iCloud Drive", "The library in iCloud Drive can’t be read, so it stays there. Nothing was changed.")
             return
         }
+        // Stops watching the iCloud copy while its steps remove it, so Library does not react to its own change.
+        stopPresenting()
         do {
             try LibrarySync.run(LibrarySync.disableSteps(local: Self.file, cloud: cloud))
         } catch {
             LibrarySync.recover(local: Self.file, cloud: cloud)
+            startPresenting()
             showSyncAlert("Library Couldn’t Turn Off iCloud Drive", error.localizedDescription)
             return
         }

@@ -1071,10 +1071,10 @@ if let dupes = try? LibraryBackup.encode([twin, clash]) {
 }
 check(LibraryBackup.BackupError.unsupportedVersion(2).message.contains("version 2"), "version error names the version")
 // ---- iCloud Drive library (rules and file steps; temporary folders, never the real iCloud Drive) ----
-func syncAt(_ seconds: Double) -> Date { Date(timeIntervalSince1970: 1_000_000 + seconds) }
-func syncItem(_ name: String, _ seconds: Double?, id: UUID = UUID(), children: [LibraryItem]? = nil) -> LibraryItem {
-    LibraryItem(id: id, name: name, url: "https://\(name).example.com", children: children, modified: seconds.map(syncAt))
+func syncItem(_ name: String, id: UUID = UUID(), children: [LibraryItem]? = nil) -> LibraryItem {
+    LibraryItem(id: id, name: name, url: "https://\(name).example.com", children: children)
 }
+func daysAgo(_ days: Double, from now: Date) -> Date { now.addingTimeInterval(-days * 24 * 60 * 60) }
 
 // Prompt and steps
 check(LibrarySync.enablePrompt(iCloudFolderExists: false, cloudFileExists: true) == .unavailable, "no iCloud Drive, no move")
@@ -1091,52 +1091,71 @@ do {
         == [.copy(from: cloud, to: bc), .copy(from: local, to: cloud), .verify(cloud, matches: local), .remove(local), .link(local, to: cloud)], "replacing iCloud backs it up first")
     check(LibrarySync.enableSteps(local: local, cloud: cloud, backupLocal: bl, backupCloud: bc, prompt: .askWhichToKeep, choice: .cancel).isEmpty, "cancel does nothing")
     check(LibrarySync.disableSteps(local: local, cloud: cloud)
-        == [.remove(local), .copy(from: cloud, to: local), .verify(local, matches: cloud), .remove(cloud)], "turning off verifies before removing the iCloud copy")
+        == [.remove(local), .copy(from: cloud, to: local), .verify(local, matches: cloud), .removeICloud(cloud)], "turning off verifies before removing the iCloud copy")
 }
 
-// Stamps
+// Recently Deleted: tombstones, restore, delete immediately, and the 30-day purge
 do {
-    let a = syncItem("a", 1), b = syncItem("b", 1), now = syncAt(50)
-    let renamed = [LibraryItem(id: a.id, name: "a2", url: a.url, modified: a.modified), b]
-    let afterRename = LibrarySync.stamped(renamed, against: [a, b], at: now)
-    check(afterRename[0].modified == now && afterRename[1].modified == syncAt(1), "a rename stamps only that item")
-    let swapped = LibrarySync.stamped([b, a], against: [a, b], at: now)
-    check(swapped.allSatisfy { $0.modified == now }, "a move stamps the items that moved")
-    let added = LibrarySync.stamped([a, b, syncItem("c", nil)], against: [a, b], at: now)
-    check(added[2].modified == now && added[0].modified == syncAt(1), "a new item is stamped, the others are not")
-    let x = syncItem("x", 2), folder = syncItem("f", 1, children: [x])
-    var edited = folder; edited.children = [LibraryItem(id: x.id, name: "x2", url: x.url, modified: x.modified)]
-    let inside = LibrarySync.stamped([edited], against: [folder], at: now)
-    check(inside[0].children?[0].modified == now && inside[0].modified == syncAt(1), "a change inside a folder stamps the item, not the folder")
-    let encoded = try! JSONEncoder().encode([a])
-    check((try? JSONDecoder().decode([LibraryItem].self, from: encoded))?.first?.modified == syncAt(1), "the stamp is saved in bookmarks.json")
+    let now = Date(timeIntervalSince1970: 2_000_000)
+    let a = syncItem("a"), x = syncItem("x"), folder = syncItem("F", children: [x]), b = syncItem("b")
+    var c = LibrarySync.Contents(live: [a, folder, b])
+    LibrarySync.tombstone([a.id], in: &c, at: now)
+    check(c.live.map(\.name) == ["F", "b"] && c.deleted.map(\.name) == ["a"], "a deleted item moves to Recently Deleted")
+    check(c.deleted.first?.deletedDate == now && c.deleted.first?.deletedFrom == nil, "the deleted item keeps its date and no folder")
+    LibrarySync.tombstone([x.id], in: &c, at: now)
+    check(c.live[0].children?.isEmpty == true && c.deleted.last?.name == "x" && c.deleted.last?.deletedFrom == folder.id, "a deleted child remembers its folder")
+    LibrarySync.restore([x.id], in: &c)
+    check(c.live[0].children?.map(\.name) == ["x"] && c.deleted.map(\.name) == ["a"], "restore puts a child back in its folder")
+    LibrarySync.tombstone([folder.id, x.id], in: &c, at: now)
+    check(c.live.map(\.name) == ["b"] && c.deleted.map(\.name).contains("F") && c.deleted.first(where: { $0.name == "F" })?.children?.map(\.name) == ["x"],
+          "a deleted folder takes its children, and a selected child is not deleted twice")
+    LibrarySync.restore([x.id], in: &c)
+    check(c.live.map(\.name) == ["b", "F"] && c.live.last?.children?.map(\.name) == ["x"], "restoring a child restores its folder with its children")
+    LibrarySync.tombstone([folder.id], in: &c, at: now)
+    LibrarySync.deleteImmediately([folder.id], in: &c)
+    check(!c.deleted.contains { $0.name == "F" } && c.deleted.map(\.name) == ["a"], "delete immediately removes the subtree for good")
+    var old = LibrarySync.Contents(live: [], deleted: [
+        { var i = syncItem("old"); i.deletedDate = daysAgo(31, from: now); return i }(),
+        { var i = syncItem("recent"); i.deletedDate = daysAgo(29, from: now); return i }(),
+    ])
+    LibrarySync.purge(&old, now: now)
+    check(old.deleted.map(\.name) == ["recent"], "a tombstone older than 30 days is purged, a newer one is kept")
+    let file = try! LibrarySync.encode(LibrarySync.Contents(live: [a], deleted: [c.deleted.first ?? a]))
+    check(LibrarySync.decode(file)?.live.map(\.name) == ["a"] && LibrarySync.decode(file)?.deleted.count == 1, "the file keeps live items and tombstones apart on reading")
+    check(LibrarySync.decode(Data(#"[{"id":"6F1E3C2A-0000-4000-8000-000000000001","name":"old","modified":"2024-01-01T00:00:00Z","url":"https://o.example.com"}]"#.utf8))?.live.map(\.name) == ["old"],
+          "a file with the old merge stamp still loads")
 }
 
-// Merge
+// Conflicts: differences and the choices for each item
 do {
-    let id = UUID(), other = UUID()
-    let mine = syncItem("Mine", 2, id: id), theirs = syncItem("Theirs", 3, id: id)
-    let notice = LibrarySync.merge(local: [mine], remote: [theirs], lastSynced: syncAt(1), knownIDs: [id])
-    check(notice.items.map(\.name) == ["Theirs"] && notice.replacedEdits == ["Mine"], "a newer remote edit replaces an unsynced local edit, and says so")
-    let quiet = LibrarySync.merge(local: [syncItem("Old", 1, id: id)], remote: [theirs], lastSynced: syncAt(1.5), knownIDs: [id])
-    check(quiet.items.map(\.name) == ["Theirs"] && quiet.replacedEdits.isEmpty, "a synced local copy is replaced quietly")
-    let localWins = LibrarySync.merge(local: [syncItem("Local", 3, id: id)], remote: [syncItem("Remote", 2, id: id)], lastSynced: syncAt(1), knownIDs: [id])
-    check(localWins.items.map(\.name) == ["Local"] && localWins.replacedEdits.isEmpty, "a newer local edit wins without a notice")
-    let deleted = LibrarySync.merge(local: [syncItem("a", 1, id: id), syncItem("b", 1, id: other)], remote: [syncItem("a", 5, id: id)],
-                                    lastSynced: syncAt(1), knownIDs: [id, other])
-    check(deleted.items.map(\.name) == ["a"], "an item the newer side deleted stays deleted")
-    let newLocal = LibrarySync.merge(local: [syncItem("a", 1, id: id), syncItem("new", 2)], remote: [syncItem("a", 5, id: id)],
-                                     lastSynced: syncAt(1), knownIDs: [id])
-    check(newLocal.items.map(\.name) == ["a", "new"], "an item this Mac has not synced yet is kept")
-    let newRemote = LibrarySync.merge(local: [syncItem("a", 1, id: id)], remote: [syncItem("a", 1, id: id), syncItem("r", 6)],
-                                      lastSynced: syncAt(1), knownIDs: [id])
-    check(newRemote.items.map(\.name) == ["a", "r"], "an item added on the other Mac is kept")
-    let a = syncItem("a", 1), b = syncItem("b", 1)
-    let order = LibrarySync.merge(local: [a, b], remote: [b, a].map { var c = $0; c.modified = syncAt(0.5); return c }, lastSynced: syncAt(0), knownIDs: [a.id, b.id])
-    check(order.items.map(\.name) == ["a", "b"], "the side with the newer change decides the order")
+    let id = UUID(), other = UUID(), third = UUID()
+    let local = LibrarySync.Contents(live: [syncItem("A", id: id), syncItem("B", id: other)])
+    let remote = LibrarySync.Contents(live: [syncItem("A2", id: id), syncItem("C", id: third)])
+    let diffs = LibrarySync.differences(local: local, other: remote)
+    check(diffs.count == 3 && diffs.contains { $0.id == other && $0.other == "Not in this version" }, "items on one side only, and changed items, are listed")
+    check(LibrarySync.differences(local: local, other: local).isEmpty, "identical versions have no differences")
+    check(LibrarySync.resolve(local: local, other: remote, preferring: .thisMac, choices: [:]) == local, "keeping this Mac's version keeps it exactly")
+    check(LibrarySync.resolve(local: local, other: remote, preferring: .other, choices: [:]) == remote, "keeping the other version keeps it exactly")
+    let picked = LibrarySync.resolve(local: local, other: remote, preferring: .thisMac, choices: [id: .other])
+    check(picked.live.map(\.name) == ["A2", "B"], "a per-item choice takes the other version of that item only")
+    let withTrash = LibrarySync.Contents(live: [syncItem("a", id: id)], deleted: [])
+    var deletedOnOther = withTrash
+    LibrarySync.tombstone([id], in: &deletedOnOther, at: Date(timeIntervalSince1970: 5))
+    let kept = LibrarySync.resolve(local: withTrash, other: deletedOnOther, preferring: .thisMac, choices: [:])
+    check(kept.live.map(\.name) == ["a"] && kept.deleted.isEmpty, "this Mac's live item stays live when the other Mac deleted it")
+    let deletedFolder = LibrarySync.resolve(local: withTrash, other: deletedOnOther, preferring: .other, choices: [:])
+    check(deletedFolder.live.isEmpty && deletedFolder.deleted.map(\.name) == ["a"], "keeping the other version keeps its deletion")
 }
 
-// File steps on temporary folders
+// Sync state from ubiquitous keys
+check(LibrarySync.syncState(isUploading: false, isUploaded: true, downloading: .current) == .upToDate, "a current, uploaded file is up to date")
+check(LibrarySync.syncState(isUploading: true, isUploaded: true, downloading: .current) == .uploading, "an uploading file shows uploading")
+check(LibrarySync.syncState(isUploading: false, isUploaded: false, downloading: .current) == .uploading, "a file not uploaded yet shows uploading")
+check(LibrarySync.syncState(isUploading: false, isUploaded: true, downloading: .notDownloaded) == .waiting, "a file not downloaded shows waiting")
+check(LibrarySync.syncState(isUploading: false, isUploaded: true, downloading: nil) == .upToDate, "no download status is up to date")
+check(LibrarySync.syncState(of: URL(fileURLWithPath: "/tmp/not-in-icloud-\(UUID().uuidString).json")) == nil, "a file outside iCloud Drive has no sync state")
+
+// File steps and coordinated access on temporary folders
 do {
     let fm = FileManager.default
     let root = fm.temporaryDirectory.appendingPathComponent("library-sync-check-\(UUID().uuidString)", isDirectory: true)
@@ -1152,9 +1171,9 @@ do {
                                                  prompt: .move, choice: .useThisMac))
     check(LibrarySync.linkDestination(of: local) == cloud && (try? Data(contentsOf: cloud)) == Data("LOCAL".utf8), "moving links this Mac's file to iCloud")
     check(LibrarySync.isLinked(local) && !LibrarySync.isDanglingLink(local), "the link works")
-    // A save writes to the link's destination, so the link stays a link.
-    try! Data("SAVED".utf8).write(to: LibrarySync.linkDestination(of: local)!, options: .atomic)
-    check(LibrarySync.isLinked(local) && (try? Data(contentsOf: local)) == Data("SAVED".utf8), "a save through the destination keeps the link")
+    // A save writes to the link's destination, through the coordinator, so the link stays a link.
+    try! LibrarySync.write(Data("SAVED".utf8), to: LibrarySync.linkDestination(of: local)!)
+    check(LibrarySync.isLinked(local) && (try? LibrarySync.read(local)) == Data("SAVED".utf8), "a coordinated save through the destination keeps the link")
     try! LibrarySync.run(LibrarySync.disableSteps(local: local, cloud: cloud))
     check(!LibrarySync.isLinked(local) && (try? Data(contentsOf: local)) == Data("SAVED".utf8) && !fm.fileExists(atPath: cloud.path), "turning off leaves a real file and removes the iCloud copy")
 

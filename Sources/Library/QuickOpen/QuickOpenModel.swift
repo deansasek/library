@@ -63,7 +63,7 @@ final class QuickOpenModel: ObservableObject {
         self.selectedText = selectedText
         self.pastes = pastes
         // Any change to the library drops the index and the frequent list. Both are rebuilt when next needed.
-        nodesObserver = store.$nodes.dropFirst().sink { [weak self] _ in
+        nodesObserver = store.$contents.dropFirst().sink { [weak self] _ in
             self?.index = nil
             self?.nodesVersion += 1
         }

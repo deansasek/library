@@ -24,6 +24,8 @@ final class ManageState: ObservableObject {
     /// The row a drag is over, for the drop highlight.
     @Published var dropTarget: UUID?
     @Published var sheet: Sheet?
+    /// Items the user chose to delete for good. Set only after the confirmation is asked.
+    @Published var pendingPurge: Set<UUID>?
     /// The text in the window's search field. Separate from `search`, which filters the app picker.
     @Published var query = ""
     /// The search result for `query`, kept between redraws.
