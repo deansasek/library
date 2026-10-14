@@ -28,6 +28,16 @@ Library lives in your menu bar. Keep your bookmarks, apps, folders, and terminal
 
 Because you build it yourself, macOS opens it without a security warning. To update, download the new zip and run `./install.sh` again.
 
+### One command
+
+Paste this into Terminal. It downloads Library to `~/Developer/Library`, builds it, and installs it in Applications:
+
+```bash
+git clone https://github.com/deansasek/library.git ~/Developer/Library && ~/Developer/Library/install.sh
+```
+
+Run it again any time to update, or run `~/Developer/Library/update.sh`. Your library is kept.
+
 ### Clone the repository
 
 ```bash
