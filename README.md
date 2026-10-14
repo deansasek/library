@@ -10,6 +10,18 @@ Everything you open and copy, one shortcut away.
 
 Library is a menu bar app for macOS. Keep your bookmarks, apps, folders, and terminal commands in one place, and open any of them from the menu, a shortcut, or Spotlight. Library also remembers what you copy.
 
+## Features
+
+**Open anything.** Bookmarks, applications, folders, and terminal commands open from the menu bar, a keyboard shortcut, or Spotlight.
+
+**Find it fast.** Quick Open is a search panel that finds items by name, keyword, URL, or folder. It also calculates expressions, converts units, and searches the web.
+
+**Keep what you copy.** Clipboard history stores text, links, images, and files in every format you copied them in. Pin the items you need.
+
+**Shortcuts for everything.** Assign a key combination, a modified click, a scroll, a pinch, a swipe, or a hot corner to any item.
+
+**Templates.** Ask for a value each time you open an item, such as a ticket number, and insert it into a URL.
+
 ## Requirements
 
 - macOS 26 or later
@@ -25,6 +37,8 @@ cd library
 ./install.sh
 ```
 
+To update, run `git pull`, then `./install.sh` again. Your data isn't affected.
+
 To build without installing, run `./build.sh`. The app is written to `build/Library.app`.
 
 ## Getting started
@@ -32,24 +46,17 @@ To build without installing, run `./build.sh`. The app is written to `build/Libr
 1. Open Library and follow the welcome tour.
 2. Click the bookmark icon in the menu bar, or press Control-Space for Quick Open.
 3. Choose **Edit Library…** to add items. You can also drag an app or a link into the window.
+4. Turn on **Open at Login** in Settings to start Library with your Mac.
 
-## Features
+## Shortcuts
 
-- **Open anything.** Bookmarks, apps, folders, and terminal commands open from the menu, a shortcut, or Spotlight.
-- **Quick Open.** Search by name, keyword, URL, or folder. It also calculates, converts units, and searches the web.
-- **Clipboard history.** Keeps text, links, images, and files. Pin the items you need.
-- **Shortcuts.** Assign key combinations, clicks, scrolls, swipes, or hot corners to any item.
-- **Templates.** Enter a value each time you open an item, such as a ticket number.
-
-### Shortcuts
-
-- Control-click opens the menu.
+- Control and right-click opens the menu.
 - Control-Space opens Quick Open.
 - Control-Command-V opens the clipboard menu.
 
 Change them in **Settings > Shortcuts**.
 
-### From other apps
+## From other apps
 
 - **Services:** Select a link, then choose **Services > Add to Library**.
 - **URL scheme:** `open "library://open?name=Jira&value=ABC-123"` opens an item. `open "library://menu"` shows the menu.
@@ -67,7 +74,7 @@ Data is stored in `~/.library/`. Updates don't touch it.
 ## Troubleshooting
 
 - **A shortcut does nothing.** Another app may use the same keys. Check **Settings > Shortcuts** for a conflict.
-- **Open When You Log In has no effect.** Move `Library.app` to `/Applications` first.
+- **Open at Login has no effect.** Move `Library.app` to `/Applications` first.
 - **Services are missing.** Log out and back in.
 
 ## Contributing
