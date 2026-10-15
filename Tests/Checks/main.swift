@@ -1989,6 +1989,9 @@ do {
     check(!HistoryRestart.saves(kind: .text, byteCount: 10, pinned: false, keeps: false), "a copy is not saved when the setting is off")
     check(HistoryRestart.saves(kind: .text, byteCount: 10, pinned: false, keeps: true), "an unpinned copy is saved when the setting is on")
     check(!HistoryRestart.saves(kind: .text, byteCount: 10, pinned: true, keeps: true), "a pinned item is left to clipboard.json")
+    // Pinned clips are capped in total, so a pin that would pass 200 MB is refused.
+    check(HistoryRestart.canPin(byteCount: 1_000, pinnedBytes: HistoryRestart.maxPinnedBytes - 1_000), "a pin that reaches the 200 MB total is allowed")
+    check(!HistoryRestart.canPin(byteCount: 1_001, pinnedBytes: HistoryRestart.maxPinnedBytes - 1_000), "a pin that passes the 200 MB total is refused")
     check(HistoryRestart.saves(kind: .image, byteCount: HistoryRestart.maxSavedImageBytes, pinned: false, keeps: true), "an image of 5 MB is saved")
     check(!HistoryRestart.saves(kind: .image, byteCount: HistoryRestart.maxSavedImageBytes + 1, pinned: false, keeps: true), "an image over 5 MB is not saved")
     check(HistoryRestart.saves(kind: .text, byteCount: HistoryRestart.maxSavedImageBytes + 1, pinned: false, keeps: true), "the 5 MB limit is for images only")

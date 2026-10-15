@@ -7,6 +7,15 @@ enum HistoryRestart {
     /// Images over this size are never saved, so the history file stays small. Other items keep the normal item limit.
     static let maxSavedImageBytes = 5_000_000
 
+    /// The most bytes all pinned clips may hold together. Pinned clips stay in memory and are re-encoded on every pin change,
+    /// so the total is capped, not only each item.
+    static let maxPinnedBytes = 200_000_000
+
+    /// Whether one more item can be pinned, given the bytes the pinned items already hold.
+    static func canPin(byteCount: Int, pinnedBytes: Int) -> Bool {
+        pinnedBytes + byteCount <= maxPinnedBytes
+    }
+
     /// Whether an item is written to the history file. Pinned items are not, because clipboard.json already keeps them.
     /// Items that were private or from a password manager were never recorded, so they cannot reach this.
     static func saves(kind: ClipItem.Kind, byteCount: Int, pinned: Bool, keeps: Bool) -> Bool {

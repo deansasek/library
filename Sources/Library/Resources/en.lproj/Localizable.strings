@@ -422,3 +422,6 @@
 
 /* Confirmation text: the value a library:// link fills a template with. */
 "The link fills this address with: %@" = "The link fills this address with: %@";
+
+/* Shown when a clipboard item cannot be pinned because the pinned items would pass 200 MB together. */
+"Pinned clips can’t total more than 200 MB. Unpin a clip to make room." = "Pinned clips can’t total more than 200 MB. Unpin a clip to make room.";
