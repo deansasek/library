@@ -2256,5 +2256,13 @@ do {
     check(FileManager.default.fileExists(atPath: strings.path), "the English strings file is in the Resources folder the bundle is made from")
 }
 
+// A saved link is the same as a copied one when only the scheme, a trailing slash, or the case of the host differs.
+check(AddSuggestion.matchKey(LibraryItem(name: "A", url: "example.com")) == AddSuggestion.matchKey(LibraryItem(name: "B", url: "https://Example.com/")),
+      "a bare host matches the saved https address with a trailing slash")
+check(AddSuggestion.matchKey(LibraryItem(name: "A", url: "http://example.com/x")) == AddSuggestion.matchKey(LibraryItem(name: "B", url: "https://example.com/x")),
+      "http and https count as the same address")
+check(AddSuggestion.matchKey(LibraryItem(name: "A", url: "https://example.com/x?q=1")) != AddSuggestion.matchKey(LibraryItem(name: "B", url: "https://example.com/x?q=2")),
+      "a different query is a different address")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
