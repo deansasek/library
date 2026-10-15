@@ -77,8 +77,10 @@ final class QuickOpenModel: ObservableObject {
         }
         results = computeResults()
         // A copied GIF finishing its download updates the open panel.
+        // A copy added or removed changes the clip rows, so the results are recomputed too.
         historyObserver = ClipboardHistory.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] in
             self?.objectWillChange.send()
+            self?.historyChanged()
             self?.refreshPreview()
         }
         // Unlocking or locking a pinned item changes what the rows and the preview show.
@@ -123,6 +125,15 @@ final class QuickOpenModel: ObservableObject {
     /// browse list at once. Otherwise one display frame, so keystrokes that arrive together cost one search.
     nonisolated static func recomputeDelay(for query: String) -> Duration? {
         query.trimmingCharacters(in: .whitespaces).isEmpty ? nil : .milliseconds(16)
+    }
+
+    /// Recomputes the results after the clipboard history changed. The selection stays on its row when that row is still
+    /// listed, and moves to the first result when it is gone.
+    private func historyChanged() {
+        results = computeResults()
+        if let selection, !results.contains(where: { $0.id == selection }) {
+            resetSelection()
+        }
     }
 
     private func scheduleResults() {
