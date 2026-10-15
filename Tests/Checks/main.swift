@@ -280,6 +280,11 @@ check(QuickOpenIndex(nodes: qoBig).search("e", counts: [:]).count > 20, "generat
 // (cancelling the pending recompute on each keystroke) is in QuickOpenModel.scheduleResults and is not run here.
 check(QuickOpenModel.recomputeDelay(for: "") == nil && QuickOpenModel.recomputeDelay(for: "   ") == nil, "blank query recomputes at once")
 check(QuickOpenModel.recomputeDelay(for: "j") == .milliseconds(16), "typed query waits one frame")
+// Space previews only with an empty search, so a typed space reaches the field in a multi-word search.
+check(QuickOpenModel.spaceTogglesPreview(query: "", showActions: false, selectionIsClip: true), "Space previews a selected clip with an empty search")
+check(!QuickOpenModel.spaceTogglesPreview(query: "hello", showActions: false, selectionIsClip: true), "Space types while the search has text")
+check(!QuickOpenModel.spaceTogglesPreview(query: "", showActions: false, selectionIsClip: false), "Space types when the selection is not a clip")
+check(!QuickOpenModel.spaceTogglesPreview(query: "", showActions: true, selectionIsClip: true), "Space types while actions are showing")
 
 // ---- suggestions ----
 let sel = AddSuggestion.make(selection: "https://swift.org/docs", clipboard: nil, in: tree())
