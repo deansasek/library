@@ -340,3 +340,6 @@
 "blue" = "blue";
 "purple" = "purple";
 "gray" = "gray";
+
+/* VoiceOver label for a copied image in Quick Open. */
+"Copied image" = "Copied image";
