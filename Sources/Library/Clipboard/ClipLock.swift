@@ -141,6 +141,13 @@ final class ClipboardLock: ObservableObject {
     /// Turns the setting on or off from Settings. Turning it on is refused, with an explanation, when the Mac has no
     /// Touch ID or password, since the items could then never be unlocked. The toggle stays off.
     func setRequired(_ on: Bool) {
+        // Turning the lock off is a way to show every pinned item, so it needs the same authentication.
+        if !on && isRequired {
+            Task {
+                if await authenticate(for: .show) { isRequired = false }
+            }
+            return
+        }
         let decision = LockAvailability.decide(canAuthenticate: LockAuthentication.isAvailable, enabling: on,
                                                needsAuthentication: false)
         guard decision == .available else {
