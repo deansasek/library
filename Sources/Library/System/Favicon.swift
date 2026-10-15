@@ -98,12 +98,18 @@ enum Favicon {
         UserDefaults.standard.set(failures, forKey: failuresKey)
     }
 
-    private static func iconHref(in html: String) -> String? {
-        let pattern = #"<link[^>]*rel=["'](?:shortcut )?icon["'][^>]*href=["']([^"']+)["']"#
+    /// The most characters of a page that are searched for an icon link. Icon links sit in the head.
+    static let iconSearchLimit = 64 * 1024
+
+    /// The `href` of the page's icon link, read from its first 64 KB. Each attribute scan is bounded, so a tag that
+    /// never closes costs a fixed amount of work and cannot stall the parse.
+    static func iconHref(in html: String) -> String? {
+        let head = String(html.prefix(iconSearchLimit))
+        let pattern = #"<link[^>]{0,500}?rel=["'](?:shortcut )?icon["'][^>]{0,500}?href=["']([^"']{1,2048})["']"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
-              let range = Range(match.range(at: 1), in: html) else { return nil }
-        return String(html[range])
+              let match = regex.firstMatch(in: head, range: NSRange(head.startIndex..., in: head)),
+              let range = Range(match.range(at: 1), in: head) else { return nil }
+        return String(head[range])
     }
 
     private static func sized(_ image: NSImage?) -> NSImage? {
