@@ -18,16 +18,21 @@ enum Installer {
         let destination = URL(fileURLWithPath: "/Applications/\(Bundle.main.bundleURL.lastPathComponent)")
         let staging = URL(fileURLWithPath: "/Applications/.Library-\(UUID().uuidString).installing")
         let previous = URL(fileURLWithPath: "/Applications/.Library-\(UUID().uuidString).previous")
+        let replacing = fm.fileExists(atPath: destination.path)
+        // Only an older copy of this app is replaced. Another app that happens to have the same file name is left alone.
+        if replacing, Bundle(url: destination)?.bundleIdentifier != Bundle.main.bundleIdentifier {
+            showFailure(String(localized: "Applications already has a different app named Library.app. Move it out of the way yourself, then try again. Nothing was changed.", bundle: L10n.bundle))
+            return false
+        }
         do {
             try fm.copyItem(at: Bundle.main.bundleURL, to: staging)
         } catch {
             try? fm.removeItem(at: staging)
-            showFailure(error)
+            showFailure(errorDetail(error))
             return false
         }
         // Moving the older copy aside and the new copy into place are renames on the same volume. If the second
         // fails, the older copy goes back, and only then is the older copy trashed.
-        let replacing = fm.fileExists(atPath: destination.path)
         do {
             if replacing {
                 try fm.moveItem(at: destination, to: previous)
@@ -42,7 +47,7 @@ enum Installer {
             }
         } catch {
             try? fm.removeItem(at: staging)
-            showFailure(error)
+            showFailure(errorDetail(error))
             return false
         }
         if replacing {
@@ -67,13 +72,18 @@ enum Installer {
         return true
     }
 
-    /// Tells the user the move failed, and that the app can be dragged into Applications by hand.
+    /// The detail for a failed move: the error, and a note that the app can be dragged into Applications by hand.
+    private static func errorDetail(_ error: Error) -> String {
+        "\(error.localizedDescription)\n\n" + String(localized: "You can drag Library.app into your Applications folder yourself.", bundle: L10n.bundle)
+    }
+
+    /// Tells the user the move did not happen, with the reason.
     @MainActor
-    private static func showFailure(_ error: Error) {
+    private static func showFailure(_ detail: String) {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Library Couldn’t Be Moved", bundle: L10n.bundle)
-        alert.informativeText = "\(error.localizedDescription)\n\n" + String(localized: "You can drag Library.app into your Applications folder yourself.", bundle: L10n.bundle)
+        alert.informativeText = detail
         alert.runModal()
     }
 }
