@@ -57,13 +57,32 @@ if pgrep -x Library >/dev/null; then
     fail "Library is still running. Quit it from the menu bar, then try again."
 fi
 
-rm -rf /Applications/Library.app
-cp -R build/Library.app /Applications/Library.app
+# Copy the new app beside the old one in /Applications (same volume, so the moves are renames), check the copy, and only
+# then swap it in. The old copy is removed last, so a failed copy leaves the installed app as it was.
+staging="/Applications/.Library.new.$$.app"
+previous="/Applications/.Library.old.$$.app"
+trap 'rm -rf "$staging"' EXIT
+rm -rf "$staging"
+cp -R build/Library.app "$staging" || fail "the copy into Applications failed."
 
-# Check the installed copy reports the version we built, so a bad copy is caught here.
+# Check the copy reports the version we built, so a bad copy is caught before it replaces the installed app.
 built="$(defaults read "$PWD/build/Library.app/Contents/Info" CFBundleShortVersionString)"
+copied="$(defaults read "$staging/Contents/Info" CFBundleShortVersionString)"
+[[ "$built" == "$copied" ]] || fail "the copy in Applications reports version $copied, not $built."
+
+had_previous=0
+if [[ -e /Applications/Library.app ]]; then
+    mv /Applications/Library.app "$previous" || fail "the installed copy could not be moved aside."
+    had_previous=1
+fi
+if ! mv "$staging" /Applications/Library.app; then
+    if (( had_previous )); then
+        mv "$previous" /Applications/Library.app || print -u2 "The previous copy is at $previous. Move it back to Applications."
+    fi
+    fail "the new copy could not be put in place."
+fi
+rm -rf "$previous" || print -u2 "Installed, but the old copy could not be removed: $previous"
 installed="$(defaults read /Applications/Library.app/Contents/Info CFBundleShortVersionString)"
-[[ "$built" == "$installed" ]] || fail "the copy in Applications reports version $installed, not $built."
 
 # Opening the app is a convenience. A failure here does not undo a good install.
 open /Applications/Library.app 2>/dev/null || print -u2 "Installed, but Library did not open. Open it from Applications."
