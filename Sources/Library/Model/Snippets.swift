@@ -8,6 +8,16 @@ struct Snippet: Codable, Identifiable, Equatable {
     var text: String
     /// Extra words that find the snippet in Quick Open, separated by spaces.
     var keywords: String?
+
+    /// This edit's changes, compared with `base`, applied to `current`. A field this edit did not change keeps the
+    /// value in `current`.
+    func applying(changesFrom base: Snippet, to current: Snippet) -> Snippet {
+        var result = current
+        if name != base.name { result.name = name }
+        if text != base.text { result.text = text }
+        if keywords != base.keywords { result.keywords = keywords }
+        return result
+    }
 }
 
 /// The saved snippets, in snippets.json in the library folder.
@@ -52,11 +62,15 @@ final class SnippetStore: ObservableObject {
         save()
     }
 
-    /// Replaces the snippet with the same id.
-    func update(_ snippet: Snippet) {
-        guard !saveBlocked, let index = snippets.firstIndex(where: { $0.id == snippet.id }) else { return }
-        snippets[index] = snippet
+    /// Saves an edit. `base` is the snippet as the editor opened it. Fields this edit did not change keep the value the
+    /// stored snippet has now, so an edit made in another window is kept. Returns false, and changes nothing, when the
+    /// snippet was removed or saving is blocked.
+    @discardableResult
+    func update(_ snippet: Snippet, changedFrom base: Snippet) -> Bool {
+        guard !saveBlocked, let index = snippets.firstIndex(where: { $0.id == snippet.id }) else { return false }
+        snippets[index] = snippet.applying(changesFrom: base, to: snippets[index])
         save()
+        return true
     }
 
     func remove(_ ids: Set<UUID>) {

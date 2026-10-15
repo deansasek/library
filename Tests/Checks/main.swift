@@ -362,10 +362,26 @@ savedSnippets.add(Snippet(name: "Sig", text: "Thanks,\nDean"))
 let reopenedSnippets = SnippetStore(file: snippetFile)
 check(reopenedSnippets.snippets.map(\.name) == ["Sig"] && reopenedSnippets.snippets.first?.text == "Thanks,\nDean", "snippets reload from snippets.json")
 check((try? Data(contentsOf: snippetFile))?.range(of: Data("Dean".utf8)) != nil, "snippets are plain text in snippets.json, not encrypted")
-var renamedSnippet = savedSnippets.snippets[0]
+let openedSnippet = savedSnippets.snippets[0]
+var renamedSnippet = openedSnippet
 renamedSnippet.name = "Signature"
-savedSnippets.update(renamedSnippet)
+savedSnippets.update(renamedSnippet, changedFrom: openedSnippet)
 check(SnippetStore(file: snippetFile).snippets.first?.name == "Signature", "an edit is saved")
+// An editor saves only the fields it changed, so an edit made in another window is kept.
+let mergeBase = Snippet(name: "Address", text: "1 Main St", keywords: "home")
+let mergeStore = SnippetStore(file: nil)
+mergeStore.add(mergeBase)
+var otherWindowEdit = mergeBase
+otherWindowEdit.name = "Home address"
+mergeStore.update(otherWindowEdit, changedFrom: mergeBase)
+var editorEdit = mergeBase
+editorEdit.text = "2 Main St"
+check(mergeStore.update(editorEdit, changedFrom: mergeBase), "an edit of a snippet that still exists is saved")
+check(mergeStore.snippets.first?.name == "Home address" && mergeStore.snippets.first?.text == "2 Main St"
+      && mergeStore.snippets.first?.keywords == "home", "a save keeps the fields another window changed")
+mergeStore.remove([mergeBase.id])
+check(!mergeStore.update(editorEdit, changedFrom: mergeBase) && mergeStore.snippets.isEmpty,
+      "an edit of a removed snippet is refused, so its text stays in the editor")
 savedSnippets.remove([renamedSnippet.id])
 check(SnippetStore(file: snippetFile).snippets.isEmpty, "a delete is saved")
 let damagedSnippetFile = snippetDir.appendingPathComponent("damaged-snippets.json")
