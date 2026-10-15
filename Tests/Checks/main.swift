@@ -1161,13 +1161,26 @@ check(dateReads == 2, "a date is read again after five seconds")
 _ = dateCache.modified(at: "/b.app", now: 5_000_000_001, read: readDate)
 check(dateReads == 3, "each path has its own date")
 
-// ---- Search result kept between redraws ----
-let searchCache = SearchCache()
+// ---- Window rows kept between redraws ----
+let listingCache = ManageListingCache()
+var listingBuilds = 0
+@MainActor func listingFor(_ query: String, revision: Int, usage: Int = 0, sort: ManageState.SortKey? = nil, ascending: Bool = true,
+                           nodes: [LibraryItem]) -> ManageListing {
+    listingCache.listing(for: .init(query: query, scope: .all, revision: revision, usage: usage, sort: sort, ascending: ascending)) {
+        listingBuilds += 1
+        return ManageListing.build(query: query, scope: .all, nodes: nodes, deleted: [], sort: sort, ascending: ascending,
+                                   counts: [:], opened: [:])
+    }
+}
 let searchedTree = tree()
-check(searchCache.result(for: "jira", revision: 1, in: searchedTree).count == 1, "cached search counts bookmarks")
-check(searchCache.result(for: "jira", revision: 1, in: []).count == 1, "same query and library reuse the search")
-check(searchCache.result(for: "jira", revision: 2, in: []).count == 0, "a changed library searches again")
-check(searchCache.result(for: "docs", revision: 2, in: searchedTree).tree.leaves.map(\.name) == ["Docs"], "a changed query searches again")
+check(listingFor("jira", revision: 1, nodes: searchedTree).count == 1, "cached search counts bookmarks")
+check(listingFor("jira", revision: 1, nodes: []).count == 1 && listingBuilds == 1, "same query, library, and sort reuse the rows")
+check(listingFor("jira", revision: 2, nodes: []).count == 0 && listingBuilds == 2, "a changed library builds the rows again")
+check(listingFor("docs", revision: 2, nodes: searchedTree).tree.leaves.map(\.name) == ["Docs"], "a changed query builds the rows again")
+check(listingFor("docs", revision: 2, usage: 1, nodes: searchedTree).count == 1 && listingBuilds == 4, "a change to open counts builds the rows again")
+check(listingFor("", revision: 3, sort: .name, nodes: searchedTree).tree.map(\.name) == ["Work", "Apps", "Safari"], "a name sort lists folders first, then ascending")
+check(listingFor("", revision: 3, sort: .name, ascending: false, nodes: searchedTree).tree.map(\.name) == ["Work", "Safari", "Apps"],
+      "a descending sort reverses the order")
 
 // ---- App Intents logic: no Shortcuts needed ----
 let intentNodes = [
@@ -2497,10 +2510,10 @@ check(scopedTree.matching("work", scope: .bookmarks).leaves.map(\.name) == ["Jir
 check(scopedTree.matching("docs", scope: .folders).isEmpty, "the Folders scope shows no bookmarks for a query")
 check(scopedTree.searchSuggestions(for: "") == [] && scopedTree.searchSuggestions(for: "doc") == ["Docs"],
       "suggestions are names that match the query, and none for an empty query")
-let cache = SearchCache()
-check(cache.result(for: "", scope: .apps, revision: 1, in: scopedTree).count == 1
-      && cache.result(for: "", scope: .folders, revision: 1, in: scopedTree).count == 2,
-      "the cached result follows the scope")
+@MainActor func rowsCount(_ scope: SearchScope) -> Int {
+    ManageListing.build(query: "", scope: scope, nodes: scopedTree, deleted: [], sort: nil, ascending: true, counts: [:], opened: [:]).count
+}
+check(rowsCount(.apps) == 1 && rowsCount(.folders) == 2, "the rows follow the scope")
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

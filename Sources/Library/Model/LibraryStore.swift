@@ -37,6 +37,8 @@ final class LibraryStore: ObservableObject {
     var deleted: [LibraryItem] { contents.deleted }
     /// Counts every change to `nodes` and `deleted`, so a cached search knows when the library changed.
     private(set) var revision = 0
+    /// Counts every open, which changes Most Used and Recently Opened, so cached orders know when to rebuild.
+    private(set) var usageRevision = 0
     /// The fields of `nodes` that the follow-up work depends on. Matches `nodes` at all times.
     private var fingerprint = TreeFingerprint([])
     @Published private var icons: [String: NSImage] = [:]
@@ -475,6 +477,7 @@ final class LibraryStore: ObservableObject {
         UserDefaults.standard.set(openCounts, forKey: "openCounts")
         lastOpened[id.uuidString] = .now
         UserDefaults.standard.set(lastOpened, forKey: "lastOpened")
+        usageRevision += 1
     }
 
     /// Renames a bookmark to the title of its page, but only while it still has the host it was added with, so a

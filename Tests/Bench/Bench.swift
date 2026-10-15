@@ -53,9 +53,18 @@ func runBenchmark() {
     timeIt("search filter, query \"topic7\" (matches many)") { _ = library.matching("topic7") }
     timeIt("search filter, query \"zzz\" (no match)") { _ = library.matching("zzz") }
     timeIt("search filter, empty query") { _ = library.matching("") }
-    let cache = SearchCache()
-    _ = cache.result(for: "topic7", revision: 1, in: library)
-    timeIt("search, same query on a redraw (cached)") { _ = cache.result(for: "topic7", revision: 1, in: library) }
+    let cache = ManageListingCache()
+    let listingKey = ManageListingCache.Key(query: "topic7", scope: .all, revision: 1, usage: 0, sort: .name, ascending: true)
+    func listing() -> ManageListing {
+        cache.listing(for: listingKey) {
+            ManageListing.build(query: "topic7", scope: .all, nodes: library, deleted: [], sort: .name, ascending: true, counts: [:], opened: [:])
+        }
+    }
+    timeIt("rows, sort by name (built)") {
+        _ = ManageListing.build(query: "topic7", scope: .all, nodes: library, deleted: [], sort: .name, ascending: true, counts: [:], opened: [:])
+    }
+    _ = listing()
+    timeIt("rows, same query and sort on a redraw (cached)") { _ = listing() }
     var renamed = library
     renamed[0].children![0].name = "Renamed"
     let before = TreeFingerprint(library)
