@@ -11,8 +11,10 @@ struct LibraryApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Library", systemImage: "bookmark") {
+        MenuBarExtra {
             MenuContent(store: store)
+        } label: {
+            MenuBarLabel()
         }
         Window("Library", id: "manage") {
             ManageView(store: store)
@@ -27,6 +29,21 @@ struct LibraryApp: App {
             ManageCommands(store: store)
             HelpCommands(store: store)
         }
+        Window("Welcome to Library", id: Welcome.windowID) {
+            WelcomeScene()
+        }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultLaunchBehavior(.suppressed)
+        .handlesExternalEvents(matching: [])
+        Window("Snippet", id: SnippetEditorWindow.windowID) {
+            SnippetEditorScene()
+        }
+        .windowResizability(.contentSize)
+        // The form's text belongs to the snippet it was opened for, so the window does not reopen on launch.
+        .restorationBehavior(.disabled)
+        .defaultLaunchBehavior(.suppressed)
+        .handlesExternalEvents(matching: [])
         Settings {
             SettingsView(store: store)
         }

@@ -15,7 +15,7 @@ struct HelpCommands: Commands {
             Button("Library Help") { NSWorkspace.shared.open(Self.guide) }
             Button("Keyboard Shortcuts") { NSWorkspace.shared.open(Self.shortcuts) }
             Divider()
-            Button("Welcome Tour…") { Welcome.show(store: store) }
+            Button("Welcome Tour…") { Welcome.show() }
             Divider()
             Button("Report an Issue…") { NSWorkspace.shared.open(Self.issues) }
             Divider()

@@ -204,27 +204,28 @@ final class SnippetListModel: ObservableObject {
     @Published var editing: Editing?
 }
 
-/// Opens one snippet form in its own window: File > New Snippet, and Edit in Quick Open.
+/// Opens one snippet form in its own window: File > New Snippet, and Edit in Quick Open. The window is single-instance,
+/// so an editor that is already open is brought forward with the text it holds, which may not be saved yet.
 @MainActor
 enum SnippetEditorWindow {
-    private static var window: NSWindow?
+    static let windowID = "snippet"
+    /// The snippet the window's form opens with. Nil is a new snippet.
+    private(set) static var snippet: Snippet?
 
     static func show(_ snippet: Snippet?) {
-        // An editor that is already open may hold text not yet saved. Bring it forward instead of closing it.
-        if let window, window.isVisible || window.isMiniaturized {
-            if window.isMiniaturized { window.deminiaturize(nil) }
-            NSApp.activate(ignoringOtherApps: true)
-            window.makeKeyAndOrderFront(nil)
-            return
-        }
-        let window = NSWindow(contentViewController: NSHostingController(
-            rootView: SnippetForm(snippet: snippet) { SnippetEditorWindow.window?.close() }))
-        window.title = snippet == nil ? "New Snippet" : "Edit Snippet"
-        window.styleMask = [.titled, .closable]
-        window.isReleasedWhenClosed = false
-        window.center()
+        self.snippet = snippet
+        SceneOpener.open(windowID)
         NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
-        self.window = window
+    }
+}
+
+/// The content of the snippet editor window scene.
+struct SnippetEditorScene: View {
+    @Environment(\.dismissWindow) private var dismissWindow
+
+    var body: some View {
+        let snippet = SnippetEditorWindow.snippet
+        SnippetForm(snippet: snippet) { dismissWindow(id: SnippetEditorWindow.windowID) }
+            .navigationTitle(snippet == nil ? "New Snippet" : "Edit Snippet")
     }
 }
