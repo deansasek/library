@@ -114,7 +114,7 @@ struct NodeRow: View {
             return ("wifi.exclamationmark",
                     String(localized: "Unreachable link. Library could not reach the site when it last checked it.", bundle: L10n.bundle),
                     String(localized: "unreachable link", bundle: L10n.bundle))
-        case .ok, nil:
+        case .ok, .unknown, nil:
             return nil
         }
     }

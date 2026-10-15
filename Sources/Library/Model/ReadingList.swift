@@ -3,6 +3,13 @@ import Foundation
 /// Where a bookmark stands in the Reading List. An item with no state is not in the list.
 enum ReadLaterState: String, Codable {
     case unread, read
+    /// A value a newer version wrote. Decoding it does not fail the whole library; it is shown as unread.
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = ReadLaterState(rawValue: raw) ?? .unknown
+    }
 }
 
 /// The Reading List: bookmarks marked to read later. Unread items come before read ones.
