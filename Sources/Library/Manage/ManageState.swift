@@ -140,6 +140,8 @@ final class ManageState: ObservableObject {
         appSelection = nil
         showsOpenAll = true
         keepChoices = [:]
+        // The folder from an earlier sheet may have been deleted or moved since, so each sheet starts at the top level.
+        folderID = nil
         recordingIndex = nil
         showIconPicker = false
         iconSearch = ""
