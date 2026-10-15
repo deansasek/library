@@ -58,8 +58,9 @@ enum LibraryBackup {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let header = try? decoder.decode(Header.self, from: data) else {
-            // A bare array has no header. It is accepted only if its items decode.
-            guard let items = try? decoder.decode([LibraryItem].self, from: data) else {
+            // A bare array has no header. It is accepted only if its items decode. bookmarks.json is written with the
+            // default date strategy (see LibrarySync.encode), so that is tried first; ISO 8601 is the fallback.
+            guard let items = bareItems(data) else {
                 return .failure(.malformed)
             }
             return unique(withoutLoginCommands(items))
@@ -72,6 +73,15 @@ enum LibraryBackup {
             return .failure(.malformed)
         }
         return unique(withoutLoginCommands(envelope.items))
+    }
+
+    /// Decodes a bare bookmarks.json array, trying the date strategy the encoder uses first, then the other one.
+    static func bareItems(_ data: Data) -> [LibraryItem]? {
+        let defaultDates = JSONDecoder()
+        if let items = try? defaultDates.decode([LibraryItem].self, from: data) { return items }
+        let isoDates = JSONDecoder()
+        isoDates.dateDecodingStrategy = .iso8601
+        return try? isoDates.decode([LibraryItem].self, from: data)
     }
 
     /// A file someone else sent can mark a terminal command to run at login. The mark is removed on read, so it runs at

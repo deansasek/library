@@ -1529,6 +1529,23 @@ if let bare = try? JSONEncoder().encode(backupTree) {
     } else { check(false, "bare array decodes") }
     check(backupError(Data(bare.prefix(bare.count - 40))) == .malformed, "truncated bookmarks.json array is rejected")
 }
+// A bookmarks.json copy with Recently Deleted items: the deletedDate is written by the default strategy.
+var bareTrashed = LibraryItem(name: "Gone", url: "https://gone.example.com")
+bareTrashed.deletedDate = Date(timeIntervalSince1970: 1_700_000_000)
+if let bareWithTrash = try? JSONEncoder().encode(backupTree + [bareTrashed]) {
+    if case .success(let items) = LibraryBackup.decode(bareWithTrash) {
+        check(items.allIDs == (backupTree + [bareTrashed]).allIDs, "bookmarks.json with Recently Deleted items restores")
+        check(LibraryBackup.restorable(items, avoiding: []).allIDs == backupTree.allIDs, "restore keeps the live items only")
+    } else { check(false, "bookmarks.json with Recently Deleted items decodes") }
+}
+// A bare array written with ISO 8601 dates still restores through the fallback.
+let isoEncoder = JSONEncoder()
+isoEncoder.dateEncodingStrategy = .iso8601
+if let isoBare = try? isoEncoder.encode(backupTree + [bareTrashed]) {
+    if case .success(let items) = LibraryBackup.decode(isoBare) {
+        check(items.allIDs == (backupTree + [bareTrashed]).allIDs, "bare array with ISO 8601 dates restores")
+    } else { check(false, "bare array with ISO 8601 dates decodes") }
+}
 check(backupError(Data(#"{"format":"other-app","version":1,"items":[]}"#.utf8)) == .wrongFormat, "wrong format is rejected")
 check(backupError(Data(#"{"version":1,"items":[]}"#.utf8)) == .wrongFormat, "missing format is rejected")
 check(backupError(Data(#"{"format":"library-backup","version":2,"items":[]}"#.utf8)) == .unsupportedVersion(2), "future version is rejected")
