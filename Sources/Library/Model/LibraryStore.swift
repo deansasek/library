@@ -352,6 +352,13 @@ final class LibraryStore: ObservableObject {
         undoManager?.removeAllActions()
         guard writeLibrary() else { return }
         guard !versions.isEmpty else { return }
+        // Keep a copy of every conflict version first. If the copy fails, the versions stay for the next check.
+        do {
+            try LibrarySync.preserve(versions, in: Self.dir.appendingPathComponent("conflict-backups"))
+        } catch {
+            reportSaveFailure("Library couldn’t keep a copy of the other iCloud versions, so they were left in place. \(error.localizedDescription)")
+            return
+        }
         do {
             try LibrarySync.resolveConflicts(versions, at: Self.dataFile)
         } catch {
