@@ -2222,5 +2222,13 @@ do {
     if case .clips(_, let migrated) = PinnedFile.read(oldBytes, key: sealKey), migrated {} else { check(false, "a file sealed before the kinds opens and is saved again") }
 }
 
+// An address is a scheme only with // after the colon, or a slashless scheme such as mailto or tel. A host with a path
+// after its colon gets https://.
+check(LibraryItem(name: "W", url: "wiki.corp:team").link?.scheme != "wiki.corp", "a host with a non-numeric path after a colon is not taken for a scheme")
+check(LibraryItem(name: "L", url: "localhost:8080").link?.absoluteString == "https://localhost:8080", "a host with a port gets https")
+check(LibraryItem(name: "T", url: "tel:5551234567").link?.absoluteString == "tel:5551234567", "tel keeps its number")
+check(LibraryItem(name: "M", url: "mailto:123@example.com").link?.absoluteString == "mailto:123@example.com", "mailto keeps its address")
+check(LibraryItem(name: "O", url: "obsidian://open?vault=x").link?.absoluteString == "obsidian://open?vault=x", "a scheme with // is kept")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
