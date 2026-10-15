@@ -683,10 +683,33 @@ final class LibraryStore: ObservableObject {
         undoManager?.registerUndo(withTarget: self) { store in
             MainActor.assumeIsolated {
                 let name = store.undoManager?.undoActionName ?? ""
-                store.contents = snapshot
+                store.contents = store.keepingLinkStatuses(of: snapshot)
                 store.undoManager?.setActionName(name)
             }
         }
+    }
+
+    /// The snapshot with the link check results the library holds now. A check is not an edit, so undo and redo keep
+    /// the results that came after the snapshot was taken.
+    private func keepingLinkStatuses(of snapshot: LibrarySync.Contents) -> LibrarySync.Contents {
+        var current: [UUID: LinkStatus?] = [:]
+        func collect(_ items: [LibraryItem]) {
+            for item in items {
+                current[item.id] = item.linkStatus
+                collect(item.children ?? [])
+            }
+        }
+        collect(contents.live)
+        collect(contents.deleted)
+        func apply(_ items: [LibraryItem]) -> [LibraryItem] {
+            items.map { item in
+                var kept = item
+                if let status = current[item.id] { kept.linkStatus = status }
+                kept.children = item.children.map(apply)
+                return kept
+            }
+        }
+        return LibrarySync.Contents(live: apply(snapshot.live), deleted: apply(snapshot.deleted))
     }
 
     /// Writes soon after the last change, so typing a name does not write the file for every key.
