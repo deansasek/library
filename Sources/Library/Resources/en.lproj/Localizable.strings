@@ -314,6 +314,9 @@
 /* Alert or dialog text. */
 "You can drag Library.app into your Applications folder yourself." = "You can drag Library.app into your Applications folder yourself.";
 
+/* Alert or dialog text. */
+"Applications already has a different app named Library.app. Move it out of the way yourself, then try again. Nothing was changed." = "Applications already has a different app named Library.app. Move it out of the way yourself, then try again. Nothing was changed.";
+
 /* VoiceOver label for a Manage row: the shortcut that opens it, such as "⌘⇧K". */
 "shortcut %@" = "shortcut %@";
 
