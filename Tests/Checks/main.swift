@@ -2078,5 +2078,10 @@ undoLog.redo()
 check(undoStore.nodes.map(\.name) == ["B", "A", "C"], "Redo still moves B before A: \(undoStore.nodes.map(\.name))")
 try? FileManager.default.removeItem(at: storeHome)
 
+// A thumbnail is made only from a picture whose header size is reasonable.
+check(ClipboardHistory.thumbnailSizeAllowed(width: 5120, height: 2880), "a 5K screenshot gets a thumbnail")
+check(!ClipboardHistory.thumbnailSizeAllowed(width: 40_000, height: 40_000), "a picture with a huge header size gets none")
+check(!ClipboardHistory.thumbnailSizeAllowed(width: 0, height: 100) && !ClipboardHistory.thumbnailSizeAllowed(width: -1, height: 100), "a picture with no size gets none")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
