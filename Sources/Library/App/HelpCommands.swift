@@ -4,14 +4,15 @@ import SwiftUI
 struct HelpCommands: Commands {
     let store: LibraryStore
 
-    static let readme = URL(string: "https://github.com/deansasek/library#readme")!
-    static let shortcuts = URL(string: "https://github.com/deansasek/library#shortcuts")!
+    /// The guide is on the website, so it can be searched, linked, and read offline after the first visit.
+    static let guide = URL(string: "https://deansasek.github.io/library-site/guide/")!
+    static let shortcuts = URL(string: "https://deansasek.github.io/library-site/guide/find-and-open/#shortcuts")!
     static let issues = URL(string: "https://github.com/deansasek/library/issues/new")!
     static let support = URL(string: "https://buymeacoffee.com/deansasek")!
 
     var body: some Commands {
         CommandGroup(replacing: .help) {
-            Button("Library Help") { NSWorkspace.shared.open(Self.readme) }
+            Button("Library Help") { NSWorkspace.shared.open(Self.guide) }
             Button("Keyboard Shortcuts") { NSWorkspace.shared.open(Self.shortcuts) }
             Divider()
             Button("Welcome Tour…") { Welcome.show(store: store) }
