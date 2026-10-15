@@ -2174,5 +2174,14 @@ do {
     check(!BookmarkImport.isAlreadyImported(LibraryItem(name: "Empty", children: []), in: saved), "an import with no links is not a repeat")
 }
 
+// The calendar event file is written for this user only, and stays until the system clears the temporary folder.
+do {
+    let eventURL = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-event-\(UUID().uuidString).ics")
+    check(SmartText.writeOwnerOnly("BEGIN:VCALENDAR", to: eventURL), "the event file is written")
+    let mode = (try? FileManager.default.attributesOfItem(atPath: eventURL.path))?[.posixPermissions] as? Int
+    check(mode == 0o600 && (try? String(contentsOf: eventURL, encoding: .utf8)) == "BEGIN:VCALENDAR", "the event file is readable by this user only")
+    try? FileManager.default.removeItem(at: eventURL)
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

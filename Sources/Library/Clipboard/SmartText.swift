@@ -78,21 +78,19 @@ enum SmartText {
     }
 
     /// Writes the event to a temporary .ics file and opens it, so Calendar shows its add-event sheet. The file is
-    /// removed a few seconds later, after Calendar has had time to read it.
+    /// left in the temporary folder, where the system clears it, because Calendar may read it at any time after the
+    /// open. It is readable by this user only.
     @MainActor
     static func openInCalendar(text: String, date: DetectedDate) {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("Library-Event-\(UUID().uuidString).ics")
         let event = calendarEvent(text: text, date: date, created: Date(), uid: UUID().uuidString)
-        do {
-            try event.write(to: url, atomically: true, encoding: .utf8)
-        } catch {
-            return
-        }
+        guard writeOwnerOnly(event, to: url) else { return }
         NSWorkspace.shared.open(url)
-        Task {
-            try? await Task.sleep(for: .seconds(5))
-            try? FileManager.default.removeItem(at: url)
-        }
+    }
+
+    /// Writes `text` to `url` with permissions that let only this user read it. False when the file is not written.
+    static func writeOwnerOnly(_ text: String, to url: URL) -> Bool {
+        FileManager.default.createFile(atPath: url.path, contents: Data(text.utf8), attributes: [.posixPermissions: 0o600])
     }
 
     /// A date as UTC in iCalendar form, such as 20261225T143000Z.
