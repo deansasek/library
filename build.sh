@@ -60,8 +60,12 @@ cat > "$app/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+# A malformed Info.plist would be installed and fail only at launch, so it is checked before anything is signed.
+plutil -lint "$app/Contents/Info.plist"
 # A fixed requirement keeps macOS permissions (Accessibility) valid across rebuilds. A plain ad-hoc
 # signature changes on every build, which silently revokes them.
 codesign --force --sign - --identifier com.deansasek.library \
     -r='designated => identifier "com.deansasek.library"' "$app"
+# A bad signature would be refused by macOS on another Mac, so the strict check runs before the build is reported.
+codesign --verify --strict --verbose=2 "$app"
 echo "Built $app"
