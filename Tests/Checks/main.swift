@@ -480,6 +480,19 @@ MainActor.assumeIsolated {
     check(AppDelegate.item(named: "Deploy", in: items) == nil, "a command is never opened by name")
 }
 
+// ---- a library:// link asks before it opens an app with arguments or fills a template ----
+do {
+    let bookmark = LibraryItem(name: "Jira", url: "https://jira.example.com")
+    let plainApp = LibraryItem(name: "Safari", appPath: "/Applications/Safari.app")
+    let argsApp = LibraryItem(name: "Chrome", appPath: "/Applications/Chrome.app", arguments: "--profile Work")
+    let blankArgsApp = LibraryItem(name: "Blank", appPath: "/Applications/Blank.app", arguments: "   ")
+    let template = LibraryItem(name: "Ticket", url: "tickets.example.com/browse/{}")
+    check(!linkOpenNeedsConfirmation(bookmark, value: nil) && !linkOpenNeedsConfirmation(bookmark, value: "x"), "a bookmark opens without a prompt")
+    check(!linkOpenNeedsConfirmation(plainApp, value: nil) && !linkOpenNeedsConfirmation(blankArgsApp, value: nil), "a plain app opens without a prompt")
+    check(linkOpenNeedsConfirmation(argsApp, value: nil), "an app with arguments asks")
+    check(linkOpenNeedsConfirmation(template, value: "ABC-123") && !linkOpenNeedsConfirmation(template, value: nil), "a template filled from the link asks, and an empty one does not")
+}
+
 // ---- Services: apps and folders dropped from Finder ----
 MainActor.assumeIsolated {
     let base = FileManager.default.temporaryDirectory.appendingPathComponent("library-services-\(UUID().uuidString)")
