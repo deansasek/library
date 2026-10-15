@@ -390,6 +390,22 @@ let movedSnippets = SnippetStore(file: damagedSnippetFile)
 check(movedSnippets.snippets.isEmpty && !FileManager.default.fileExists(atPath: damagedSnippetFile.path)
       && FileManager.default.fileExists(atPath: snippetDir.appendingPathComponent("snippets-damaged.json").path),
       "a damaged snippets file is moved aside, not read as snippets")
+// snippets.json records its format version. A bare list from before the version was added still loads.
+let versionedData = (try? Data(contentsOf: snippetFile)) ?? Data()
+let versionedObject = (try? JSONSerialization.jsonObject(with: versionedData)) as? [String: Any]
+check(versionedObject?["version"] as? Int == 1 && versionedObject?["snippets"] is [Any],
+      "snippets.json is saved with a format version")
+let legacySnippetFile = snippetDir.appendingPathComponent("legacy-snippets.json")
+try? JSONEncoder().encode([Snippet(name: "Old", text: "Kept")]).write(to: legacySnippetFile)
+check(SnippetStore(file: legacySnippetFile).snippets.map(\.name) == ["Old"], "a snippets file without a version still loads")
+// A file from a newer release is left as it is, and saving is blocked so it is not overwritten.
+let newerSnippetFile = snippetDir.appendingPathComponent("newer-snippets.json")
+let newerText = Data(#"{"version": 2, "snippets": [], "groups": []}"#.utf8)
+try? newerText.write(to: newerSnippetFile)
+let newerSnippets = SnippetStore(file: newerSnippetFile)
+newerSnippets.add(Snippet(name: "Blocked", text: "Not saved"))
+check(newerSnippets.saveBlocked && newerSnippets.snippets.isEmpty && (try? Data(contentsOf: newerSnippetFile)) == newerText,
+      "a snippets file from a newer release is not changed")
 // A snippets.json that exists but cannot be read (a directory here) blocks saving: changes do nothing and nothing is written.
 let blockedSnippetFile = snippetDir.appendingPathComponent("blocked-snippets.json")
 try? FileManager.default.createDirectory(at: blockedSnippetFile, withIntermediateDirectories: true)
