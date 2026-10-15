@@ -6,7 +6,7 @@
 
 <p><strong>Everything you open and copy, one shortcut away.</strong></p>
 
-<p><a href="https://getlibrary.app">getlibrary.app</a> · <a href="https://github.com/deansasek/library-site">Website source</a></p>
+<p><a href="https://github.com/deansasek/library-site">Website source</a></p>
 
 </div>
 
