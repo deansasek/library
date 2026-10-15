@@ -53,6 +53,19 @@ enum Installer {
         if replacing {
             try? fm.trashItem(at: previous, resultingItemURL: nil)
         }
+        // Opening the new copy while this one runs would just bring this one forward, and a copy that is in the
+        // Trash cannot open at all. So a helper process waits a moment, until this app has quit, and opens the
+        // new copy as a fresh launch. It starts before the login item or the running copy is touched: if it cannot
+        // start, this copy keeps running and the login item is left as it was.
+        let relaunch = Process()
+        relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+        relaunch.arguments = ["-c", "sleep 0.6; /usr/bin/open -n \"$0\"", destination.path]
+        do {
+            try relaunch.run()
+        } catch {
+            showFailure(String(localized: "Library was copied to Applications, but the new copy could not be started. This copy keeps running. Open Library from Applications.", bundle: L10n.bundle))
+            return false
+        }
         // The new copy opens the tour on its last page, so the green check closes the loop.
         UserDefaults.standard.set(true, forKey: "resumeWelcomeAfterMove")
         // The login item remembers the app's old location, so the new copy turns it on again.
@@ -60,13 +73,6 @@ enum Installer {
             UserDefaults.standard.set(true, forKey: "reenableLoginItemAfterMove")
             LoginItem.shared.set(false)
         }
-        // Opening the new copy while this one runs would just bring this one forward, and a copy that is in the
-        // Trash cannot open at all. So a helper process waits a moment, until this app has quit, and opens the
-        // new copy as a fresh launch.
-        let relaunch = Process()
-        relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
-        relaunch.arguments = ["-c", "sleep 0.6; /usr/bin/open -n \"$0\"", destination.path]
-        try? relaunch.run()
         try? fm.trashItem(at: Bundle.main.bundleURL, resultingItemURL: nil)
         NSApp.terminate(nil)
         return true
