@@ -2197,5 +2197,10 @@ check(SmartTitle.mayFetch(URL(string: "https://example.com/docs")!) && !SmartTit
       "an address with a query is not asked for its page")
 check(!SmartTitle.mayFetch(URL(string: "file:///Applications/X.app")!), "a non-web address is not asked for its page")
 
+// The paste key is the key that types V on the current layout; QWERTY's key 9 when none does.
+check(FrontApp.keyCode(typing: "v", character: { $0 == 47 ? "v" : "x" }) == 47, "the key that types V is found on another layout")
+check(FrontApp.keyCode(typing: "v", character: { _ in nil }) == 9, "with no layout, the QWERTY V key is used")
+check(FrontApp.keyCode(typing: "v", character: { $0 == 9 ? "V" : nil }) == 9, "the letter is compared without case")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
