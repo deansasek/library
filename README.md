@@ -77,6 +77,7 @@ Library remembers what you copy, including text, links, images, and files, in ev
 - Copy as lower or upper case, trimmed, or with its lines joined. Copy a bookmark as a Markdown link.
 - Type `from Safari` in Quick Open to see only what you copied in Safari.
 - Build a paste queue, then paste the items one at a time, in order.
+- To keep unpinned history after you quit, turn on **Keep clipboard history across restarts** in [Settings](#settings). It is off by default, and turning it off deletes the saved history.
 
 Library skips anything a password manager marks as private, and copies over 25 MB.
 
@@ -97,6 +98,7 @@ Choose **Edit Library…** to manage everything in one window.
 - Right-click a row to open it, show it in Finder, get info, rename, move, share, or delete it.
 - Find and merge duplicate bookmarks from **File > Find Duplicates…**.
 - Import bookmarks from Safari or Chrome with **File > Import Bookmarks…**. They go into one folder, and ⌘Z undoes the import.
+- Add a [note](#add-notes) to any item in Get Info, or add a bookmark to the [Reading List](#read-later).
 - Use ⌘Z to undo and ⇧⌘Z to redo.
 
 ### Edit an item
@@ -138,11 +140,11 @@ The defaults are Control and right-click for the menu, Control-Space for Quick O
 
 ## Smart features
 
-Library works out what you copied and what you are doing, so the next step is one choice away.
+Library looks at what you copy and offers the actions that fit it. Detection runs on your Mac.
 
-- **Smart actions.** Text with an address, a phone number, or a date gets **Open in Maps**, **Copy Phone Number**, or **Add to Calendar** in Quick Open, under Tab. Detection happens on your Mac.
+- **Smart actions.** Text with an address, a phone number, or a date gets **Open in Maps**, **Copy Phone Number**, or **Add to Calendar** in Quick Open, under Tab.
 - **Smart Punctuation.** In **Copy as**, turn straight quotes and dashes into curly quotes, apostrophes, em dashes, and ellipses.
-- **Smart titles.** Turn on **Name New Bookmarks from Their Pages** in **Settings > General** (off by default), and a new bookmark takes the title of its page. Library reads only the start of the page, and it requests each new bookmark's page once.
+- **Smart titles.** Turn on **Name new bookmarks from their pages** in **Settings > General** (off by default), and a new bookmark takes the title of its page. Library reads only the start of the page, and it requests each new bookmark's page once.
 - **Smart sorting.** In the Edit Library window, sort by **Most Used** or **Recently Opened** from the sort menu in the header.
 
 ## Settings
@@ -153,13 +155,13 @@ Press ⌘, to open Settings.
   <img src="docs/media/settings_general.png" width="480" alt="Settings, General tab, with storage, updates, backup, and tracking options">
 </p>
 
-- **General:** startup, iCloud Drive sync, automatic update checks, backup and restore, and link cleaning.
+- **General:** startup, iCloud Drive sync, automatic update checks, link checks, names for new bookmarks, backup and restore, and link cleaning.
 - **Shortcuts:** the global keys for the menu, Quick Open, and the clipboard.
-- **Clipboard:** history, pasting, GIFs, and the Touch ID or password lock for pinned items.
+- **Clipboard:** history, keeping history across restarts, pasting, GIFs, and the Touch ID or password lock for pinned items.
 
 ## Privacy
 
-Your library and clipboard history stay on your Mac. Library connects to the internet only to load site icons, to check for updates, and, if you choose, to sync your library through iCloud Drive. Pinned clipboard items are encrypted with a key kept in your Keychain. The [privacy guide](docs/privacy.md) lists exactly what is stored and sent.
+Your library and clipboard history stay on your Mac. Library connects to the internet only to load site icons, to check for updates, and, if you choose, to check your links, read the titles of new bookmarks' pages, or sync your library through iCloud Drive. Pinned clipboard items are encrypted with a key kept in your Keychain. The [privacy guide](docs/privacy.md) lists exactly what is stored and sent.
 
 ## Documentation
 
