@@ -37,6 +37,9 @@ enum BookmarkImporter {
         }
 
         let folder = result.folder
+        if BookmarkImport.isAlreadyImported(folder, in: store.nodes), !confirmImportAgain(url.lastPathComponent) {
+            return
+        }
         store.perform("Import Bookmarks") { $0.append(folder) }
 
         let count = "\(result.imported) \(result.imported == 1 ? "bookmark" : "bookmarks")"
@@ -45,6 +48,17 @@ enum BookmarkImporter {
             details += " Skipped \(result.skipped) \(result.skipped == 1 ? "entry" : "entries") that aren’t web links."
         }
         report("Imported \(count)", details, style: .informational)
+    }
+
+    /// Asks before a second copy of bookmarks that are all saved already. True when the user chooses to import again.
+    private static func confirmImportAgain(_ fileName: String) -> Bool {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "These bookmarks are already in your library"
+        alert.informativeText = "Every web link in “\(fileName)” is saved already. Importing again adds a second copy of each."
+        alert.addButton(withTitle: "Import Again")
+        alert.addButton(withTitle: "Cancel")
+        return alert.runModal() == .alertFirstButtonReturn
     }
 
     private static func report(_ message: String, _ details: String, style: NSAlert.Style = .warning) {

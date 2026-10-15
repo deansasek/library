@@ -37,6 +37,14 @@ enum BookmarkImport {
         var skipped = 0
     }
 
+    /// True when the import has web links and every one is already in `library`, so importing again would only add a
+    /// second copy of each. The addresses are compared after normalizing them, as duplicates are.
+    static func isAlreadyImported(_ folder: LibraryItem, in library: [LibraryItem]) -> Bool {
+        let saved = Set(library.leaves.compactMap { $0.url.map(Duplicates.normalizedLink) })
+        let links = (folder.children ?? []).leaves.compactMap { $0.url.map(Duplicates.normalizedLink) }
+        return !links.isEmpty && links.allSatisfy(saved.contains)
+    }
+
     static func parse(_ data: Data) throws -> Result {
         if let result = try parseSafari(data) { return result }
         if let result = try parseChromium(data) { return result }

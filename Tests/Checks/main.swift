@@ -2165,5 +2165,14 @@ do {
     check(cycle.live.map(\.name).sorted() == ["F1", "F2"], "folders chosen as each other's parents are both kept at the top level")
 }
 
+// Importing a browser file whose links are all saved already is noticed; a new link means it is not a repeat.
+do {
+    let imported = LibraryItem(name: "Imported", children: [LibraryItem(name: "A", url: "https://a.example.com"), LibraryItem(name: "B", url: "https://b.example.com/x")])
+    let saved = [LibraryItem(name: "A saved", url: "https://A.example.com/"), LibraryItem(name: "B saved", url: "https://b.example.com/x")]
+    check(BookmarkImport.isAlreadyImported(imported, in: saved), "an import whose links are all saved is a repeat")
+    check(!BookmarkImport.isAlreadyImported(imported, in: [saved[0]]), "an import with a link not yet saved is not a repeat")
+    check(!BookmarkImport.isAlreadyImported(LibraryItem(name: "Empty", children: []), in: saved), "an import with no links is not a repeat")
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
