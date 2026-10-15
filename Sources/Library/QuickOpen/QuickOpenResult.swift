@@ -80,11 +80,12 @@ struct QuickOpenResult: Identifiable {
     }
 
     /// The web link in what was typed, if it is one: a full URL, or a host name such as `example.com/path`.
+    /// Only http and https addresses count, so a copied `file://` or app address is never offered as a web link.
     static func link(from query: String) -> URL? {
         let text = query.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty, !text.contains(" ") else { return nil }
         if text.contains("://") {
-            return URL(string: text).flatMap { $0.host == nil ? nil : $0 }
+            return URL(string: text).flatMap { $0.host == nil || !WebFetch.isWeb($0) ? nil : $0 }
         }
         guard let url = URL(string: "https://\(text)"), let host = url.host,
               let last = host.split(separator: ".").last, host.contains("."),

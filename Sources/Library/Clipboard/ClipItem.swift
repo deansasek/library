@@ -73,7 +73,7 @@ struct ClipItem: Identifiable {
 
     /// What Add to Library would create: a bookmark for a link, an app item for a copied application.
     var libraryNode: LibraryItem? {
-        if let link { return LibraryItem(name: link.host ?? link.absoluteString, url: link.absoluteString) }
+        if let link, WebFetch.isWeb(link) { return LibraryItem(name: link.host ?? link.absoluteString, url: link.absoluteString) }
         if let app = fileURLs.first(where: { $0.pathExtension == "app" }) {
             return LibraryItem(name: appName(at: app.path), appPath: app.path)
         }
