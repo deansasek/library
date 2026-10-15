@@ -16,7 +16,10 @@ mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 cp "$bin" "$app/Contents/MacOS/Library"
 cp Resources/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
 # SwiftPM puts the localized strings (from Sources/Library/Resources) in this bundle. The app reads them from here.
-cp -R "$(swift build -c release --show-bin-path)/Library_Library.bundle" "$app/Contents/Resources/"
+strings_bundle="$(swift build -c release --show-bin-path)/Library_Library.bundle"
+# Without this bundle the app falls back to its main bundle, which has no translations, and nothing reports it.
+[[ -d "$strings_bundle" ]] || { echo "Missing $strings_bundle: the localized strings would not be in the app." >&2; exit 1; }
+cp -R "$strings_bundle" "$app/Contents/Resources/"
 cat > "$app/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
