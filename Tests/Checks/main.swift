@@ -2049,6 +2049,25 @@ step {
 undoLog.undo()
 check(undoStore.nodes.map(\.name) == ["B"] && undoStore.deleted.map(\.id) == [renamedA.id],
       "a rename after its item was deleted does not undo the delete: \(undoStore.nodes.map(\.name))")
+
+// An edit that changes nothing is not an undo step, so Redo survives it. These run outside any group, as a menu
+// action does, so an empty group is not what keeps Redo.
+let noopA = LibraryItem(name: "A", url: "https://a.example.com")
+let noopB = LibraryItem(name: "B", url: "https://b.example.com")
+let noopC = LibraryItem(name: "C", url: "https://c.example.com")
+step { undoStore.nodes = [noopA, noopB, noopC] }
+undoLog.removeAllActions()
+step { undoStore.move([noopB.id], before: noopA.id) }
+undoLog.undo()
+check(undoLog.canRedo && undoStore.nodes.map(\.name) == ["A", "B", "C"], "the move is undone before the no-op edits")
+undoStore.perform("Edit") { _ in }
+undoStore.move([noopA.id], before: noopB.id)
+undoStore.move([noopB.id], before: noopC.id)
+undoStore.rename(noopA.id, to: "A")
+undoStore.endRename()
+check(undoLog.canRedo, "no-op edits leave Redo alone")
+undoLog.redo()
+check(undoStore.nodes.map(\.name) == ["B", "A", "C"], "Redo still moves B before A: \(undoStore.nodes.map(\.name))")
 try? FileManager.default.removeItem(at: storeHome)
 
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")

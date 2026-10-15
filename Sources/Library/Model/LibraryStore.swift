@@ -537,18 +537,22 @@ final class LibraryStore: ObservableObject {
         return icons[node.url ?? ""] ?? Self.fallbackIcon
     }
 
-    /// Applies an edit as one undoable step named `actionName` in the Edit menu.
+    /// Applies an edit as one undoable step named `actionName` in the Edit menu. An edit that changes nothing is not
+    /// a step, and does not clear Redo.
     func perform(_ actionName: String, _ change: (inout [LibraryItem]) -> Void) {
         var edited = nodes
         change(&edited)
+        guard edited != nodes else { return }
         nodes = edited
         undoManager?.setActionName(actionName)
     }
 
-    /// Applies an edit to the library and Recently Deleted as one undoable step named `actionName`.
+    /// Applies an edit to the library and Recently Deleted as one undoable step named `actionName`. An edit that
+    /// changes nothing is not a step.
     private func edit(_ actionName: String, _ change: (inout LibrarySync.Contents) -> Void) {
         var edited = contents
         change(&edited)
+        guard edited != contents else { return }
         contents = edited
         undoManager?.setActionName(actionName)
     }
@@ -588,7 +592,7 @@ final class LibraryStore: ObservableObject {
         let id = renamingID
         renameBase = nil
         renamingID = nil
-        guard let base, let id, nodes.node(withID: id) != nil else { return }
+        guard let base, let id, nodes.node(withID: id) != nil, base != contents else { return }
         registerUndo(restoring: base)
         undoManager?.setActionName("Rename")
     }
