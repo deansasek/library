@@ -40,7 +40,7 @@ struct ManageCommands: Commands {
             Button { LinkChecker.checkNow(store: store) } label: { Text("Check Links", bundle: L10n.bundle) }
             Button("Export Library…") { LibraryBackupActions.export(store) }
             Divider()
-            Button("Edit…") { state?.editSelection(in: store) }
+            Button("Get Info…") { state?.editSelection(in: store) }
                 .keyboardShortcut("i")
                 .disabled(state?.selection.isEmpty != false)
         }
