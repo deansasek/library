@@ -141,7 +141,9 @@ struct QuickOpenView: View {
             Label {
                 Text("Pinned Item", bundle: L10n.bundle)
             } icon: {
+                // Bounces when a different locked item is selected. Reduce Motion leaves it still.
                 Image(systemName: "lock.fill")
+                    .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? nil : result?.id)
             }
             .font(.title3.weight(.semibold))
             Button {
