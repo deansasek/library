@@ -19,7 +19,7 @@ Press Control-Space to search everything in your library.
 
 - Type words from a name, keyword, URL, or folder. Press ↑ or ↓, then Return.
 - Type or paste a web address to open it, or add it to your library.
-- Press Tab, or right-click a result, to open it the other way, copy its link, path, or command, or show it in Finder.
+- Press Tab, or right-click a result, to open it the other way, copy its link, path, or command, or, for an app, show it in Finder.
 - Press ⌘1 through ⌘9 to open the first nine results.
 
 ### Keep what you copy
@@ -28,7 +28,7 @@ Press Control-Space to search everything in your library.
   <img src="docs/media/clipboard_menu.png" width="640" alt="The Library clipboard menu listing recent copies, with numbered shortcuts">
 </p>
 
-Library remembers what you copy, including text, links, images, and files, in every format you copied them in.
+Library remembers what you copy, including text, links, images, and files, in the formats you copied them in, keeping one copy of each image.
 
 - Open the **Library** menu or Quick Open to see your latest copies. Choose one to copy it again.
 - Pin an item to keep it after you quit.
@@ -40,6 +40,11 @@ Library remembers what you copy, including text, links, images, and files, in ev
 - Text with an address, a phone number, or a date gets Open in Maps, Copy Phone Number, or Add to Calendar in Quick Open, under Tab. Detection happens on this Mac.
 - Type `from Safari` in Quick Open to see only what you copied in Safari.
 - Build a paste queue. Add several items, then paste them one at a time, in order.
+- Library keeps the 50 most recent unpinned copies, up to 200 MB of them. Pinned items stay.
+- Turn on **Play copied GIFs** in **Settings > Clipboard** (off by default) to download the GIF behind a copied image so it plays.
+- Turn on **Require Touch ID or password to show pinned items** in **Settings > Clipboard** (off by default) to hide pinned items until you authenticate. **Lock Pinned Items** in the Library menu hides them again.
+- Turn on **Put the Latest Item on the Clipboard When Library Opens** in **Settings > Clipboard** to copy the newest saved item at launch. It needs **Keep clipboard history across restarts**.
+- When the clipboard holds a link or app that is not in your library, the menu and Quick Open offer to add it.
 
 Library skips anything a password manager marks as private, and copies over 25 MB.
 
@@ -57,10 +62,15 @@ Choose **Edit Library…** to manage everything in one window.
 
 - Add items from the **+** menu, or drag an app or a link into the window.
 - Select several rows to move, reorder, or edit them together. Changes you make in bulk are a single undo step.
-- Right-click a row to open it, show it in Finder, get info, rename, move, share, or delete it.
+- Right-click a row to open it, edit or rename it, move, share, or delete it. An app can also be shown in Finder.
+- Deleted items go to **Recently Deleted**, where you can restore them or delete them for good. They are removed for good after 30 days.
 - Find and merge duplicate bookmarks from **File > Find Duplicates…**.
 - Import bookmarks from Safari or Chrome with **File > Import Bookmarks…**. They go into one folder, and ⌘Z undoes the import.
 - Export and restore your whole library from **Settings > General**.
+
+Add a bookmark to the **Reading List** from its right-click menu, or from Tab in Quick Open. Unread bookmarks are listed first. Removing a bookmark from the Reading List leaves it in the library.
+
+Turn on **Check links periodically** in **Settings > General** (off by default) to request each bookmark's address once a day, with a HEAD request, which reads no page content. A bookmark whose page fails or can't be reached gets a warning in Edit Library. **Check Links** in the File menu checks now.
 
 Use ⌘Z to undo and ⇧⌘Z to redo.
 
@@ -78,6 +88,7 @@ Select an item and press ⌘I, or choose **Edit…** from the toolbar or a right
 - **Color** adds a dot in the menu and the Library window.
 - **Shortcuts** can be added to any item.
 - **Open When You Log In** opens it a few seconds after you log in.
+- **Notes** appear under the name in Quick Open and in Spotlight.
 
 ### Use templates
 
@@ -99,11 +110,11 @@ The defaults are Control and right-click for the menu, Control-Space for Quick O
 
 ### Stay up to date
 
-Library checks GitHub for a new release every hour while it runs, and when it starts if the last check was an hour or more ago. When there's a newer version, a single item appears at the top of the menu. Nothing pops up. Turn this off in **Settings > General**, or choose **Check for Updates…** at any time. See [Privacy](#privacy) for exactly what is sent.
+Library checks GitHub for a new release every hour while it runs, and when it starts if the last check was an hour or more ago. When there's a newer version, a single item appears at the top of the menu. Nothing pops up. Turn this off in **Settings > General**, or choose **Check for Updates…** at any time. See [Privacy](privacy.md) for exactly what is sent.
 
 ## Settings
 
-Press ⌘, to open Settings. General holds startup, iCloud Drive, updates, backup and restore, and link cleaning. Shortcuts sets the global keys. Clipboard controls history, pasting, GIFs, and the lock.
+Press ⌘, to open Settings. General holds startup, iCloud Drive, updates, backup and restore, names for new bookmarks, link checks, and link cleaning. **Name new bookmarks from their pages** is off by default. When it is on, a new bookmark takes its page's title. Shortcuts sets the global keys for the menu, Quick Open, the clipboard, and Open Copied Link, and where the Library menu opens: at the pointer or from the menu bar. Clipboard controls history, pasting, GIFs, the lock, and keeping history across restarts.
 
 <p align="center">
   <img src="docs/media/settings_general.png" width="640" alt="Settings, General tab, with storage, updates, backup, and tracking options">
@@ -112,7 +123,7 @@ Press ⌘, to open Settings. General holds startup, iCloud Drive, updates, backu
 ## Permissions
 
 - **Keyboard shortcuts**, **hot corners**, Quick Open, and the menus don't need any permission.
-- **Click, scroll, pinch, and swipe shortcuts**, **pasting into text fields**, and **suggesting a selected link** need Accessibility access. Turn it on in **System Settings > Privacy & Security > Accessibility**. Library reads your selection only when you open one of its menus, and it doesn't keep it.
+- **Click, scroll, pinch, and swipe shortcuts**, **pasting into text fields**, and **suggesting a selected link** need Accessibility access. Turn it on in **System Settings > Privacy & Security > Accessibility**. Library reads your selection only when you open one of its menus or Quick Open, and it doesn't keep it.
 
 ## Troubleshooting
 
