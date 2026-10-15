@@ -16,17 +16,22 @@ enum MarkdownLink {
         return result
     }
 
-    /// The URL as a Markdown link destination. Spaces and parentheses are percent-encoded, so they cannot end the link early.
+    /// The URL as a Markdown link destination. Spaces, parentheses, angle brackets, and backslashes are percent-encoded,
+    /// so none of them can end the link early or escape its closing parenthesis.
     static func destination(_ url: String) -> String {
         url.replacingOccurrences(of: " ", with: "%20")
             .replacingOccurrences(of: "(", with: "%28")
             .replacingOccurrences(of: ")", with: "%29")
+            .replacingOccurrences(of: "<", with: "%3C")
+            .replacingOccurrences(of: ">", with: "%3E")
+            .replacingOccurrences(of: "\\", with: "%5C")
     }
 
-    /// The title to show: the trimmed title, or the URL when the title is blank.
+    /// The title to show: the trimmed title with each run of white space, including line breaks, shortened to one space,
+    /// or the URL when the title is blank. A line break would end a Markdown link early, so none is kept.
     static func displayTitle(_ title: String, url: String) -> String {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? url : trimmed
+        let words = title.split(whereSeparator: \.isWhitespace)
+        return words.isEmpty ? url : words.joined(separator: " ")
     }
 
     /// The Markdown link for a title and URL, as typed in Markdown.
