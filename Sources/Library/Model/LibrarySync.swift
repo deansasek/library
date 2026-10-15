@@ -250,9 +250,9 @@ enum LibrarySync {
 
         var label: String {
             switch self {
-            case .upToDate: "Up to date"
-            case .waiting: "Waiting for iCloud…"
-            case .uploading: "Uploading…"
+            case .upToDate: String(localized: "Up to date", bundle: L10n.bundle)
+            case .waiting: String(localized: "Waiting for iCloud…", bundle: L10n.bundle)
+            case .uploading: String(localized: "Uploading…", bundle: L10n.bundle)
             }
         }
     }

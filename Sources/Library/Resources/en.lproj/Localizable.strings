@@ -385,3 +385,8 @@
 
 /* Settings shortcut action name, shown beside its record button. */
 "Open Copied Link" = "Open Copied Link";
+
+/* The iCloud sync state in the Manage footer and its VoiceOver announcement. */
+"Up to date" = "Up to date";
+"Waiting for iCloud…" = "Waiting for iCloud…";
+"Uploading…" = "Uploading…";

@@ -124,6 +124,10 @@ struct ManageView: View {
                     .accessibilityElement(children: .combine)
                 }
             }
+            // The footer is only read when VoiceOver reaches it, so a change is announced as it happens.
+            .onChange(of: store.syncState) { _, state in
+                if let state { AccessibilityNotification.Announcement(state.label).post() }
+            }
         }
         .frame(minWidth: 680, idealWidth: 780, minHeight: 320, idealHeight: 420)
         // Remembers the window's size and position across launches.
