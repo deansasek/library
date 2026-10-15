@@ -20,16 +20,48 @@ major="$(sw_vers -productVersion | cut -d. -f1)"
 # Installs the Command Line Tools when they are missing. Apple's installer runs without a window when softwareupdate
 # can find them, which needs an administrator password once. Otherwise the standard install window opens, and this
 # waits up to 30 minutes for it to finish.
+# softwareupdate -l can hang, so it gets a time limit. Apple's installer looks for the marker file at a fixed path, so the
+# marker cannot have a random name. It is created only when nothing exists at that path, so a file or symlink another
+# user planted there is never written through.
+CLT_MARKER=/tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+
+# Runs a command for at most $1 seconds, and returns 124 when the limit stops it.
+run_with_timeout() {
+    local secs="$1"
+    shift
+    "$@" &
+    local pid=$! rc=0 i
+    for (( i = 0; i < secs * 2; i++ )); do
+        kill -0 "$pid" 2>/dev/null || break
+        sleep 0.5
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null || true
+        wait "$pid" 2>/dev/null || true
+        return 124
+    fi
+    wait "$pid" || rc=$?
+    return $rc
+}
+
 ensure_command_line_tools() {
     xcode-select -p >/dev/null 2>&1 && return 0
     print "The Xcode Command Line Tools are needed to build Library. Installing them now."
-    touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
-    local label
-    label="$(softwareupdate -l 2>/dev/null | sed -n 's/^[*] Label: *//p' | grep 'Command Line Tools' | tail -1 || true)"
+    local made_marker=0 listing label
+    rm -f "$CLT_MARKER" 2>/dev/null || true
+    if ( set -C; : > "$CLT_MARKER" ) 2>/dev/null; then
+        made_marker=1
+    fi
+    listing="$(mktemp)"
+    run_with_timeout 60 softwareupdate -l >"$listing" 2>/dev/null || true
+    label="$(sed -n 's/^[*] Label: *//p' "$listing" | grep 'Command Line Tools' | tail -1 || true)"
+    rm -f "$listing"
     if [[ -n "$label" ]]; then
         sudo softwareupdate -i "$label" --verbose || true
     fi
-    rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+    if (( made_marker )); then
+        rm -f "$CLT_MARKER"
+    fi
     if ! xcode-select -p >/dev/null 2>&1; then
         xcode-select --install 2>/dev/null || true
         print "Finish the window that opened. Waiting for the tools to install."
