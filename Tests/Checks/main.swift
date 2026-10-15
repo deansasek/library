@@ -2230,5 +2230,9 @@ check(LibraryItem(name: "T", url: "tel:5551234567").link?.absoluteString == "tel
 check(LibraryItem(name: "M", url: "mailto:123@example.com").link?.absoluteString == "mailto:123@example.com", "mailto keeps its address")
 check(LibraryItem(name: "O", url: "obsidian://open?vault=x").link?.absoluteString == "obsidian://open?vault=x", "a scheme with // is kept")
 
+// A new window is asked for with the flag each browser family takes; Safari and others have none.
+check(newWindowFlag(bundleID: "org.mozilla.firefox") == "-new-window" && newWindowFlag(bundleID: "com.google.Chrome") == "--new-window", "Firefox and Chromium browsers have a new-window flag")
+check(newWindowFlag(bundleID: "com.apple.Safari") == nil && newWindowFlag(bundleID: "") == nil, "Safari has no new-window flag, so it gets the link itself")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

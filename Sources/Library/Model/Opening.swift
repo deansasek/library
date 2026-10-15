@@ -171,19 +171,14 @@ func installedBrowsers() -> [(id: String, name: String)] { browserList }
 
 /// New-window launch flags for browsers that accept them. `browser` is the app to use, or the default browser.
 private func openInNewWindow(_ link: URL, in browser: URL?) {
-    guard let app = browser ?? NSWorkspace.shared.urlForApplication(toOpen: link),
-          let id = Bundle(url: app)?.bundleIdentifier?.lowercased() else {
+    guard let app = browser ?? NSWorkspace.shared.urlForApplication(toOpen: link) else {
         NSWorkspace.shared.open(link)
         return
     }
-    let chromium = ["chrome", "chromium", "edgemac", "brave", "vivaldi", "thebrowser", "opera"]
-    let flag: String
-    if id.contains("firefox") {
-        flag = "-new-window"
-    } else if chromium.contains(where: id.contains) {
-        flag = "--new-window"
-    } else {
-        NSWorkspace.shared.open(link)
+    let id = Bundle(url: app)?.bundleIdentifier ?? ""
+    guard let flag = newWindowFlag(bundleID: id) else {
+        // A browser with no new-window flag still gets the link, so it is not sent to the default browser.
+        NSWorkspace.shared.open([link], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
         return
     }
     // A second launch hands the URL to the running browser and exits.
@@ -191,6 +186,15 @@ private func openInNewWindow(_ link: URL, in browser: URL?) {
     configuration.arguments = [flag, link.absoluteString]
     configuration.createsNewApplicationInstance = true
     NSWorkspace.shared.openApplication(at: app, configuration: configuration)
+}
+
+/// The launch flag that opens a new window in a browser, by its bundle identifier. Nil for a browser with no such flag.
+func newWindowFlag(bundleID: String) -> String? {
+    let id = bundleID.lowercased()
+    let chromium = ["chrome", "chromium", "edgemac", "brave", "vivaldi", "thebrowser", "opera"]
+    if id.contains("firefox") { return "-new-window" }
+    if chromium.contains(where: id.contains) { return "--new-window" }
+    return nil
 }
 
 /// Asks before a terminal command runs, when the Settings option is on. Cancel is the default button.
