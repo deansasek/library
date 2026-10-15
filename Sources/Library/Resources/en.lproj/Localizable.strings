@@ -352,3 +352,6 @@
 
 /* VoiceOver announcement when a clipboard item cannot be added to the library. */
 "This clipboard item can’t be added to the library." = "This clipboard item can’t be added to the library.";
+
+/* VoiceOver label for the warning beside a shortcut that another app uses. */
+"Another app uses this shortcut" = "Another app uses this shortcut";
