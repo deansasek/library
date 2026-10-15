@@ -29,6 +29,18 @@ do {
     try? FileManager.default.removeItem(at: dir)
 }
 
+// ---- web requests refuse local and private addresses ----
+for address in ["127.0.0.1", "127.8.9.10", "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.10.1", "0.0.0.0",
+                "::1", "::", "fe80::1", "fd00::5", "::ffff:10.0.0.1", "::ffff:127.0.0.1"] {
+    check(WebFetch.isPrivateAddress(address), "private address \(address)")
+}
+for address in ["8.8.8.8", "172.32.0.1", "172.15.0.1", "192.169.0.1", "100.64.0.1", "2001:db8::1", "2606:4700::1111", "::ffff:8.8.8.8"] {
+    check(!WebFetch.isPrivateAddress(address), "public address \(address)")
+}
+check(WebFetch.isLocalTarget(URL(string: "http://localhost:8080/x")!) && WebFetch.isLocalTarget(URL(string: "https://printer.local/")!), "localhost and .local names are local")
+check(WebFetch.isLocalTarget(URL(string: "http://127.1/")!) && WebFetch.isLocalTarget(URL(string: "http://[::1]/")!), "short and bracketed loopback are local")
+check(WebFetch.isLocalTarget(URL(string: "http://10.0.0.7/admin")!) && WebFetch.isLocalTarget(URL(string: "http://192.168.0.1/")!), "LAN addresses are local")
+
 // ---- model ----
 check(splitArguments("--profile \"My Work\" -n 'a b'") == ["--profile", "My Work", "-n", "a b"], "quoted arguments")
 let jira = LibraryItem(name: "Jira", url: "x.example.com/browse/{}")

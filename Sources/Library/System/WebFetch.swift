@@ -17,6 +17,67 @@ enum WebFetch {
         source?.scheme?.lowercased() == "https" && target?.scheme?.lowercased() == "http"
     }
 
+    /// True when a request may be made to `url`: a web address whose host is not this Mac or a private network. Every
+    /// request from a bookmark, a clipboard link, or a Services selection goes through this check. It resolves the
+    /// host, so it runs off the main thread.
+    static func isAllowed(_ url: URL) async -> Bool {
+        guard isWeb(url) else { return false }
+        return await Task.detached { !WebFetch.isLocalTarget(url) }.value
+    }
+
+    /// True when `url` has no host, names localhost or a `.local` name, or has a host that resolves to a loopback,
+    /// private, link-local, or unspecified address. A host that does not resolve is not local: its request fails.
+    static func isLocalTarget(_ url: URL) -> Bool {
+        guard var host = url.host?.lowercased(), !host.isEmpty else { return true }
+        if host.hasPrefix("[") && host.hasSuffix("]") { host = String(host.dropFirst().dropLast()) }
+        if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local") { return true }
+        if isPrivateAddress(host) { return true }
+        return resolvedAddresses(of: host).contains(where: isPrivateAddress)
+    }
+
+    /// True for loopback (127/8, ::1), unspecified (0/8, ::), private (10/8, 172.16/12, 192.168/16, fc00::/7),
+    /// link-local (169.254/16, fe80::/10), and IPv4-mapped IPv6 addresses of those. Other addresses are public.
+    static func isPrivateAddress(_ address: String) -> Bool {
+        let text = address.lowercased().split(separator: "%").first.map(String.init) ?? address.lowercased()
+        if text.contains(":") {
+            if text.hasPrefix("::ffff:"), text.contains(".") {
+                return isPrivateAddress(String(text.dropFirst("::ffff:".count)))
+            }
+            if text == "::" || text == "::1" { return true }
+            let first = text.split(separator: ":", omittingEmptySubsequences: false).first.map(String.init) ?? ""
+            let group = Int(first.isEmpty ? "0" : first, radix: 16) ?? 0
+            return (group & 0xFE00) == 0xFC00 || (group & 0xFFC0) == 0xFE80
+        }
+        let octets = text.split(separator: ".", omittingEmptySubsequences: false).compactMap { Int($0) }
+        guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) else { return false }
+        let (a, b) = (octets[0], octets[1])
+        return a == 0 || a == 10 || a == 127
+            || (a == 169 && b == 254)
+            || (a == 172 && (16...31).contains(b))
+            || (a == 192 && b == 168)
+    }
+
+    /// The numeric addresses a host name resolves to, or none when it does not resolve.
+    static func resolvedAddresses(of host: String) -> [String] {
+        var hints = addrinfo()
+        hints.ai_family = AF_UNSPEC
+        hints.ai_socktype = SOCK_STREAM
+        var list: UnsafeMutablePointer<addrinfo>?
+        guard getaddrinfo(host, nil, &hints, &list) == 0, let first = list else { return [] }
+        defer { freeaddrinfo(list) }
+        var addresses: [String] = []
+        var node: UnsafeMutablePointer<addrinfo>? = first
+        while let entry = node {
+            var buffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            if getnameinfo(entry.pointee.ai_addr, entry.pointee.ai_addrlen, &buffer, socklen_t(buffer.count), nil, 0,
+                           NI_NUMERICHOST) == 0 {
+                addresses.append(String(cString: buffer))
+            }
+            node = entry.pointee.ai_next
+        }
+        return addresses
+    }
+
     /// How one download is made. The defaults are the favicon rules: a 10 s limit, any number of redirects, and a
     /// body over `limit` is a failure.
     struct Options {
@@ -57,7 +118,7 @@ enum WebFetch {
     /// Downloads `url` as `options` describe. The session keeps no cookies and no cache, so nothing from the browser
     /// is sent. Only the `keepsPrefix` option changes what a body over the limit gives: the cut-off body.
     static func fetch(_ url: URL, options: Options) async -> (data: Data, response: HTTPURLResponse)? {
-        guard isWeb(url) else { return nil }
+        guard await isAllowed(url) else { return nil }
         return await withCheckedContinuation { continuation in
             // A serial queue runs every delegate call and the deadline, so the collector's state is never shared.
             let queue = OperationQueue()
@@ -138,7 +199,7 @@ enum WebFetch {
                         willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
                         completionHandler: @escaping (URLRequest?) -> Void) {
             redirects += 1
-            let allowed = request.url.map(WebFetch.isWeb) == true
+            let allowed = request.url.map { WebFetch.isWeb($0) && !WebFetch.isLocalTarget($0) } == true
                 && !isDowngrade(from: response.url, to: request.url)
                 && (options.maxRedirects.map { redirects <= $0 } ?? true)
             if !allowed { failed = true }
