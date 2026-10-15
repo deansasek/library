@@ -329,6 +329,7 @@ struct WelcomeView: View {
                 Image(systemName: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
                     .help("Another app uses this shortcut. Choose another in Settings.")
+                    .accessibilityLabel(String(localized: "Another app uses this shortcut", bundle: L10n.bundle))
             }
             Text(store.extraHotkeys[index]?.description ?? "Not set")
                 .font(.system(.body, design: .rounded).weight(.medium))
