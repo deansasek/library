@@ -122,6 +122,7 @@ struct EditSheet: View {
         case .ok: Text("Working", bundle: L10n.bundle)
         case .broken: Text("Broken", bundle: L10n.bundle)
         case .unreachable: Text("Unreachable", bundle: L10n.bundle)
+        case .unknown: Text("Not checked", bundle: L10n.bundle)
         }
     }
 

@@ -1219,6 +1219,16 @@ check(edited[3].icon == "star.fill" && edited[3].color == nil, "dividers take an
 let cleared = BulkEdit.apply(BulkEdit(icon: .clear, color: .clear, openNew: .set(true)), to: bulkIDs, in: edited)
 check(cleared[0].icon == nil && cleared[0].color == nil && cleared[1].openNew == true && cleared[1].icon == nil, "clear removes, Opens In sets new")
 check(BulkEdit.apply(BulkEdit(openNew: .set(true)), to: [bulkTree[2].id], in: bulkTree)[2].children?.first?.openNew == nil, "a bookmark in a folder is not changed unless selected")
+// ---- newer values in a file do not stop the library from loading ----
+do {
+    let newer = #"[{"id":"00000000-0000-0000-0000-000000000001","name":"Later","url":"https://example.com","readLater":"archived"}]"#
+    if case .success(let items) = LibraryBackup.decode(Data(newer.utf8)) {
+        check(items.first?.readLater == .unknown, "an unknown reading-list value loads as unknown")
+    } else {
+        check(false, "a file with an unknown reading-list value still loads")
+    }
+}
+
 // ---- update command: the release's checksum is checked before install.sh runs ----
 do {
     let command = UpdateCheck.installCommand(tag: "v1.6.5")

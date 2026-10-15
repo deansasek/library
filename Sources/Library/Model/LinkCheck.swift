@@ -9,6 +9,13 @@ struct LinkStatus: Codable, Equatable {
         case broken
         /// No answer: a DNS failure, a refused connection, a timeout, or a redirect that could not be followed.
         case unreachable
+        /// A value a newer version wrote. Decoding it does not fail the whole library; it is treated as not checked.
+        case unknown
+
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Kind(rawValue: raw) ?? .unknown
+        }
     }
 
     var kind: Kind

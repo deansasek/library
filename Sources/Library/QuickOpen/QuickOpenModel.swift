@@ -378,6 +378,7 @@ final class QuickOpenModel: ObservableObject {
         case nil: return [action(.add)]
         case .unread?: return [action(.markRead), action(.remove)]
         case .read?: return [action(.markUnread), action(.remove)]
+        case .unknown?: return [action(.markRead), action(.remove)]
         }
     }
 
