@@ -273,6 +273,8 @@ final class LibraryStore: ObservableObject {
         loadingFromDisk = false
         undoSuppressed = false
         undoManager?.removeAllActions()
+        // A rename in progress would otherwise undo back to the copy from before this reload.
+        renameBase = nil
     }
 
     /// Records that the file now matches the library, so later edits are the only unsynced changes.
@@ -350,6 +352,7 @@ final class LibraryStore: ObservableObject {
         loadingFromDisk = false
         undoSuppressed = false
         undoManager?.removeAllActions()
+        renameBase = nil
         guard writeLibrary() else { return }
         guard !versions.isEmpty else { return }
         // Keep a copy of every conflict version first. If the copy fails, the versions stay for the next check.
