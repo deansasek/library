@@ -712,6 +712,10 @@ MainActor.assumeIsolated {
     ClipboardHistory.waitForSaves()
     check(history.items.isEmpty && !FileManager.default.fileExists(atPath: saveFile.path), "removing the last pin removes the file")
 
+    // A paste goes back to the app that had the keyboard, and never to Library itself.
+    check(FrontApp.canPaste(toProcess: 42, ownProcess: 7), "a paste may go to another app")
+    check(!FrontApp.canPaste(toProcess: 7, ownProcess: 7), "a paste never goes to Library")
+
     for index in 1...12 { copy("menu copy \(index)") }
     let (menu, target) = PopupMenu.makeClipboardMenu(history: history, suggestion: nil, pastes: false)
     let numbered = menu.items.filter { !$0.keyEquivalent.isEmpty && $0.keyEquivalentModifierMask.isEmpty }
