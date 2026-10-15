@@ -20,6 +20,7 @@ struct MenuContent: View {
                     Text("Update Available — Version \(UpdateRules.displayVersion(version))", bundle: L10n.bundle)
                 } icon: {
                     Image(systemName: "arrow.down.circle")
+                        .symbolRenderingMode(.hierarchical)
                         // Bounces once when an update is found. Reduce Motion leaves it still.
                         .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? nil : version)
                 }

@@ -28,6 +28,7 @@ struct NodeRow: View {
                         .lineLimit(1)
                     if let warning = linkWarning {
                         Image(systemName: warning.symbol)
+                            .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.orange)
                             .help(warning.help)
                             .accessibilityLabel(warning.label)
@@ -36,6 +37,7 @@ struct NodeRow: View {
                 if let readLater = node.readLater {
                     // A book for unread, a check for read: the Reading List state, shown beside the name.
                     Image(systemName: readLater == .read ? "checkmark.circle" : "book")
+                        .symbolRenderingMode(.hierarchical)
                         .foregroundStyle(.secondary)
                         // The book turns into a check in place. Reduce Motion swaps it at once.
                         .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
@@ -49,6 +51,7 @@ struct NodeRow: View {
                 if let shortcuts = node.shortcuts {
                     if store.failedShortcuts.contains(node.id) {
                         Image(systemName: "exclamationmark.triangle")
+                            .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.orange)
                             .help("A shortcut is in use by another app")
                             .accessibilityLabel("Shortcut in use by another app")
