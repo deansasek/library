@@ -93,6 +93,14 @@ struct ClipItem: Identifiable {
 
     /// How long ago it was copied, and what it is.
     @MainActor var subtitle: String {
+        // A locked pinned item hides its text, and its source app and age go with it, so only its kind and pin show.
+        if ClipboardLock.shared.isHidden(self) { return "Pinned · \(kindName)" }
+        let parts = [pinned ? "Pinned" : nil, sourceApp, Self.times.localizedString(for: date, relativeTo: Date()), kindName]
+        return parts.compactMap { $0 }.joined(separator: " · ")
+    }
+
+    /// The kind as a word, such as Text or Link.
+    var kindName: String {
         let name: String
         switch kind {
         case .text: name = "Text"
@@ -101,7 +109,6 @@ struct ClipItem: Identifiable {
         case .file: name = "File"
         case .other: name = "Item"
         }
-        let parts = [pinned ? "Pinned" : nil, sourceApp, Self.times.localizedString(for: date, relativeTo: Date()), name]
-        return parts.compactMap { $0 }.joined(separator: " · ")
+        return name
     }
 }
