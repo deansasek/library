@@ -140,14 +140,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Services menu item "Add to Library": turns a selected web link into a bookmark.
     @objc func addBookmark(_ pasteboard: NSPasteboard, userData: String,
                            error: AutoreleasingUnsafeMutablePointer<NSString>) {
-        guard let text = pasteboard.string(forType: .string), let url = Self.webLink(from: text), let host = url.host else {
+        guard let text = pasteboard.string(forType: .string), let url = Self.webLink(from: text) else {
             error.pointee = "The selection is not a web link."
             return
         }
-        let address = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let node = LibraryItem(name: host, url: address)
+        guard let node = Self.newBookmark(from: text, existing: LibraryStore.shared.nodes) else { return }
         LibraryStore.shared.perform("Add Bookmark") { $0.append(node, to: nil) }
         SmartTitle.nameFromPage(node.id, url: url)
+    }
+
+    /// The bookmark a Services selection adds: nil when the selection is not a web link, or when the library already
+    /// holds that link (http and https count as one, as in `AddSuggestion.matchKey`), so a repeat adds nothing.
+    static func newBookmark(from text: String, existing: [LibraryItem]) -> LibraryItem? {
+        guard let url = webLink(from: text), let host = url.host else { return nil }
+        let node = LibraryItem(name: host, url: text.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard let key = AddSuggestion.matchKey(node) else { return nil }
+        let known = existing.leaves.contains { AddSuggestion.matchKey($0) == key }
+        return known ? nil : node
     }
 
     /// The web link a Services selection names: an `http` or `https` address, at most 4,096 characters. Other
