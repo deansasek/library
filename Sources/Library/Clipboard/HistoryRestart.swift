@@ -60,12 +60,22 @@ enum HistoryFile {
     }
 
     static func encode(_ clips: [PinnedFile.Clip], key: SymmetricKey) throws -> Data {
-        try PinnedFile.seal(JSONEncoder().encode(clips), key: key)
+        try PinnedFile.seal(JSONEncoder().encode(clips), key: key, kind: .history)
     }
 
+    /// The history file, sealed as history. A file sealed before the kinds were told apart is read too, as the pinned
+    /// file's older format is. The next save writes it with its kind.
     static func read(_ data: Data, key: SymmetricKey?) -> Read {
-        guard let key, let plain = try? PinnedFile.open(data, key: key),
-              let clips = try? JSONDecoder().decode([PinnedFile.Clip].self, from: plain) else { return .unreadable }
-        return .clips(clips)
+        guard let key else { return .unreadable }
+        let decoder = JSONDecoder()
+        if let plain = try? PinnedFile.open(data, key: key, kind: .history),
+           let clips = try? decoder.decode([PinnedFile.Clip].self, from: plain) {
+            return .clips(clips)
+        }
+        if let plain = try? PinnedFile.openUnbound(data, key: key),
+           let clips = try? decoder.decode([PinnedFile.Clip].self, from: plain) {
+            return .clips(clips)
+        }
+        return .unreadable
     }
 }

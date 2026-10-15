@@ -2207,5 +2207,20 @@ check(FrontApp.keyCode(typing: "v", character: { $0 == 47 ? "v" : "x" }) == 47, 
 check(FrontApp.keyCode(typing: "v", character: { _ in nil }) == 9, "with no layout, the QWERTY V key is used")
 check(FrontApp.keyCode(typing: "v", character: { $0 == 9 ? "V" : nil }) == 9, "the letter is compared without case")
 
+// A pinned file and a history file, sealed with the same key, do not open as each other. A file from before the
+// kinds were told apart still opens, and is marked to be saved again.
+do {
+    let sealKey = SymmetricKey(size: .bits256)
+    let kindClip = PinnedFile.Clip(source: "Notes", date: Date(), representations: [["public.utf8-plain-text": Data("kind".utf8)]])
+    let pinnedBytes = (try? PinnedFile.encode([kindClip], key: sealKey)) ?? Data()
+    let historyBytes = (try? HistoryFile.encode([kindClip], key: sealKey)) ?? Data()
+    if case .unreadable = HistoryFile.read(pinnedBytes, key: sealKey) {} else { check(false, "a pinned file does not open as history") }
+    if case .unreadable = PinnedFile.read(historyBytes, key: sealKey) {} else { check(false, "a history file does not open as pinned") }
+    if case .clips(let back) = HistoryFile.read(historyBytes, key: sealKey), back.count == 1 {} else { check(false, "a history file opens as history") }
+    if case .clips(_, let migrated) = PinnedFile.read(pinnedBytes, key: sealKey), !migrated {} else { check(false, "a pinned file opens as pinned") }
+    let oldBytes = (try? ChaChaPoly.seal(JSONEncoder().encode([kindClip]), using: sealKey).combined) ?? Data()
+    if case .clips(_, let migrated) = PinnedFile.read(oldBytes, key: sealKey), migrated {} else { check(false, "a file sealed before the kinds opens and is saved again") }
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
