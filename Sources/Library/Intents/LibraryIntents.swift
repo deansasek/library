@@ -190,7 +190,13 @@ struct RunCommandIntent: AppIntent {
         guard current.command == first.command else {
             throw LibraryIntentError("The command changed while it was waiting for confirmation. Nothing ran.")
         }
-        open(current)
+        // The question above is the only one. The terminal runner is called directly, so the Settings option does not
+        // add a second dialog on top of the Shortcuts confirmation.
+        guard let text = current.command else {
+            throw LibraryIntentError("“\(command.name)” is no longer a command in Library.")
+        }
+        LibraryStore.shared.recordOpen(current.id)
+        runInTerminal(text)
         return .result(dialog: "Started \(current.name) in Terminal.")
     }
 
