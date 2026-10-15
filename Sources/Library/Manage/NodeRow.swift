@@ -88,9 +88,18 @@ struct NodeRow: View {
         }
     }
 
-    /// The name and kind, as VoiceOver reads a row. Adds a warning when a shortcut is in use elsewhere.
+    /// The name, kind, target, and shortcut, as VoiceOver reads a row. Adds a warning when a shortcut is in use elsewhere.
+    /// The target and shortcut are included so two rows with the same name can be told apart.
     private var accessibilityName: String {
         var label = "\(node.name), \(kindName)"
+        let target = detail.trimmingCharacters(in: .whitespaces)
+        if !target.isEmpty {
+            label += ", \(target)"
+        }
+        if let shortcuts = node.shortcuts, !shortcuts.isEmpty {
+            let keys = shortcuts.map(\.description).joined(separator: ", ")
+            label += ", " + String(format: String(localized: "shortcut %@", bundle: L10n.bundle), keys)
+        }
         if let readLater = node.readLater {
             label += readLater == .read ? ", in Reading List, read" : ", in Reading List, unread"
         }

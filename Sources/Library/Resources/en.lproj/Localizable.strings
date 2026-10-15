@@ -313,3 +313,6 @@
 
 /* Alert or dialog text. */
 "You can drag Library.app into your Applications folder yourself." = "You can drag Library.app into your Applications folder yourself.";
+
+/* VoiceOver label for a Manage row: the shortcut that opens it, such as "⌘⇧K". */
+"shortcut %@" = "shortcut %@";
