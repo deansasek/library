@@ -17,8 +17,9 @@ final class SnippetStore: ObservableObject {
     static let defaultFile = LibraryStore.dir.appendingPathComponent("snippets.json")
 
     @Published private(set) var snippets: [Snippet] = []
-    /// True when snippets.json exists but cannot be read. Nothing is written over it until it can be read.
-    private var blocked = false
+    /// True when snippets.json exists but cannot be read. Nothing is changed or written over it until it can be read,
+    /// so add, update, and remove do nothing and the Manage window and the editor disable their save actions.
+    @Published private(set) var saveBlocked = false
     private let file: URL?
 
     /// `file` is where the snippets are saved. Nil keeps them in memory only.
@@ -31,7 +32,7 @@ final class SnippetStore: ObservableObject {
         guard let file, FileManager.default.fileExists(atPath: file.path) else { return }
         guard let data = try? Data(contentsOf: file) else {
             NSLog("Library: could not read snippets.json, so changes to snippets are not saved")
-            blocked = true
+            saveBlocked = true
             return
         }
         guard let loaded = try? JSONDecoder().decode([Snippet].self, from: data) else {
@@ -46,24 +47,26 @@ final class SnippetStore: ObservableObject {
     }
 
     func add(_ snippet: Snippet) {
+        guard !saveBlocked else { return }
         snippets.append(snippet)
         save()
     }
 
     /// Replaces the snippet with the same id.
     func update(_ snippet: Snippet) {
-        guard let index = snippets.firstIndex(where: { $0.id == snippet.id }) else { return }
+        guard !saveBlocked, let index = snippets.firstIndex(where: { $0.id == snippet.id }) else { return }
         snippets[index] = snippet
         save()
     }
 
     func remove(_ ids: Set<UUID>) {
+        guard !saveBlocked else { return }
         snippets.removeAll { ids.contains($0.id) }
         save()
     }
 
     private func save() {
-        guard let file, !blocked else { return }
+        guard let file, !saveBlocked else { return }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         do {

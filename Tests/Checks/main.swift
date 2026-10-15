@@ -369,6 +369,15 @@ let movedSnippets = SnippetStore(file: damagedSnippetFile)
 check(movedSnippets.snippets.isEmpty && !FileManager.default.fileExists(atPath: damagedSnippetFile.path)
       && FileManager.default.fileExists(atPath: snippetDir.appendingPathComponent("snippets-damaged.json").path),
       "a damaged snippets file is moved aside, not read as snippets")
+// A snippets.json that exists but cannot be read (a directory here) blocks saving: changes do nothing and nothing is written.
+let blockedSnippetFile = snippetDir.appendingPathComponent("blocked-snippets.json")
+try? FileManager.default.createDirectory(at: blockedSnippetFile, withIntermediateDirectories: true)
+let blockedSnippets = SnippetStore(file: blockedSnippetFile)
+blockedSnippets.add(Snippet(name: "Lost", text: "Not saved"))
+check(blockedSnippets.saveBlocked && blockedSnippets.snippets.isEmpty, "an unreadable snippets file blocks changes")
+var blockedIsDirectory: ObjCBool = false
+check(FileManager.default.fileExists(atPath: blockedSnippetFile.path, isDirectory: &blockedIsDirectory) && blockedIsDirectory.boolValue,
+      "a change while blocked does not replace the unreadable file")
 try? FileManager.default.removeItem(at: snippetDir)
 
 // ---- a shortcut is equal to the same shortcut ----

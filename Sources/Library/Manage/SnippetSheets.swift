@@ -28,9 +28,21 @@ final class SnippetDraft: ObservableObject {
     }
 }
 
+/// Says that snippets cannot be saved, because snippets.json cannot be read.
+struct SnippetSaveNotice: View {
+    var body: some View {
+        Label("snippets.json cannot be read, so snippets cannot be saved. Check the file in your library folder.",
+              systemImage: "exclamationmark.triangle")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+    }
+}
+
 /// The form for one snippet. Used in the Snippets sheet and in its own window from Quick Open and the File menu.
 struct SnippetForm: View {
     @StateObject private var draft: SnippetDraft
+    @ObservedObject private var store = SnippetStore.shared
     private let isNew: Bool
     /// Closes the form, after a save or a cancel.
     let close: () -> Void
@@ -43,6 +55,9 @@ struct SnippetForm: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if store.saveBlocked {
+                SnippetSaveNotice()
+            }
             Form {
                 Section {
                     TextField("Name", text: $draft.name, prompt: Text("Required"))
@@ -66,7 +81,7 @@ struct SnippetForm: View {
                 Button("Cancel", role: .cancel) { close() }
                     .keyboardShortcut(.cancelAction)
                 Button(isNew ? "Add" : "Save") {
-                    guard draft.isValid else { return }
+                    guard draft.isValid, !store.saveBlocked else { return }
                     if isNew {
                         SnippetStore.shared.add(draft.snippet)
                     } else {
@@ -75,7 +90,7 @@ struct SnippetForm: View {
                     close()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!draft.isValid)
+                .disabled(!draft.isValid || store.saveBlocked)
             }
             .padding([.horizontal, .bottom], 20)
         }
@@ -91,6 +106,10 @@ struct SnippetsSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if store.saveBlocked {
+                SnippetSaveNotice()
+                Divider()
+            }
             List(store.snippets, selection: $model.selection) { snippet in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(snippet.name)
@@ -121,6 +140,7 @@ struct SnippetsSheet: View {
             HStack {
                 Button("Add…") { model.editing = .new }
                     .accessibilityLabel("Add Snippet")
+                    .disabled(store.saveBlocked)
                 Button("Edit…") {
                     if let id = model.selection { model.editing = .edit(id) }
                 }
@@ -131,7 +151,7 @@ struct SnippetsSheet: View {
                         model.selection = nil
                     }
                 }
-                .disabled(model.selection == nil)
+                .disabled(model.selection == nil || store.saveBlocked)
                 Spacer()
                 Button("Done") { dismiss() }
                     .keyboardShortcut(.defaultAction)
