@@ -104,6 +104,16 @@ struct MenuContent: View {
         } label: {
             Text("Check for Updates…", bundle: L10n.bundle)
         }
+        Menu {
+            Button("Library Help") { NSWorkspace.shared.open(HelpCommands.readme) }
+            Button("Keyboard Shortcuts") { NSWorkspace.shared.open(HelpCommands.shortcuts) }
+            Button("Welcome Tour…") { Welcome.show(store: store) }
+            Divider()
+            Button("Report an Issue…") { NSWorkspace.shared.open(HelpCommands.issues) }
+            Button("Support Library…") { NSWorkspace.shared.open(HelpCommands.support) }
+        } label: {
+            Text("Help", bundle: L10n.bundle)
+        }
         Button {
             NSApp.activate(ignoringOtherApps: true)
             NSApp.orderFrontStandardAboutPanel(options: [

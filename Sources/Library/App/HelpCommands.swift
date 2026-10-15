@@ -4,10 +4,10 @@ import SwiftUI
 struct HelpCommands: Commands {
     let store: LibraryStore
 
-    private static let readme = URL(string: "https://github.com/deansasek/library#readme")!
-    private static let shortcuts = URL(string: "https://github.com/deansasek/library#shortcuts")!
-    private static let issues = URL(string: "https://github.com/deansasek/library/issues/new")!
-    private static let support = URL(string: "https://buymeacoffee.com/deansasek")!
+    static let readme = URL(string: "https://github.com/deansasek/library#readme")!
+    static let shortcuts = URL(string: "https://github.com/deansasek/library#shortcuts")!
+    static let issues = URL(string: "https://github.com/deansasek/library/issues/new")!
+    static let support = URL(string: "https://buymeacoffee.com/deansasek")!
 
     var body: some Commands {
         CommandGroup(replacing: .help) {
