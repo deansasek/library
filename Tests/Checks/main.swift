@@ -2079,6 +2079,15 @@ undoStore.endRename()
 check(undoLog.canRedo, "no-op edits leave Redo alone")
 undoLog.redo()
 check(undoStore.nodes.map(\.name) == ["B", "A", "C"], "Redo still moves B before A: \(undoStore.nodes.map(\.name))")
+
+// After Undo, Redo is named for the step it redoes, and Undo after Redo is named again.
+step { undoStore.move([noopC.id], before: noopA.id) }
+step { undoStore.rename(noopA.id, to: "A2"); undoStore.endRename() }
+check(undoLog.undoActionName == "Rename", "undo names the last step: \(undoLog.undoActionName)")
+undoLog.undo()
+check(undoLog.redoActionName == "Rename", "redo is named for the step it redoes: \(undoLog.redoActionName)")
+undoLog.undo()
+check(undoLog.redoActionName == "Move", "redo after a second undo is named for that step: \(undoLog.redoActionName)")
 try? FileManager.default.removeItem(at: storeHome)
 
 // A thumbnail is made only from a picture whose header size is reasonable.
