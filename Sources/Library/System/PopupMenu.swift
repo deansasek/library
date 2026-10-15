@@ -41,7 +41,10 @@ enum PopupMenu {
             menu.addItem(suggestionItem(suggestion, action: #selector(Target.addSuggested(_:)), target: target))
         }
         NSApp.activate(ignoringOtherApps: true)
-        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        // Menu items hold their target weakly, so the target must live until the menu closes.
+        withExtendedLifetime(target) {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
     }
 
     /// Shows the clipboard history at the mouse pointer. Choosing an item copies it back.
