@@ -234,7 +234,7 @@ struct ManageView: View {
             }
             Button("Cancel", role: .cancel) { state.pendingPurge = nil }
         } message: {
-            Text("The items are removed for good and can’t be restored.")
+            Text("The items are removed from Recently Deleted. Undo right after this brings them back.")
         }
         .dropDestination(for: RowDrag.self) { drags, _ in
             // Rows dropped on empty space, not on a row, go to the top level.
