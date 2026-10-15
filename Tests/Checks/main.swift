@@ -2145,5 +2145,18 @@ do {
     check(current.applying(base, from: base) == current, "an unchanged editor leaves the item as it is")
 }
 
+// Two folders each moved into the other, one choice from each Mac: neither is dropped, both stay at the top level.
+do {
+    let f1 = LibraryItem(name: "F1", children: [])
+    let f2 = LibraryItem(name: "F2", children: [])
+    var localF1 = f1
+    localF1.children = [f2]
+    var otherF2 = f2
+    otherF2.children = [f1]
+    let cycle = LibrarySync.resolve(local: LibrarySync.Contents(live: [localF1]), other: LibrarySync.Contents(live: [otherF2]),
+                                    preferring: .thisMac, choices: [f1.id: .other, f2.id: .thisMac])
+    check(cycle.live.map(\.name).sorted() == ["F1", "F2"], "folders chosen as each other's parents are both kept at the top level")
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
