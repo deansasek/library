@@ -220,6 +220,12 @@ struct ManageView: View {
             }
         }
         .onChange(of: state.query) { _, _ in state.selection.formIntersection(visible) }
+        // An undo, a removal, or a sync can take a selected item out of both the library and Recently Deleted. Delete and
+        // Get Info act on the selection, so such an item is dropped from it, and the commands follow the pruned set.
+        .onChange(of: store.revision) { _, _ in
+            let existing = Set(store.nodes.allIDs + store.deleted.allIDs)
+            state.selection.formIntersection(existing)
+        }
         .onDeleteCommand { delete(state.selection.intersection(visible)) }
         .onKeyPress(.delete) {
             // Delete alone is handled by onDeleteCommand. Command-Delete matches Finder's Move to Trash.
