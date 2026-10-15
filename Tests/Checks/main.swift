@@ -1235,6 +1235,11 @@ if let exported = try? LibraryBackup.encode(backupTree, exportedAt: backupFixed)
     if case .success(let restored) = LibraryBackup.decode(exported) {
         check(restored.allIDs == backupTree.allIDs, "backup round trip keeps every id")
         check((try? LibraryBackup.encode(restored, exportedAt: backupFixed)) == exported, "backup round trip re-encodes byte for byte")
+        var loginCommand = LibraryItem(name: "Login", command: "echo hi")
+        loginCommand.openAtLogin = true
+        if case .success(let fromFile) = LibraryBackup.decode(try! JSONEncoder().encode([loginCommand])) {
+            check(fromFile.first?.openAtLogin == nil, "a restored command does not run at login by itself")
+        }
         check(restored[1].shortcuts?.first?.description == "⌘T" && restored[1].icon == "star.fill" && restored[1].color == "red"
               && restored[1].keywords == "term" && restored[2].openAtLogin == true && restored[2].children?[0].browser == "com.apple.Safari"
               && restored[2].promptLabel == "Ticket", "backup keeps every field")
