@@ -232,7 +232,7 @@ struct EditSheet: View {
                 HStack {
                     ShortcutField(
                         shortcut: Binding(
-                            get: { state.draft.shortcuts?[index] },
+                            get: { state.draft.shortcuts?.indices.contains(index) == true ? state.draft.shortcuts?[index] : nil },
                             set: { if let new = $0, index < (state.draft.shortcuts?.count ?? 0) { state.draft.shortcuts?[index] = new } }
                         ),
                         isRecording: state.recordingIndex == index,
@@ -242,8 +242,8 @@ struct EditSheet: View {
                     Spacer()
                     if let labels = node.modeLabels {
                         Picker("Opens In", selection: Binding(
-                            get: { state.draft.shortcuts?[index].openNew ?? false },
-                            set: { state.draft.shortcuts?[index].openNew = $0 }
+                            get: { state.draft.shortcuts?.indices.contains(index) == true ? state.draft.shortcuts?[index].openNew ?? false : false },
+                            set: { if state.draft.shortcuts?.indices.contains(index) == true { state.draft.shortcuts?[index].openNew = $0 } }
                         )) {
                             Text(labels.existing).tag(false)
                             Text(labels.new).tag(true)
