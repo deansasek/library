@@ -26,13 +26,13 @@ Click the Library icon in the menu bar to open your items and recent copies, or 
 
 ## Install
 
-Paste this into Terminal. It builds Library and installs `Library.app` in your Applications folder. The source is kept out of the way, in Application Support:
+Paste this into Terminal. It installs the Xcode Command Line Tools if they are missing, builds Library, and installs `Library.app` in your Applications folder. It downloads the source to a temporary folder and needs no git or Xcode beforehand:
 
 ```bash
-git clone https://github.com/deansasek/library.git "$HOME/Library/Application Support/Library/Source" && "$HOME/Library/Application Support/Library/Source/install.sh"
+cd "$(mktemp -d)" && curl -fsSL https://github.com/deansasek/library/archive/refs/heads/main.zip -o library.zip && unzip -q library.zip && ./library-main/install.sh
 ```
 
-Library checks for updates itself. **Check for Updates…** offers to install a newer version in Terminal. Your library and pinned clipboard items are kept. To update a clone made this way, run `update.sh` in the Source folder.
+Library checks for updates itself. **Check for Updates…** offers to install a newer version in Terminal. Your library and pinned clipboard items are kept. An install made from a clone can be updated with `update.sh` in that folder.
 
 **Requirements:** macOS 26 or later, and the Xcode Command Line Tools.
 

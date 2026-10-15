@@ -17,7 +17,30 @@ fail() {
 [[ "$(uname)" == "Darwin" ]] || fail "Library only runs on macOS."
 major="$(sw_vers -productVersion | cut -d. -f1)"
 (( major >= 26 )) || fail "Library needs macOS 26 or later. This Mac runs macOS $(sw_vers -productVersion)."
-xcode-select -p >/dev/null 2>&1 || fail "the Xcode Command Line Tools are missing. Run 'xcode-select --install', wait for it to finish, then try again."
+# Installs the Command Line Tools when they are missing. Apple's installer runs without a window when softwareupdate
+# can find them, which needs an administrator password once. Otherwise the standard install window opens, and this
+# waits up to 30 minutes for it to finish.
+ensure_command_line_tools() {
+    xcode-select -p >/dev/null 2>&1 && return 0
+    print "The Xcode Command Line Tools are needed to build Library. Installing them now."
+    touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+    local label
+    label="$(softwareupdate -l 2>/dev/null | sed -n 's/^[*] Label: *//p' | grep 'Command Line Tools' | tail -1 || true)"
+    if [[ -n "$label" ]]; then
+        sudo softwareupdate -i "$label" --verbose || true
+    fi
+    rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+    if ! xcode-select -p >/dev/null 2>&1; then
+        xcode-select --install 2>/dev/null || true
+        print "Finish the window that opened. Waiting for the tools to install."
+        for _ in {1..360}; do
+            xcode-select -p >/dev/null 2>&1 && break
+            sleep 5
+        done
+    fi
+    xcode-select -p >/dev/null 2>&1 || fail "the Xcode Command Line Tools did not install. Run 'xcode-select --install', finish the window, then run the install again."
+}
+ensure_command_line_tools
 command -v swift >/dev/null 2>&1 || fail "the Swift compiler was not found. Reinstall the Xcode Command Line Tools with 'xcode-select --install'."
 
 if ! ./build.sh; then
