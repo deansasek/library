@@ -25,9 +25,12 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
-      # test.sh compiles the app's sources itself, so a pull request does not need a separate release build.
+      # test.sh compiles the app's sources itself, but it leaves out the app entry point (LibraryApp.swift), Package.swift,
+      # and resource processing. The release build of the package covers those on every pull request.
       - name: Run the checks
         run: ./test.sh
+      - name: Build the package
+        run: swift build -c release
 
   # The release build is what main ships, so it runs on main only.
   build:
