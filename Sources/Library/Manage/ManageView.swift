@@ -74,41 +74,6 @@ struct ManageView: View {
         return store.nodes.node(withID: id)?.shareURL
     }
 
-    /// The nodes in the order the window shows them: yours, or sorted by a column at every level, folders first.
-    private func displayed(_ nodes: [LibraryItem]) -> [LibraryItem] {
-        guard let key = state.sortKey else { return nodes }
-        func value(_ node: LibraryItem) -> String {
-            switch key {
-            case .name, .mostUsed, .recentlyOpened: return node.name
-            case .shortcut: return node.shortcuts?.first?.description ?? "\u{10FFFF}"
-            case .path: return node.url ?? node.command ?? node.appPath ?? ""
-            }
-        }
-        var result = nodes.map { node -> LibraryItem in
-            var node = node
-            node.children = node.children.map(displayed)
-            return node
-        }
-        if key == .mostUsed || key == .recentlyOpened {
-            // Within each section between dividers, folders keep their places first, as they do in the other orders, and
-            // the items are ordered by their use. A divider stays where it is, so no item moves across it.
-            return UsageOrder.withinSections(result) { section in
-                let folders = section.filter(\.isFolder)
-                let items = section.filter { !$0.isFolder }
-                let ordered = key == .mostUsed
-                    ? UsageOrder.mostUsed(items, counts: store.openCounts)
-                    : UsageOrder.recentlyOpened(items, opened: store.lastOpened)
-                return folders + ordered
-            }
-        }
-        result.sort { a, b in
-            if a.isFolder != b.isFolder { return a.isFolder }
-            let order = value(a).localizedCaseInsensitiveCompare(value(b))
-            return state.ascending ? order == .orderedAscending : order == .orderedDescending
-        }
-        return result
-    }
-
     var body: some View {
         // The Path column takes about two fifths of the window, so widening the window gives it room.
         GeometryReader { geometry in
@@ -201,15 +166,19 @@ struct ManageView: View {
     }
 
     private func list(pathWidth: CGFloat) -> some View {
-        // The search runs once per change to the query or the library, not on every redraw.
-        let found = state.searches.result(for: state.query, scope: state.scope, revision: store.revision, in: store.nodes)
-        let trashed = store.deleted.matching(state.query, scope: state.scope)
-        let reading = ReadingList.ordered(found.tree.leaves)
-        let shown = found.count
+        // The rows are sorted and searched once per change to the query, scope, library, usage, or sort, not on every redraw.
+        let key = ManageListingCache.Key(query: state.query, scope: state.scope, revision: store.revision,
+                                         usage: store.usageRevision, sort: state.sortKey, ascending: state.ascending)
+        let listing = state.listings.listing(for: key) {
+            ManageListing.build(query: state.query, scope: state.scope, nodes: store.nodes, deleted: store.deleted,
+                                sort: state.sortKey, ascending: state.ascending, counts: store.openCounts, opened: store.lastOpened)
+        }
+        let trashed = listing.trashed
+        let shown = listing.count
         // Rows the search hid must not stay selected: Delete and Get Info act on the selection.
-        let visible = Set(found.tree.allIDs + trashed.allIDs)
+        let visible = listing.visible
         return List(selection: $state.selection) {
-            rows(displayed(found.tree), reading: reading, trashed: trashed, pathWidth: pathWidth)
+            rows(listing.tree, reading: listing.reading, trashed: trashed, pathWidth: pathWidth)
         }
         .listStyle(.inset(alternatesRowBackgrounds: true))
         .navigationSubtitle("\(shown) \(shown == 1 ? "item" : "items")")
@@ -236,7 +205,7 @@ struct ManageView: View {
                 } actions: {
                     Button("Add Bookmark") { state.present(.bookmark) }
                 }
-            } else if found.tree.isEmpty && trashed.isEmpty {
+            } else if listing.tree.isEmpty && trashed.isEmpty {
                 ContentUnavailableView.search(text: state.query)
             }
         }

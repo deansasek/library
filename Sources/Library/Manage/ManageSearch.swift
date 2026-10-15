@@ -103,27 +103,91 @@ extension Array where Element == LibraryItem {
     }
 }
 
-/// The last search in the Library window. Searching a large library takes a noticeable time, and the window
-/// redraws on every selection, so the result is kept until the query, the scope, or the library changes.
-final class SearchCache {
-    struct Result {
-        /// The tree the search leaves in view.
-        let tree: [LibraryItem]
-        /// The bookmarks and apps in `tree`, or the folders when the scope is Folders, for the window subtitle.
-        let count: Int
+/// The rows the Library window lists: the library tree in the window's order, the Reading List, Recently Deleted,
+/// and the rows the search leaves visible. Searching and sorting a large library takes a noticeable time, and the
+/// window redraws on every selection, so these are built once per change (see ManageListingCache).
+struct ManageListing {
+    /// The library rows the search leaves in view, in the order the window shows them.
+    let tree: [LibraryItem]
+    /// The bookmarks and apps in the search result, or the folders when the scope is Folders, for the window subtitle.
+    let count: Int
+    /// The Reading List rows, unread first.
+    let reading: [LibraryItem]
+    /// The Recently Deleted rows the search leaves in view.
+    let trashed: [LibraryItem]
+    /// The ids of the rows listed, so a selection can drop the rows the search hid.
+    let visible: Set<UUID>
+
+    static func build(query: String, scope: SearchScope, nodes: [LibraryItem], deleted: [LibraryItem],
+                      sort: ManageState.SortKey?, ascending: Bool, counts: [String: Int], opened: [String: Date]) -> ManageListing {
+        let found = nodes.matching(query, scope: scope)
+        let trashed = deleted.matching(query, scope: scope)
+        return ManageListing(
+            tree: arranged(found, by: sort, ascending: ascending, counts: counts, opened: opened),
+            count: scope == .folders ? found.folderCount : found.leaves.count,
+            reading: ReadingList.ordered(found.leaves),
+            trashed: trashed,
+            visible: Set(found.allIDs + trashed.allIDs)
+        )
     }
 
-    private var last: (query: String, scope: SearchScope, revision: Int, result: Result)?
-
-    /// `revision` changes whenever `nodes` changes, so a stale result is never returned.
-    func result(for query: String, scope: SearchScope = .all, revision: Int, in nodes: [LibraryItem]) -> Result {
-        if let last, last.query == query, last.scope == scope, last.revision == revision {
-            return last.result
+    /// The nodes in the order the window shows them: yours, or sorted by a column at every level, folders first.
+    static func arranged(_ nodes: [LibraryItem], by sort: ManageState.SortKey?, ascending: Bool,
+                         counts: [String: Int], opened: [String: Date]) -> [LibraryItem] {
+        guard let key = sort else { return nodes }
+        func value(_ node: LibraryItem) -> String {
+            switch key {
+            case .name, .mostUsed, .recentlyOpened: return node.name
+            case .shortcut: return node.shortcuts?.first?.description ?? "\u{10FFFF}"
+            case .path: return node.url ?? node.command ?? node.appPath ?? ""
+            }
         }
-        let tree = nodes.matching(query, scope: scope)
-        let count = scope == .folders ? tree.folderCount : tree.leaves.count
-        let result = Result(tree: tree, count: count)
-        last = (query, scope, revision, result)
+        var result = nodes.map { node -> LibraryItem in
+            var node = node
+            node.children = node.children.map { arranged($0, by: sort, ascending: ascending, counts: counts, opened: opened) }
+            return node
+        }
+        if key == .mostUsed || key == .recentlyOpened {
+            // Within each section between dividers, folders keep their places first, as they do in the other orders, and
+            // the items are ordered by their use. A divider stays where it is, so no item moves across it.
+            return UsageOrder.withinSections(result) { section in
+                let folders = section.filter(\.isFolder)
+                let items = section.filter { !$0.isFolder }
+                let ordered = key == .mostUsed
+                    ? UsageOrder.mostUsed(items, counts: counts)
+                    : UsageOrder.recentlyOpened(items, opened: opened)
+                return folders + ordered
+            }
+        }
+        result.sort { a, b in
+            if a.isFolder != b.isFolder { return a.isFolder }
+            let order = value(a).localizedCaseInsensitiveCompare(value(b))
+            return ascending ? order == .orderedAscending : order == .orderedDescending
+        }
         return result
+    }
+}
+
+/// The last rows the Library window built. They are kept between redraws and rebuilt only when the query, the scope,
+/// the library revision, the usage counts, or the sort changes.
+final class ManageListingCache {
+    struct Key: Equatable {
+        let query: String
+        let scope: SearchScope
+        /// Changes whenever the library changes (`LibraryStore.revision`).
+        let revision: Int
+        /// Changes whenever an item is opened, since Most Used and Recently Opened depend on it (`LibraryStore.usageRevision`).
+        let usage: Int
+        let sort: ManageState.SortKey?
+        let ascending: Bool
+    }
+
+    private var last: (key: Key, listing: ManageListing)?
+
+    func listing(for key: Key, build: () -> ManageListing) -> ManageListing {
+        if let last, last.key == key { return last.listing }
+        let listing = build()
+        last = (key, listing)
+        return listing
     }
 }

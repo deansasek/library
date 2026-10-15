@@ -32,8 +32,8 @@ final class ManageState: ObservableObject {
     @Published var query = ""
     /// The search field's scope bar. It narrows the results of `query`.
     @Published var scope = SearchScope.all
-    /// The search result for `query`, kept between redraws.
-    let searches = SearchCache()
+    /// The rows for the current query, scope, and sort, kept between redraws.
+    let listings = ManageListingCache()
 
     // Add sheets.
     @Published var name = ""
