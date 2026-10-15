@@ -355,3 +355,12 @@
 
 /* VoiceOver label for the warning beside a shortcut that another app uses. */
 "Another app uses this shortcut" = "Another app uses this shortcut";
+
+/* VoiceOver value on the welcome window: its position, such as "Step 2 of 7". */
+"Step %lld of %lld" = "Step %lld of %lld";
+
+/* VoiceOver label for the progress spinner while Library moves to Applications. */
+"Moving Library" = "Moving Library";
+
+/* VoiceOver label for the progress spinner while the app list loads. */
+"Loading applications" = "Loading applications";

@@ -54,6 +54,14 @@ struct WelcomeView: View {
         .frame(width: 540, height: 580)
         .clipped()
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.28), value: model.page)
+        .accessibilityValue(stepText)
+        // A page change is not spoken on its own, so the new step is announced.
+        .onChange(of: model.page) { _, _ in AccessibilityNotification.Announcement(stepText).post() }
+    }
+
+    /// The position in the welcome pages, such as "Step 2 of 7".
+    private var stepText: String {
+        String(localized: "Step \(model.page + 1) of \(WelcomeModel.pageCount)", bundle: L10n.bundle)
     }
 
     // MARK: Pages
@@ -156,7 +164,9 @@ struct WelcomeView: View {
             if installed {
                 Text("Done").foregroundStyle(.secondary)
             } else if model.isMoving {
-                ProgressView().controlSize(.small)
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityLabel(String(localized: "Moving Library", bundle: L10n.bundle))
             } else {
                 Button("Move to Applications") { move() }
             }
