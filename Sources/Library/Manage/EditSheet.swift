@@ -109,6 +109,9 @@ struct EditSheet: View {
                                 Circle().strokeBorder(Color.primary.opacity(0.6), lineWidth: 2).padding(-3)
                             }
                         }
+                        // The clickable area is the 24 pt frame, not the 18 pt dot. The selection ring sits within it.
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(name.capitalized)
