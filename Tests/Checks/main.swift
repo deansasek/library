@@ -292,6 +292,15 @@ check(sel?.source == .selection && sel?.node.name == "swift.org", "a selected li
 check(AddSuggestion.make(selection: "just some words", clipboard: nil, in: tree()) == nil, "plain selected text is not")
 check(AddSuggestion.make(selection: "https://docs.example.com", clipboard: nil, in: tree()) == nil, "a link already in the library is not")
 check(AddSuggestion.make(selection: nil, clipboard: nil, in: tree()) == nil, "nothing to suggest")
+// Only web addresses are suggested: a copied local file or app address, or a library address, is not offered.
+check(AddSuggestion.make(selection: "file://localhost/Applications/X.app", clipboard: nil, in: tree()) == nil
+      && AddSuggestion.make(selection: "library://item/abc", clipboard: nil, in: tree()) == nil, "a file or library address is not suggested from a selection")
+check(QuickOpenResult.link(from: "file://localhost/Applications/X.app") == nil && QuickOpenResult.link(from: "library://x/y") == nil
+      && QuickOpenResult.link(from: "http://a.example.com/x")?.scheme == "http", "only web schemes are links")
+let localClip = ClipItem(representations: [], digest: "local", kind: .link, title: "link", plainText: nil,
+                         link: URL(string: "file://localhost/Applications/X.app"), thumbnail: nil, gifURL: nil, fileURLs: [],
+                         byteCount: 0)
+check(localClip.libraryNode == nil && AddSuggestion.make(selection: nil, clipboard: localClip, in: tree()) == nil, "a copied file address is not suggested from the clipboard")
 
 // ---- tracking parameters: a table of links and their cleaned copies ----
 let trackingTable: [(link: String, clean: String)] = [
