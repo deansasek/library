@@ -54,6 +54,23 @@ struct LibraryItem: Codable, Identifiable, Equatable {
         "blue": .systemBlue, "purple": .systemPurple, "gray": .systemGray,
     ]
 
+    /// The color tag as VoiceOver reads it, such as "red tag". Nil for an item without a color. The dot alone is not
+    /// enough, because VoiceOver cannot see it.
+    static func tagAccessibilityName(_ color: String?) -> String? {
+        guard let color, tagColors[color] != nil else { return nil }
+        let name: String
+        switch color {
+        case "red": name = String(localized: "red", bundle: L10n.bundle)
+        case "orange": name = String(localized: "orange", bundle: L10n.bundle)
+        case "yellow": name = String(localized: "yellow", bundle: L10n.bundle)
+        case "green": name = String(localized: "green", bundle: L10n.bundle)
+        case "blue": name = String(localized: "blue", bundle: L10n.bundle)
+        case "purple": name = String(localized: "purple", bundle: L10n.bundle)
+        default: name = String(localized: "gray", bundle: L10n.bundle)
+        }
+        return String(format: String(localized: "%@ tag", bundle: L10n.bundle), name)
+    }
+
     /// Names for the two open behaviors. Nil for items without a choice.
     var modeLabels: (existing: String, new: String)? {
         if appPath != nil { return ("Bring Forward", "New Instance") }

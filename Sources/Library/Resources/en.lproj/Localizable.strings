@@ -325,3 +325,15 @@
 
 /* VoiceOver announcement in Quick Open with the number of results a search found. */
 "%lld results" = "%lld results";
+
+/* VoiceOver name for a color tag, such as "red tag". The color name is in the first %@. */
+"%@ tag" = "%@ tag";
+
+/* Color tag names, read by VoiceOver. */
+"red" = "red";
+"orange" = "orange";
+"yellow" = "yellow";
+"green" = "green";
+"blue" = "blue";
+"purple" = "purple";
+"gray" = "gray";
