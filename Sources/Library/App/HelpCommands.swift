@@ -7,6 +7,7 @@ struct HelpCommands: Commands {
     private static let readme = URL(string: "https://github.com/deansasek/library#readme")!
     private static let shortcuts = URL(string: "https://github.com/deansasek/library#shortcuts")!
     private static let issues = URL(string: "https://github.com/deansasek/library/issues/new")!
+    private static let support = URL(string: "https://buymeacoffee.com/deansasek")!
 
     var body: some Commands {
         CommandGroup(replacing: .help) {
@@ -16,6 +17,8 @@ struct HelpCommands: Commands {
             Button("Welcome Tour…") { Welcome.show(store: store) }
             Divider()
             Button("Report an Issue…") { NSWorkspace.shared.open(Self.issues) }
+            Divider()
+            Button("Support Library…") { NSWorkspace.shared.open(Self.support) }
         }
     }
 }
