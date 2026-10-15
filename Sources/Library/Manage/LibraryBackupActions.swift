@@ -2,6 +2,7 @@ import AppKit
 import UniformTypeIdentifiers
 
 /// File > Export Library… and Settings > Backup. Writes and reads the files that `LibraryBackup` encodes and decodes.
+/// Panels and alerts attach to the window in front as sheets (see `Sheets`).
 @MainActor
 enum LibraryBackupActions {
     static let exportNote = "The backup has your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at login settings. It doesn’t include clipboard items. Pinned clipboard items are encrypted with a key that stays on this Mac, so they aren’t exported."
@@ -13,18 +14,20 @@ enum LibraryBackupActions {
         panel.allowedContentTypes = [.json]
         panel.canCreateDirectories = true
         panel.nameFieldStringValue = "Library Backup \(dateStamp()).json"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        AttachedSheets.choose(panel) { url in
+            guard let url else { return }
 
-        let data: Data
-        do {
-            data = try LibraryBackup.encode(store.nodes)
-        } catch {
-            return report("Couldn’t export the library", error.localizedDescription)
-        }
-        do {
-            try data.write(to: url, options: .atomic)
-        } catch {
-            report("Couldn’t export the library", "Library couldn’t write “\(url.lastPathComponent)”. \(error.localizedDescription)")
+            let data: Data
+            do {
+                data = try LibraryBackup.encode(store.nodes)
+            } catch {
+                return report("Couldn’t export the library", error.localizedDescription)
+            }
+            do {
+                try data.write(to: url, options: .atomic)
+            } catch {
+                report("Couldn’t export the library", "Library couldn’t write “\(url.lastPathComponent)”. \(error.localizedDescription)")
+            }
         }
     }
 
@@ -40,14 +43,19 @@ enum LibraryBackupActions {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        AttachedSheets.choose(panel) { url in
+            guard let url else { return }
+            confirmRestore(from: url, into: store)
+        }
+    }
 
-        let items: [LibraryItem]
+    private static func confirmRestore(from url: URL, into store: LibraryStore) {
+        let decoded: [LibraryItem]
         do {
             let data = try Data(contentsOf: url)
             switch LibraryBackup.decode(data) {
-            case .success(let decoded):
-                items = LibraryBackup.restorable(decoded, avoiding: store.deleted)
+            case .success(let items):
+                decoded = items
             case .failure(let error):
                 return report("Couldn’t restore the library", "“\(url.lastPathComponent)” couldn’t be restored. \(error.message)")
             }
@@ -56,7 +64,7 @@ enum LibraryBackupActions {
         }
 
         let current = store.nodes.allIDs.count
-        let incoming = items.allIDs.count
+        let incoming = LibraryBackup.restorable(decoded, avoiding: store.deleted).allIDs.count
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Replace your library?", bundle: L10n.bundle)
@@ -65,9 +73,12 @@ enum LibraryBackupActions {
         let replace = alert.addButton(withTitle: String(localized: "Replace Library", bundle: L10n.bundle))
         replace.hasDestructiveAction = true
         // Cancel is the default button, so pressing Return keeps the library.
-        guard alert.runModal() == .alertSecondButtonReturn else { return }
-
-        store.perform("Restore Library") { $0 = items }
+        AttachedSheets.alert(alert) { response in
+            guard response == .alertSecondButtonReturn else { return }
+            // The library may have changed while the sheet was up, so the restored items are made against it now.
+            let items = LibraryBackup.restorable(decoded, avoiding: store.deleted)
+            store.perform("Restore Library") { $0 = items }
+        }
     }
 
     private static func count(_ n: Int) -> String {
@@ -82,11 +93,10 @@ enum LibraryBackupActions {
     }
 
     private static func report(_ message: String, _ details: String) {
-        NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = message
         alert.informativeText = details
-        alert.runModal()
+        AttachedSheets.alert(alert)
     }
 }

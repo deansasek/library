@@ -932,13 +932,12 @@ final class LibraryStore: ObservableObject {
     }
 
     private func showSyncAlert(_ title: String, _ message: String) {
-        NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = title
         alert.informativeText = message
         alert.addButton(withTitle: String(localized: "OK", bundle: L10n.bundle))
-        alert.runModal()
+        AttachedSheets.alert(alert)
     }
 
     /// Shows a save failure once, until a save works again, so a failing disk does not open an alert per edit.
@@ -948,12 +947,11 @@ final class LibraryStore: ObservableObject {
         saveFailureShown = true
         // Shown on the next pass of the run loop, so the alert does not open in the middle of a save.
         DispatchQueue.main.async {
-            NSApp.activate(ignoringOtherApps: true)
             let alert = NSAlert()
             alert.alertStyle = .warning
             alert.messageText = String(localized: "Library Couldn’t Save Your Changes", bundle: L10n.bundle)
             alert.informativeText = reason
-            alert.runModal()
+            AttachedSheets.alert(alert)
         }
     }
 
