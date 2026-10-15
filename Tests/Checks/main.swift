@@ -1308,6 +1308,14 @@ check(AppDelegate.webLink(from: " https://example.com/a ")?.host == "example.com
 check(AppDelegate.webLink(from: "file:///etc/hosts") == nil && AppDelegate.webLink(from: "httpx://example.com") == nil
       && AppDelegate.webLink(from: "hello") == nil, "non-web selections are refused")
 check(AppDelegate.webLink(from: "https://e.com/" + String(repeating: "a", count: 5_000)) == nil, "a selection over 4,096 characters is refused")
+// Services "Add to Library" for a link: a link already in the library is skipped, so a repeat adds nothing.
+let savedLinks = [LibraryItem(name: "Example", url: "https://example.com/"), LibraryItem(name: "Group", children: [])]
+check(AppDelegate.newBookmark(from: "https://example.com", existing: savedLinks) == nil, "a saved link is not added twice")
+check(AppDelegate.newBookmark(from: "http://example.com/", existing: savedLinks) == nil, "http and https count as one link")
+check(AppDelegate.newBookmark(from: " https://example.com/ \n", existing: savedLinks) == nil, "a padded selection matches the saved link")
+check(AppDelegate.newBookmark(from: "https://other.example.com/a", existing: savedLinks)?.url == "https://other.example.com/a", "a new link is added")
+check(AppDelegate.newBookmark(from: "  https://new.example.com ", existing: [])?.name == "new.example.com", "a new link is named by its host")
+check(AppDelegate.newBookmark(from: "javascript:alert(1)", existing: []) == nil, "a non-web selection adds nothing")
 var bodyLimit = WebFetch.BodyLimit(limit: 1_000)
 check(bodyLimit.add(600) && bodyLimit.add(400) && !bodyLimit.add(1) && bodyLimit.count == 1_001, "a body is refused one byte past its limit")
 check(Favicon.maxBytes == 512 * 1024, "favicon limit is 512 KB")
