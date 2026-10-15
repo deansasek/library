@@ -62,7 +62,7 @@ enum LibraryBackup {
             guard let items = try? decoder.decode([LibraryItem].self, from: data) else {
                 return .failure(.malformed)
             }
-            return unique(items)
+            return unique(withoutLoginCommands(items))
         }
         guard header.format == format else { return .failure(.wrongFormat) }
         guard let found = header.version, found == version else {
@@ -71,7 +71,18 @@ enum LibraryBackup {
         guard let envelope = try? decoder.decode(Envelope.self, from: data) else {
             return .failure(.malformed)
         }
-        return unique(envelope.items)
+        return unique(withoutLoginCommands(envelope.items))
+    }
+
+    /// A file someone else sent can mark a terminal command to run at login. The mark is removed on read, so it runs at
+    /// login only if you turn it on again in Get Info.
+    static func withoutLoginCommands(_ items: [LibraryItem]) -> [LibraryItem] {
+        items.map { item in
+            var copy = item
+            if copy.command != nil { copy.openAtLogin = nil }
+            if let children = copy.children { copy.children = withoutLoginCommands(children) }
+            return copy
+        }
     }
 
     /// Rejects trees with repeated ids. Ids name items everywhere in the app, so a repeat would make edits hit the wrong item.
