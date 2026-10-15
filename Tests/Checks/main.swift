@@ -2100,6 +2100,17 @@ undoLog.undo()
 check(undoLog.redoActionName == "Rename", "redo is named for the step it redoes: \(undoLog.redoActionName)")
 undoLog.undo()
 check(undoLog.redoActionName == "Move", "redo after a second undo is named for that step: \(undoLog.redoActionName)")
+
+// Link check results are not edits: undoing a rename keeps the results recorded after the rename.
+let linked = LibraryItem(name: "Linked", url: "https://linked.example.com")
+let other = LibraryItem(name: "Other", url: "https://other.example.com")
+step { undoStore.nodes = [linked, other] }
+undoLog.removeAllActions()
+step { undoStore.rename(other.id, to: "Other 2"); undoStore.endRename() }
+undoStore.recordLinkStatuses([linked.id: LinkStatus(kind: .broken, checked: Date())])
+undoLog.undo()
+check(undoStore.nodes.map(\.name) == ["Linked", "Other"] && undoStore.nodes.first?.linkStatus?.kind == .broken,
+      "undo keeps a link check result recorded after the step: \(undoStore.nodes.first?.linkStatus?.kind as Any)")
 try? FileManager.default.removeItem(at: storeHome)
 
 // A thumbnail is made only from a picture whose header size is reasonable.
