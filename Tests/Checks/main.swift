@@ -16,6 +16,19 @@ func tree() -> [LibraryItem] {
     ]
 }
 
+// ---- private files (exports and snippets.json are 0600) ----
+do {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("private-check-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let file = dir.appendingPathComponent("backup.json")
+    try? Data("old".utf8).write(to: file)
+    try? FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: file.path)
+    try? PrivateFile.write(Data("new".utf8), to: file)
+    check(PrivateFile.isPrivate(file), "an overwritten export is 0600")
+    check((try? Data(contentsOf: file)) == Data("new".utf8), "the private write keeps the data")
+    try? FileManager.default.removeItem(at: dir)
+}
+
 // ---- model ----
 check(splitArguments("--profile \"My Work\" -n 'a b'") == ["--profile", "My Work", "-n", "a b"], "quoted arguments")
 let jira = LibraryItem(name: "Jira", url: "x.example.com/browse/{}")

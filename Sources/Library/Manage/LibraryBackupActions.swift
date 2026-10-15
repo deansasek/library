@@ -24,7 +24,7 @@ enum LibraryBackupActions {
                 return report("Couldn’t export the library", error.localizedDescription)
             }
             do {
-                try data.write(to: url, options: .atomic)
+                try PrivateFile.write(data, to: url)
             } catch {
                 report("Couldn’t export the library", "Library couldn’t write “\(url.lastPathComponent)”. \(error.localizedDescription)")
             }
