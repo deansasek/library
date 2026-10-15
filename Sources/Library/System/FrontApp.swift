@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 
 /// What Library can learn about, and do in, the app in front. All of it uses Accessibility access, which
 /// Library already asks for, and does nothing without it.
@@ -47,13 +48,43 @@ enum FrontApp {
             && settable.boolValue
     }
 
+    /// The key code that types `letter` on the current keyboard layout, found by asking the layout what each key types.
+    /// Key 9 is V on QWERTY, and is the fallback when no key types the letter.
+    static func keyCode(typing letter: String, character: (CGKeyCode) -> String?) -> CGKeyCode {
+        for code in CGKeyCode(0)..<CGKeyCode(128) where character(code)?.lowercased() == letter {
+            return code
+        }
+        return 9
+    }
+
+    /// The character a key types on the current keyboard layout, without dead keys or modifiers. Nil when the layout
+    /// is not available.
+    private static func layoutCharacter(for code: CGKeyCode) -> String? {
+        guard let source = TISCopyCurrentKeyboardLayoutInputSource()?.takeRetainedValue(),
+              let pointer = TISGetInputSourceProperty(source, kTISPropertyUnicodeKeyLayoutData) else { return nil }
+        let layout = Unmanaged<CFData>.fromOpaque(pointer).takeUnretainedValue() as Data
+        var deadKeys: UInt32 = 0
+        var length = 0
+        var characters = [UniChar](repeating: 0, count: 4)
+        let capacity = characters.count
+        let status = layout.withUnsafeBytes { bytes -> OSStatus in
+            guard let base = bytes.baseAddress?.assumingMemoryBound(to: UCKeyboardLayout.self) else { return OSStatus(paramErr) }
+            return UCKeyTranslate(base, code, UInt16(kUCKeyActionDown), 0, UInt32(LMGetKbdType()),
+                                  OptionBits(kUCKeyTranslateNoDeadKeysBit), &deadKeys, capacity, &length, &characters)
+        }
+        guard status == noErr, length > 0 else { return nil }
+        return String(utf16CodeUnits: characters, count: length)
+    }
+
     /// Presses Command-V in the app in front, a moment later so a closing menu or panel has handed the keyboard back.
+    /// The V key is found on the current layout, so Command-V pastes on Dvorak and other layouts too.
     static func pasteSoon() {
         guard AXIsProcessTrusted() else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
             let source = CGEventSource(stateID: .combinedSessionState)
+            let pasteKey = keyCode(typing: "v", character: layoutCharacter(for:))
             for isDown in [true, false] {
-                let event = CGEvent(keyboardEventSource: source, virtualKey: 9, keyDown: isDown)
+                let event = CGEvent(keyboardEventSource: source, virtualKey: pasteKey, keyDown: isDown)
                 event?.flags = .maskCommand
                 event?.post(tap: .cghidEventTap)
             }
