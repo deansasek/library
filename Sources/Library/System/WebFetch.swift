@@ -11,6 +11,12 @@ enum WebFetch {
         return scheme == "http" || scheme == "https"
     }
 
+    /// True when a redirect from `from` to `to` would turn an https address into a plain http one. Such a redirect is
+    /// refused, so a download that started as https never ends as http.
+    static func isDowngrade(from source: URL?, to target: URL?) -> Bool {
+        source?.scheme?.lowercased() == "https" && target?.scheme?.lowercased() == "http"
+    }
+
     /// How one download is made. The defaults are the favicon rules: a 10 s limit, any number of redirects, and a
     /// body over `limit` is a failure.
     struct Options {
@@ -132,7 +138,9 @@ enum WebFetch {
                         willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
                         completionHandler: @escaping (URLRequest?) -> Void) {
             redirects += 1
-            let allowed = request.url.map(WebFetch.isWeb) == true && (options.maxRedirects.map { redirects <= $0 } ?? true)
+            let allowed = request.url.map(WebFetch.isWeb) == true
+                && !isDowngrade(from: response.url, to: request.url)
+                && (options.maxRedirects.map { redirects <= $0 } ?? true)
             if !allowed { failed = true }
             completionHandler(allowed ? request : nil)
         }

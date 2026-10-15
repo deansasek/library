@@ -53,10 +53,10 @@ enum LinkCheck {
         return kind(forHTTPCode: statusCode)
     }
 
-    /// Whether to follow a redirect to `target`, given how many redirects were already followed. Only web addresses
-    /// are followed, and only up to `maxRedirects`.
-    static func followsRedirect(after followed: Int, to target: URL?) -> Bool {
-        followed < maxRedirects && target.map(WebFetch.isWeb) == true
+    /// Whether to follow a redirect from `source` to `target`, given how many redirects were already followed. Only web
+    /// addresses are followed, only up to `maxRedirects`, and never from https to http.
+    static func followsRedirect(after followed: Int, from source: URL? = nil, to target: URL?) -> Bool {
+        followed < maxRedirects && target.map(WebFetch.isWeb) == true && !WebFetch.isDowngrade(from: source, to: target)
     }
 
     /// Whether a HEAD answer means the server does not accept HEAD, so the check asks again with GET: 403, 405, or 501.
