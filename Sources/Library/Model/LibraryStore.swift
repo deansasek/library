@@ -110,6 +110,8 @@ final class LibraryStore: ObservableObject {
     private var watchers: [DispatchSourceFileSystemObject] = []
     /// True when bookmarks.json existed but could not be read, so the app can say so.
     private(set) var hadUnreadableFile = false
+    /// The copy of an unreadable bookmarks.json, under its timestamped name. Nil when there is none.
+    private(set) var damagedCopy: URL?
     /// True when bookmarks.json exists but cannot be read. Library does not write over it until it can be read.
     private(set) var fileReadFailed = false
     private var saveBlocked = false
@@ -208,10 +210,14 @@ final class LibraryStore: ObservableObject {
                 saveBlocked = true
             case .damaged:
                 hadUnreadableFile = true
-                // The next edit overwrites bookmarks.json, so keep the unreadable file.
-                let damaged = Self.dir.appendingPathComponent("bookmarks-damaged.json")
-                try? FileManager.default.removeItem(at: damaged)
-                try? FileManager.default.copyItem(at: Self.file, to: damaged)
+                // The next edit overwrites bookmarks.json, so keep the unreadable file under a new name. If no copy can
+                // be written, nothing is saved over bookmarks.json either.
+                if let copy = DamagedCopy.preserve(Self.file, stem: "bookmarks-damaged", ext: "json", moving: false) {
+                    damagedCopy = copy
+                } else {
+                    fileReadFailed = true
+                    saveBlocked = true
+                }
             }
         }
         HotKeys.onTapLost = { [weak self] in self?.registerHotKeys(force: true) }
@@ -271,6 +277,7 @@ final class LibraryStore: ObservableObject {
         fileReadFailed = false
         cloudFileMissing = false
         hadUnreadableFile = false
+        damagedCopy = nil
         saveBlocked = false
         saveFailureShown = false
         undoSuppressed = true

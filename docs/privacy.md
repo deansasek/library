@@ -25,14 +25,14 @@ The app connects to the internet only for these:
 | `clipboard-history.json` | Unpinned clipboard history, encrypted the same way. Only exists when **Keep clipboard history across restarts** is on (off by default). |
 | `snippets.json` | Your snippets, as plain text. They are not encrypted. Don't keep passwords in a snippet. |
 | `bookmarks-before-iCloud.json`, `bookmarks-iCloud-replaced.json` | Backups kept when **Keep Library in iCloud Drive** is turned on, so no library is lost |
-| `bookmarks-damaged.json` | A copy of a `bookmarks.json` that could not be read. Library tells you when it launches. |
-| `snippets-damaged.json` | A copy of a `snippets.json` that could not be read |
-| `clipboard-damaged.bin`, `clipboard-history-damaged.bin` | A clipboard file that could not be read, moved aside |
+| `bookmarks-damaged-<time>.json` | A copy of a `bookmarks.json` that could not be read. Library tells you when it launches. |
+| `snippets-damaged-<time>.json` | A copy of a `snippets.json` that could not be read |
+| `clipboard-damaged-<time>.bin`, `clipboard-history-damaged-<time>.bin` | A clipboard file that could not be read, moved aside |
 | `favicons/` | Cached site icons. Library downloads them again if you delete the folder. |
 
 **Keep Library in iCloud Drive** (**Settings > General**, off by default) moves `bookmarks.json` into the `Library` folder of iCloud Drive (`~/Library/Mobile Documents/com~apple~CloudDocs/Library/`) and links to it from `~/.library`, so your library follows you to your other Macs. Clipboard history never leaves your Mac. If two Macs change the library at once, the newer change wins for each item, and Library tells you when a change from another Mac replaced an edit you hadn't saved.
 
-If Library can't read `bookmarks.json`, it saves a copy as `bookmarks-damaged.json` and tells you when it launches. Updates don't change your data.
+If Library can't read `bookmarks.json`, it saves a copy as `bookmarks-damaged-<time>.json` and tells you when it launches. Updates don't change your data.
 
 Some files are written briefly to the system's temporary folder and then removed. A copy of a clip is written while you preview it in Quick Look. A terminal command is written as a script that deletes itself when Terminal runs it. A calendar event is written as an `.ics` file for Calendar. **Export** writes a backup file to the place you choose; it does not include clipboard items.
 

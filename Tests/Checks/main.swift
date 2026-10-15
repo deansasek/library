@@ -448,9 +448,11 @@ check(SnippetStore(file: snippetFile).snippets.isEmpty, "a delete is saved")
 let damagedSnippetFile = snippetDir.appendingPathComponent("damaged-snippets.json")
 try? Data("not a list".utf8).write(to: damagedSnippetFile)
 let movedSnippets = SnippetStore(file: damagedSnippetFile)
+let snippetCopies = ((try? FileManager.default.contentsOfDirectory(at: snippetDir, includingPropertiesForKeys: nil)) ?? [])
+    .filter { $0.lastPathComponent.hasPrefix("snippets-damaged-") }
 check(movedSnippets.snippets.isEmpty && !FileManager.default.fileExists(atPath: damagedSnippetFile.path)
-      && FileManager.default.fileExists(atPath: snippetDir.appendingPathComponent("snippets-damaged.json").path),
-      "a damaged snippets file is moved aside, not read as snippets")
+      && snippetCopies.count == 1 && !movedSnippets.saveBlocked,
+      "a damaged snippets file is moved aside under a timestamped name, not read as snippets")
 // snippets.json records its format version. A bare list from before the version was added still loads.
 let versionedData = (try? Data(contentsOf: snippetFile)) ?? Data()
 let versionedObject = (try? JSONSerialization.jsonObject(with: versionedData)) as? [String: Any]
@@ -549,6 +551,29 @@ try? JSONEncoder().encode(tree()).write(to: bookmarks)
 if case .loaded(let loaded) = BookmarkFile.load(from: bookmarks) { check(loaded.count == 3, "a readable file loads") } else { check(false, "a readable file loads") }
 try? FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: bookmarks.path)
 if case .unreadable = BookmarkFile.load(from: bookmarks) {} else { check(false, "an unreadable file is reported, not replaced") }
+
+// ---- damaged files: each kept copy gets a new name, and an earlier copy is never overwritten ----
+let keptDir = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-kept-\(UUID().uuidString)")
+try? FileManager.default.createDirectory(at: keptDir, withIntermediateDirectories: true)
+let keptSource = keptDir.appendingPathComponent("bookmarks.json")
+let keptStamp = Date(timeIntervalSince1970: 1_700_000_000)
+try? Data("first damaged".utf8).write(to: keptSource)
+let keptFirst = DamagedCopy.preserve(keptSource, stem: "bookmarks-damaged", ext: "json", moving: false, at: keptStamp)
+try? Data("second damaged".utf8).write(to: keptSource)
+let keptSecond = DamagedCopy.preserve(keptSource, stem: "bookmarks-damaged", ext: "json", moving: false, at: keptStamp)
+check(keptFirst != nil && keptSecond != nil && keptFirst != keptSecond, "a second damaged copy at the same time gets a new name")
+check(keptFirst.flatMap { try? String(contentsOf: $0, encoding: .utf8) } == "first damaged"
+      && keptSecond.flatMap { try? String(contentsOf: $0, encoding: .utf8) } == "second damaged", "an earlier damaged copy is never overwritten")
+check(keptFirst?.lastPathComponent.hasPrefix("bookmarks-damaged-") == true && keptFirst?.pathExtension == "json", "a damaged copy keeps the stem and extension")
+check(DamagedCopy.fileName(stem: "x", ext: "json", at: keptStamp, attempt: 0) != DamagedCopy.fileName(stem: "x", ext: "json", at: keptStamp, attempt: 1),
+      "each attempt gets a different name")
+check(DamagedCopy.fileName(stem: "x", ext: "json", at: keptStamp, attempt: 0) < DamagedCopy.fileName(stem: "x", ext: "json", at: keptStamp.addingTimeInterval(60), attempt: 0),
+      "damaged copy names sort by time")
+check(DamagedCopy.preserve(keptDir.appendingPathComponent("missing.json"), stem: "x", ext: "json", moving: false) == nil,
+      "no damaged copy is reported when the file cannot be copied")
+let keptMoved = DamagedCopy.preserve(keptSource, stem: "bookmarks-damaged", ext: "json", moving: true, at: keptStamp)
+check(keptMoved != nil && keptMoved != keptFirst && keptMoved != keptSecond && !FileManager.default.fileExists(atPath: keptSource.path),
+      "a damaged file can be moved aside under a new name")
 try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: bookmarks.path)
 try? FileManager.default.removeItem(at: folder)
 
@@ -616,10 +641,11 @@ MainActor.assumeIsolated {
     let damagedFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-damaged-\(UUID().uuidString).json")
     try? Data(repeating: 0x42, count: 80).write(to: damagedFile)
     let damagedHistory = ClipboardHistory(pasteboard: NSPasteboard(name: NSPasteboard.Name("library-checks-d-\(UUID().uuidString)")), file: damagedFile, key: { testKey })
-    let movedAside = damagedFile.deletingLastPathComponent().appendingPathComponent("clipboard-damaged.bin")
     waitForLoad(damagedHistory)
-    check(damagedHistory.items.isEmpty && !FileManager.default.fileExists(atPath: damagedFile.path) && FileManager.default.fileExists(atPath: movedAside.path), "a damaged file is kept aside")
-    try? FileManager.default.removeItem(at: movedAside)
+    let movedAside = ((try? FileManager.default.contentsOfDirectory(at: damagedFile.deletingLastPathComponent(), includingPropertiesForKeys: nil)) ?? [])
+        .filter { $0.lastPathComponent.hasPrefix("clipboard-damaged-") }
+    check(damagedHistory.items.isEmpty && !FileManager.default.fileExists(atPath: damagedFile.path) && movedAside.count >= 1, "a damaged file is kept aside under a timestamped name")
+    for copy in movedAside { try? FileManager.default.removeItem(at: copy) }
 
     // With no key, a sealed file is neither moved nor overwritten.
     let lockedFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-locked-\(UUID().uuidString).json")
@@ -2081,7 +2107,6 @@ MainActor.assumeIsolated {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-history-\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let historyURL = folder.appendingPathComponent("clipboard-history.json")
-    let damagedURL = folder.appendingPathComponent("clipboard-history-damaged.bin")
     let pinnedURL = folder.appendingPathComponent("clipboard.json")
     let otherPinnedURL = folder.appendingPathComponent("other-clipboard.json")
     @MainActor func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
@@ -2191,7 +2216,9 @@ MainActor.assumeIsolated {
     let damagedBoard = makeBoard()
     let damaged = ClipboardHistory(pasteboard: damagedBoard, file: otherPinnedURL, historyFile: historyURL, key: { keyH })
     waitFor { damaged.historyLoaded }
-    check(damaged.items.isEmpty && !exists(historyURL) && exists(damagedURL), "a damaged history file is moved aside")
+    let historyCopies = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+        .filter { $0.lastPathComponent.hasPrefix("clipboard-history-damaged-") }
+    check(damaged.items.isEmpty && !exists(historyURL) && historyCopies.count == 1, "a damaged history file is moved aside under a timestamped name")
     damaged.keepsAcrossRestarts = false
     ClipboardHistory.waitForSaves()
 
