@@ -1945,6 +1945,31 @@ MainActor.assumeIsolated {
     check(privateSaved.count == 1 && privateSaved.first?.representations.first?["public.utf8-plain-text"] == Data("visible copy".utf8),
           "only the visible text is saved, not the private copy or the large picture")
 
+    // Clear History while the history file is still loading (the key is held up) stays cleared: the saved clips do not come back.
+    keepOn(true)
+    let clearURL = folder.appendingPathComponent("clear-history.json")
+    let seedClearBoard = makeBoard()
+    let seedClear = ClipboardHistory(pasteboard: seedClearBoard, file: nil, historyFile: clearURL, key: { keyH })
+    waitFor { seedClear.historyLoaded }
+    copyText("cleared while loading", on: seedClearBoard, into: seedClear)
+    seedClear.flushHistory()
+    ClipboardHistory.waitForSaves()
+    check(savedClips(clearURL, key: keyH)?.count == 1, "the clip to clear is saved")
+    let clearGate = DispatchSemaphore(value: 0)
+    // The first key read waits for the gate, then the gate is opened again for later reads.
+    let clearing = ClipboardHistory(pasteboard: makeBoard(), file: nil, historyFile: clearURL, key: { clearGate.wait(); clearGate.signal(); return keyH })
+    check(!clearing.historyLoaded, "the history waits for its key")
+    clearing.clear()
+    clearGate.signal()
+    waitFor { clearing.historyLoaded }
+    check(clearing.items.isEmpty, "Clear History during the load keeps the restored clips cleared")
+    clearing.flushHistory()
+    ClipboardHistory.waitForSaves()
+    check((savedClips(clearURL, key: keyH) ?? []).isEmpty, "the saved history is empty after the load")
+    clearing.keepsAcrossRestarts = false
+    seedClear.keepsAcrossRestarts = false
+    ClipboardHistory.waitForSaves()
+
     // Nothing from these checks stays on: every history is turned off, and the folder is removed.
     for history in [off, first, restarted, locked, damaged, privateHistory] { history.keepsAcrossRestarts = false }
     ClipboardHistory.waitForSaves()

@@ -87,6 +87,8 @@ final class ClipboardHistory: ObservableObject {
     private(set) var historyLoaded = false
     /// Whether a history load has started, at launch or when the setting was turned on.
     private var historyLoadStarted = false
+    /// Set when Clear History runs while the file is still loading. The restored clips are then dropped, not merged back.
+    private var clearedWhileLoading = false
     /// The pending debounced save of the history file. Each new copy restarts the wait.
     private var historySave: Task<Void, Never>?
     /// The change count when Library opened. A copy made since then means the clipboard is not replaced at launch.
@@ -246,13 +248,17 @@ final class ClipboardHistory: ObservableObject {
     /// restored item when that setting is on and nothing was copied since launch.
     private func finishHistoryLoading(_ load: HistoryLoad?, atLaunch: Bool) {
         historyLoaded = true
+        let clearedDuringLoad = clearedWhileLoading
+        clearedWhileLoading = false
         // Turned off while loading: the file was already removed, and nothing is restored.
         guard keepsAcrossRestarts else { return }
         if let load {
             leavesHistoryFile = load.leavesFile
-            items = HistoryRestart.merge(items, restored: load.items)
+            // Clear History ran before the file was read, so the clips in it were cleared too.
+            let restored = clearedDuringLoad ? [] : load.items
+            items = HistoryRestart.merge(items, restored: restored)
             trim()
-            let latest = atLaunch ? HistoryRestart.latest(in: load.items) : nil
+            let latest = atLaunch ? HistoryRestart.latest(in: restored) : nil
             if let latest, HistoryRestart.copiesLatestAtLaunch(keeps: keepsAcrossRestarts,
                                                                restoresLatest: restoresLatestAtLaunch,
                                                                latest: latest,
@@ -518,6 +524,7 @@ final class ClipboardHistory: ObservableObject {
 
     /// Removes everything that is not pinned.
     func clear() {
+        if historyLoadStarted && !historyLoaded { clearedWhileLoading = true }
         let removed = items.filter { !$0.pinned }
         items.removeAll { !$0.pinned }
         forget(removed)
