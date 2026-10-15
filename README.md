@@ -179,3 +179,7 @@ Library is free and built in the open. If it saves you time, you can support its
     <img src="docs/media/buy_me_a_coffee.png" width="217" alt="Buy me a coffee">
   </a>
 </p>
+
+## License
+
+Library is free software released under the [MIT License](LICENSE). You can use, copy, modify, and share it, including in commercial projects, as long as the copyright notice is kept.
