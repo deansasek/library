@@ -276,8 +276,9 @@ struct ManageView: View {
             addDropped(urls)
             return true
         }
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+        // The id saves each item's place and whether it is shown, so the user can customize the toolbar from View > Customize Toolbar.
+        .toolbar(id: "manage") {
+            ToolbarItem(id: "edit", placement: .primaryAction) {
                 Button("Edit…", systemImage: "pencil") {
                     state.editSelection(in: store)
                 }
@@ -285,7 +286,7 @@ struct ManageView: View {
                 .help("Edit the selected items")
                 .disabled(state.selection.isEmpty)
             }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(id: "add", placement: .primaryAction) {
                 Menu {
                     Button("Bookmark…") { state.present(.bookmark) }
                     Button("Application…") { state.present(.application) }
@@ -298,7 +299,7 @@ struct ManageView: View {
                 .help("Add a bookmark, application, command, folder, or divider (⌘N, ⇧⌘N)")
                 .accessibilityLabel("Add")
             }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(id: "snippets", placement: .primaryAction) {
                 Button {
                     state.sheet = .snippets
                 } label: {
@@ -307,7 +308,8 @@ struct ManageView: View {
                 .help("Manage the snippets you copy from Quick Open")
                 .accessibilityLabel("Snippets")
             }
-            ToolbarItem(placement: .primaryAction) {
+            .defaultCustomization(.hidden)
+            ToolbarItem(id: "info", placement: .primaryAction) {
                 Button {
                     state.editSelection(in: store)
                 } label: {
@@ -317,7 +319,7 @@ struct ManageView: View {
                 .accessibilityLabel("Get Info")
                 .disabled(state.selection.isEmpty)
             }
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(id: "share", placement: .primaryAction) {
                 if let url = singleShareURL {
                     ShareLink(item: url) {
                         Label("Share", systemImage: "square.and.arrow.up")
@@ -333,7 +335,8 @@ struct ManageView: View {
                     .disabled(true)
                 }
             }
-            ToolbarItem(placement: .primaryAction) {
+            .defaultCustomization(.hidden)
+            ToolbarItem(id: "delete", placement: .primaryAction) {
                 Button(role: .destructive) {
                     delete(state.selection)
                 } label: {
