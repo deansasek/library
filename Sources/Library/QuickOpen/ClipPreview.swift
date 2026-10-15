@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Quartz
 
 /// Picks the file the system Quick Look panel shows for a clip, writing a temporary file when the clip has no file.
@@ -69,6 +70,10 @@ final class ClipPreview: NSObject, QLPreviewPanelDataSource {
     private var ownedFile: URL?
     private var keyMonitor: Any?
     private var closeObserver: NSObjectProtocol?
+    /// The clip being previewed, kept so the lock can tell whether it is now hidden.
+    private var shownItem: ClipItem?
+    /// Watches the lock while a clip is previewed. The lock can engage at any time, from any menu or from sleep.
+    private var lockObserver: AnyCancellable?
 
     var isOpen: Bool {
         QLPreviewPanel.sharedPreviewPanelExists() && QLPreviewPanel.shared().isVisible
@@ -88,7 +93,12 @@ final class ClipPreview: NSObject, QLPreviewPanelDataSource {
     /// Follows the selection while the preview is open. A selection with nothing to preview closes it.
     func follow(_ item: ClipItem?) {
         guard isOpen else { return }
-        guard let item, item.id != itemID else { return }
+        // A locked item is not previewed until the user asks, so the preview closes on it too.
+        guard let item else {
+            close()
+            return
+        }
+        guard item.id != itemID else { return }
         if !show(item) { close() }
     }
 
@@ -99,6 +109,10 @@ final class ClipPreview: NSObject, QLPreviewPanelDataSource {
         if url.path.hasPrefix(ClipPreviewSource.directory.path) { ownedFile = url }
         file = url
         itemID = item.id
+        shownItem = item
+        lockObserver = ClipboardLock.shared.objectWillChange.receive(on: RunLoop.main).sink { [weak self] in
+            MainActor.assumeIsolated { self?.closeIfLocked() }
+        }
 
         let panel = QLPreviewPanel.shared()!
         panel.dataSource = self
@@ -128,7 +142,15 @@ final class ClipPreview: NSObject, QLPreviewPanelDataSource {
         discard()
     }
 
+    /// Closes the preview when the clip it shows has become locked, so its text does not stay on screen.
+    private func closeIfLocked() {
+        guard isOpen, let shownItem, ClipboardLock.shared.isHidden(shownItem) else { return }
+        close()
+    }
+
     private func discard() {
+        lockObserver = nil
+        shownItem = nil
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
         if let closeObserver { NotificationCenter.default.removeObserver(closeObserver) }
