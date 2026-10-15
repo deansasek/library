@@ -160,6 +160,9 @@ final class ScreenCaptures: ObservableObject {
 
     /// Reads a screenshot and converts it to PNG, the format history stores images in.
     nonisolated static func readPNG(at url: URL) -> ScreenshotRead {
+        // The size comes from the file's attributes, so a huge file is never read into memory.
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int else { return .unreadable }
+        guard size <= ClipboardHistory.maxItemBytes else { return .tooLarge }
         guard let data = try? Data(contentsOf: url) else { return .unreadable }
         guard data.count <= ClipboardHistory.maxItemBytes else { return .tooLarge }
         guard let image = NSImage(data: data), let tiff = image.tiffRepresentation,

@@ -2007,6 +2007,14 @@ do {
     let complete = folder.appendingPathComponent("complete.png")
     try? picture?.representation(using: .png, properties: [:])?.write(to: complete)
     if case .png = ScreenCaptures.readPNG(at: complete) {} else { check(false, "a finished screenshot is read as PNG") }
+    // A file over the size limit is refused by its size, without reading it. A sparse file costs no disk space.
+    let huge = folder.appendingPathComponent("huge.png")
+    FileManager.default.createFile(atPath: huge.path, contents: nil)
+    if let handle = try? FileHandle(forWritingTo: huge) {
+        try? handle.truncate(atOffset: UInt64(ClipboardHistory.maxItemBytes) + 1)
+        try? handle.close()
+    }
+    if case .tooLarge = ScreenCaptures.readPNG(at: huge) {} else { check(false, "a screenshot over the size limit is refused by its size") }
     try? FileManager.default.removeItem(at: folder)
 }
 
