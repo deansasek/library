@@ -2557,5 +2557,12 @@ check(scopedTree.searchSuggestions(for: "") == [] && scopedTree.searchSuggestion
 }
 check(rowsCount(.apps) == 1 && rowsCount(.folders) == 2, "the rows follow the scope")
 
+// ---- Clipboard history save timing (pure) ----
+let saveNow = Date(timeIntervalSince1970: 1_000)
+check(ClipboardHistory.historySaveDelay(lastWrite: nil, now: saveNow) == 1, "the first history save waits a second")
+check(ClipboardHistory.historySaveDelay(lastWrite: saveNow, now: saveNow) == 10, "a history save waits ten seconds after the last write")
+check(ClipboardHistory.historySaveDelay(lastWrite: saveNow.addingTimeInterval(-4), now: saveNow) == 6, "the wait counts from the last write")
+check(ClipboardHistory.historySaveDelay(lastWrite: saveNow.addingTimeInterval(-30), now: saveNow) == 1, "a save after a long pause waits a second")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

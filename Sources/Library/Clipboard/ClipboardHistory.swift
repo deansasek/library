@@ -89,8 +89,11 @@ final class ClipboardHistory: ObservableObject {
     private var historyLoadStarted = false
     /// Set when Clear History runs while the file is still loading. The restored clips are then dropped, not merged back.
     private var clearedWhileLoading = false
-    /// The pending debounced save of the history file. Each new copy restarts the wait.
+    /// The pending save of the history file. A copy made while one is pending joins it, since the save reads the
+    /// history when it runs.
     private var historySave: Task<Void, Never>?
+    /// When the history file was last written, so the next save waits out `historySaveInterval`.
+    private var lastHistoryWrite: Date?
     /// The change count when Library opened. A copy made since then means the clipboard is not replaced at launch.
     private let launchChangeCount: Int
     /// False until clipboard.json has been read in the background. Until then nothing is written, so a save can
@@ -271,12 +274,25 @@ final class ClipboardHistory: ObservableObject {
         scheduleHistorySave()
     }
 
-    /// Waits about a second after the last change, then saves. Copies made in quick succession share one write.
+    /// The history is saved at most once per `historySaveInterval` while copies keep coming, and at least a second
+    /// after the first copy of a burst. Copies made while a save is pending share it. Quitting always saves (flushHistory).
+    nonisolated static let historySaveInterval: TimeInterval = 10
+    nonisolated static let historySaveDebounce: TimeInterval = 1
+
+    /// How long until the next history save may run: at least `historySaveDebounce`, and no sooner than
+    /// `historySaveInterval` after the last write. Pure, so the checks can test the timing.
+    nonisolated static func historySaveDelay(lastWrite: Date?, now: Date) -> TimeInterval {
+        guard let lastWrite else { return historySaveDebounce }
+        return max(historySaveDebounce, lastWrite.addingTimeInterval(historySaveInterval).timeIntervalSince(now))
+    }
+
+    /// Schedules the history save. Only one is pending at a time: it reads the history when it runs, so it includes
+    /// every copy made until then.
     private func scheduleHistorySave() {
-        guard keepsAcrossRestarts, historyFile != nil else { return }
-        historySave?.cancel()
+        guard keepsAcrossRestarts, historyFile != nil, historySave == nil else { return }
+        let delay = Self.historySaveDelay(lastWrite: lastHistoryWrite, now: Date())
         historySave = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(1))
+            try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled else { return }
             self?.writeHistory()
         }
@@ -298,6 +314,7 @@ final class ClipboardHistory: ObservableObject {
     private func writeHistory() {
         historySave = nil
         guard let historyFile, let clips = historyClips() else { return }
+        lastHistoryWrite = Date()
         let loadKey = self.loadKey
         Self.writeQueue.async { Self.persistHistory(clips, to: historyFile, key: loadKey) }
     }
@@ -307,6 +324,7 @@ final class ClipboardHistory: ObservableObject {
         historySave?.cancel()
         historySave = nil
         guard let historyFile, let clips = historyClips() else { return }
+        lastHistoryWrite = Date()
         let loadKey = self.loadKey
         Self.writeQueue.sync { Self.persistHistory(clips, to: historyFile, key: loadKey) }
     }
