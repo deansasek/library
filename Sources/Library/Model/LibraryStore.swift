@@ -102,6 +102,8 @@ final class LibraryStore: ObservableObject {
     private var fetchTask: Task<Void, Never>?
     private var spotlightTask: Task<Void, Never>?
     private var accessTask: Task<Void, Never>?
+    /// Watches for an app quitting while a shortcut is held by another app, so the shortcut can be registered again.
+    private var hotKeyRetry: NSObjectProtocol?
     private var syncStateTask: Task<Void, Never>?
     private var watchers: [DispatchSourceFileSystemObject] = []
     /// True when bookmarks.json existed but could not be read, so the app can say so.
@@ -507,6 +509,7 @@ final class LibraryStore: ObservableObject {
         failedShortcuts = result.nodes
         failedExtras = result.extras
         clickAccessMissing = result.needsAccess
+        updateHotKeyRetry(failed: !result.nodes.isEmpty || !result.extras.isEmpty)
         // The user grants access in System Settings, so check until it arrives.
         accessTask?.cancel()
         if result.needsAccess {
@@ -516,6 +519,21 @@ final class LibraryStore: ObservableObject {
                 }
                 if !Task.isCancelled { registerHotKeys(force: true) }
             }
+        }
+    }
+
+    /// While a shortcut could not be registered, the registration is tried again whenever an app quits, since the app
+    /// that holds the shortcut may be the one that quit. The watch stops once every shortcut is registered.
+    private func updateHotKeyRetry(failed: Bool) {
+        if failed, hotKeyRetry == nil {
+            hotKeyRetry = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.registerHotKeys(force: true) }
+            }
+        } else if !failed, let observer = hotKeyRetry {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+            hotKeyRetry = nil
         }
     }
 
