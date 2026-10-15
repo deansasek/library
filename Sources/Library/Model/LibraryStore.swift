@@ -661,9 +661,14 @@ final class LibraryStore: ObservableObject {
     }
 
     /// Undoing assigns `nodes`, which registers the inverse step, so redo needs no extra code.
+    /// The Redo step takes the name of the step it undoes, so the Edit menu shows what Redo will do.
     private func registerUndo(restoring snapshot: LibrarySync.Contents) {
         undoManager?.registerUndo(withTarget: self) { store in
-            MainActor.assumeIsolated { store.contents = snapshot }
+            MainActor.assumeIsolated {
+                let name = store.undoManager?.undoActionName ?? ""
+                store.contents = snapshot
+                store.undoManager?.setActionName(name)
+            }
         }
     }
 
