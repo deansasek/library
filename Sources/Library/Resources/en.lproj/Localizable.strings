@@ -231,7 +231,7 @@
 "Library Can’t Read bookmarks.json" = "Library Can’t Read bookmarks.json";
 
 /* Alert or dialog text. */
-"The file may have been edited into something Library doesn’t understand. A copy was saved as bookmarks-damaged.json, and Library started with an empty library. Your next change replaces bookmarks.json." = "The file may have been edited into something Library doesn’t understand. A copy was saved as bookmarks-damaged.json, and Library started with an empty library. Your next change replaces bookmarks.json.";
+"The file may have been edited into something Library doesn’t understand. A copy was saved as %@, and Library started with an empty library. Your next change replaces bookmarks.json." = "The file may have been edited into something Library doesn’t understand. A copy was saved as %@, and Library started with an empty library. Your next change replaces bookmarks.json.";
 
 /* Alert or dialog text. */
 "Show in Finder" = "Show in Finder";

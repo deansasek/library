@@ -73,11 +73,14 @@ final class SnippetStore: ObservableObject {
             snippets = loaded
             return
         }
-        // Like a damaged bookmarks.json: keep the file aside for inspection and start with no snippets.
-        let damaged = file.deletingLastPathComponent().appendingPathComponent("snippets-damaged.json")
-        try? FileManager.default.removeItem(at: damaged)
-        try? FileManager.default.moveItem(at: file, to: damaged)
-        NSLog("Library: snippets.json could not be read, so it was moved to snippets-damaged.json")
+        // Like a damaged bookmarks.json: keep the file aside for inspection and start with no snippets. If it cannot be
+        // moved aside, saving stays blocked so the file is not overwritten.
+        if let moved = DamagedCopy.preserve(file, stem: "snippets-damaged", ext: "json", moving: true) {
+            NSLog("Library: snippets.json could not be read, so it was moved to \(moved.lastPathComponent)")
+        } else {
+            NSLog("Library: snippets.json could not be read or moved aside, so changes to snippets are not saved")
+            saveBlocked = true
+        }
     }
 
     func add(_ snippet: Snippet) {

@@ -61,11 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Library Can’t Read bookmarks.json", bundle: L10n.bundle)
-        alert.informativeText = String(localized: "The file may have been edited into something Library doesn’t understand. A copy was saved as bookmarks-damaged.json, and Library started with an empty library. Your next change replaces bookmarks.json.", bundle: L10n.bundle)
+        let copyName = LibraryStore.shared.damagedCopy?.lastPathComponent ?? "bookmarks-damaged.json"
+        alert.informativeText = String(localized: "The file may have been edited into something Library doesn’t understand. A copy was saved as \(copyName), and Library started with an empty library. Your next change replaces bookmarks.json.", bundle: L10n.bundle)
         alert.addButton(withTitle: String(localized: "Show in Finder", bundle: L10n.bundle))
         alert.addButton(withTitle: String(localized: "OK", bundle: L10n.bundle))
         if alert.runModal() == .alertFirstButtonReturn {
-            NSWorkspace.shared.activateFileViewerSelecting([LibraryStore.dir.appendingPathComponent("bookmarks-damaged.json")])
+            NSWorkspace.shared.activateFileViewerSelecting([LibraryStore.shared.damagedCopy ?? LibraryStore.dir.appendingPathComponent(copyName)])
         }
     }
 

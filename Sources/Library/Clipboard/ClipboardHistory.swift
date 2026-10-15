@@ -183,9 +183,9 @@ final class ClipboardHistory: ObservableObject {
             // With no key, the file may be fine, so it is left alone. With a key, it is damaged: keep it for
             // inspection and start with no pins.
             guard key != nil else { return PinnedLoad(items: [], migrated: false, leavesFile: true) }
-            NSLog("Library: clipboard.json could not be read, so it was moved to clipboard-damaged.bin")
-            quarantine(file, as: "clipboard-damaged.bin")
-            return PinnedLoad(items: [], migrated: false, leavesFile: false)
+            // If the file cannot be moved aside, it stays where it is and nothing may overwrite it.
+            let moved = quarantine(file, stem: "clipboard-damaged", ext: "bin")
+            return PinnedLoad(items: [], migrated: false, leavesFile: !moved)
         }
     }
 
@@ -223,9 +223,8 @@ final class ClipboardHistory: ObservableObject {
         case .clips(let clips):
             return HistoryLoad(items: items(from: clips, pinned: false), leavesFile: false)
         case .unreadable:
-            NSLog("Library: clipboard-history.json could not be read, so it was moved to clipboard-history-damaged.bin")
-            quarantine(file, as: "clipboard-history-damaged.bin")
-            return HistoryLoad(items: [], leavesFile: false)
+            let moved = quarantine(file, stem: "clipboard-history-damaged", ext: "bin")
+            return HistoryLoad(items: [], leavesFile: !moved)
         }
     }
 
@@ -359,15 +358,12 @@ final class ClipboardHistory: ObservableObject {
         }
     }
 
-    /// Moves a damaged file aside under `name`, replacing any earlier copy of it. The file is kept for inspection.
-    nonisolated private static func quarantine(_ file: URL, as name: String) {
-        let damaged = file.deletingLastPathComponent().appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: damaged)
-        do {
-            try FileManager.default.moveItem(at: file, to: damaged)
-        } catch {
-            NSLog("Library: could not move the damaged clipboard.json aside: \(error)")
-        }
+    /// Moves a damaged file aside under a new timestamped name, so an earlier copy is never replaced. The file is kept
+    /// for inspection. Returns false when it could not be moved, and then the file is left where it is.
+    nonisolated private static func quarantine(_ file: URL, stem: String, ext: String) -> Bool {
+        guard let moved = DamagedCopy.preserve(file, stem: stem, ext: ext, moving: true) else { return false }
+        NSLog("Library: \(file.lastPathComponent) could not be read, so it was moved to \(moved.lastPathComponent)")
+        return true
     }
 
     /// Waits until every write queued so far has finished. Used by the checks, which read the file right after a save.
