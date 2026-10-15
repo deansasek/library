@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.servicesProvider = self
         NSUpdateDynamicServices()
         _ = ClipboardHistory.shared  // starts watching the clipboard
+        _ = ScreenCaptures.shared  // starts the Spotlight query for new screenshots and recordings, when on
         ClipPreviewSource.removeLeftovers()
         _ = ClipboardLock.shared  // starts watching for sleep, so the pinned items lock
         if UserDefaults.standard.bool(forKey: "reenableLoginItemAfterMove") {
