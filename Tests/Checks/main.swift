@@ -2183,5 +2183,10 @@ do {
     try? FileManager.default.removeItem(at: eventURL)
 }
 
+// A name from the page is never fetched for an address with a query, which may carry a single-use token.
+check(SmartTitle.mayFetch(URL(string: "https://example.com/docs")!) && !SmartTitle.mayFetch(URL(string: "https://example.com/login?token=abc")!),
+      "an address with a query is not asked for its page")
+check(!SmartTitle.mayFetch(URL(string: "file:///Applications/X.app")!), "a non-web address is not asked for its page")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
