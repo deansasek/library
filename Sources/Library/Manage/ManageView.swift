@@ -182,6 +182,8 @@ struct ManageView: View {
         let trashed = store.deleted.matching(state.query)
         let reading = ReadingList.ordered(found.tree.leaves)
         let shown = found.count
+        // Rows the search hid must not stay selected: Delete and Get Info act on the selection.
+        let visible = Set(found.tree.allIDs + trashed.allIDs)
         return List(selection: $state.selection) {
             rows(displayed(found.tree), reading: reading, trashed: trashed, pathWidth: pathWidth)
         }
@@ -210,7 +212,8 @@ struct ManageView: View {
                 open(node)
             }
         }
-        .onDeleteCommand { delete(state.selection) }
+        .onChange(of: state.query) { _, _ in state.selection.formIntersection(visible) }
+        .onDeleteCommand { delete(state.selection.intersection(visible)) }
         .onKeyPress(.delete) {
             // Delete alone is handled by onDeleteCommand. Command-Delete matches Finder's Move to Trash.
             guard NSEvent.modifierFlags.contains(.command), !state.selection.isEmpty else { return .ignored }
