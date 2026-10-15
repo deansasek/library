@@ -50,7 +50,7 @@ final class RedirectGate: NSObject, URLSessionTaskDelegate, @unchecked Sendable 
 
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        if LinkCheck.followsRedirect(after: followed, to: request.url) {
+        if LinkCheck.followsRedirect(after: followed, from: response.url, to: request.url) {
             followed += 1
             completionHandler(request)
         } else {
