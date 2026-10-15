@@ -316,3 +316,12 @@
 
 /* VoiceOver label for a Manage row: the shortcut that opens it, such as "⌘⇧K". */
 "shortcut %@" = "shortcut %@";
+
+/* VoiceOver announcement in Quick Open when a search finds nothing. */
+"No results" = "No results";
+
+/* VoiceOver announcement in Quick Open when a search finds one result. */
+"1 result" = "1 result";
+
+/* VoiceOver announcement in Quick Open with the number of results a search found. */
+"%lld results" = "%lld results";
