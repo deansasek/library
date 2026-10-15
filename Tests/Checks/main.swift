@@ -2130,5 +2130,20 @@ do {
     check(moved.map(\.name) == ["Plain", "Kept"], "a bookmark for a node that is not a folder lands at the top level")
 }
 
+// Get Info saves only the fields the user edited. A change made since the sheet opened is kept.
+do {
+    let base = LibraryItem(name: "Docs", url: "https://docs.example.com", keywords: "old")
+    var draft = base
+    draft.name = "Documentation"
+    var current = base
+    current.keywords = "synced"
+    current.url = "https://docs.example.com/new"
+    current.children = nil
+    let merged = current.applying(draft, from: base)
+    check(merged.name == "Documentation" && merged.keywords == "synced" && merged.url == "https://docs.example.com/new",
+          "an edited field is taken, an unedited field keeps the newer value")
+    check(current.applying(base, from: base) == current, "an unchanged editor leaves the item as it is")
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

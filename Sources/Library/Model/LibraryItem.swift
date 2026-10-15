@@ -108,6 +108,34 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     var isOpenable: Bool { url != nil || appPath != nil || command != nil }
 
     /// True when the URL has a placeholder (`{}`, or a declared `{name}` or `{name:Label}`) that is filled in when opening.
+    /// The fields of `edits` that differ from `base`, the copy taken when the editor opened, applied to `self`. A field
+    /// the editor did not change keeps the value `self` has now, so changes made since then (by a sync or undo) stay.
+    /// Children and the deleted marker are never taken.
+    func applying(_ edits: LibraryItem, from base: LibraryItem) -> LibraryItem {
+        var result = self
+        func take<Value: Equatable>(_ path: WritableKeyPath<LibraryItem, Value>) {
+            if edits[keyPath: path] != base[keyPath: path] { result[keyPath: path] = edits[keyPath: path] }
+        }
+        take(\.name)
+        take(\.url)
+        take(\.appPath)
+        take(\.arguments)
+        take(\.command)
+        take(\.shortcuts)
+        take(\.openNew)
+        take(\.icon)
+        take(\.browser)
+        take(\.color)
+        take(\.openAtLogin)
+        take(\.keywords)
+        take(\.promptLabel)
+        take(\.note)
+        take(\.readLater)
+        take(\.templateFields)
+        take(\.showsOpenAll)
+        return result
+    }
+
     var isTemplate: Bool { !placeholders.isEmpty }
 
     /// The distinct values the URL asks for, in order. Empty when the URL is not a template.

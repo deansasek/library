@@ -46,6 +46,8 @@ final class ManageState: ObservableObject {
 
     // Edit sheet.
     @Published var draft = LibraryItem(name: "")
+    /// The item as it was when the edit sheet opened. Save applies only the fields that differ from it.
+    var draftBase = LibraryItem(name: "")
     @Published var recordingIndex: Int?
     @Published var showIconPicker = false
     @Published var iconSearch = ""
@@ -91,6 +93,7 @@ final class ManageState: ObservableObject {
         guard let node = store.nodes.node(withID: id) else { return }
         present(.edit(id))
         draft = node
+        draftBase = node
         fieldsText = (node.templateFields ?? []).joined(separator: ", ")
         let isSymbol = node.icon.map { NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil } ?? true
         iconTab = isSymbol ? .symbols : .emoji

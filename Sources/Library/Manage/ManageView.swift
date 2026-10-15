@@ -397,16 +397,14 @@ struct ManageView: View {
             node.note = LibraryItem.cleanNote(node.note)
             node.command = node.appPath == nil ? node.command.map { $0.trimmingCharacters(in: .whitespaces) } : clean(node.command)
             node.promptLabel = node.isTemplate ? clean(node.promptLabel) : nil
-            // A link check may have run while the sheet was open, so the stored status is kept. A new address has not
-            // been checked, so its old status goes.
-            let stored = store.nodes.node(withID: id)
-            node.linkStatus = stored?.url == node.url ? stored?.linkStatus : nil
-            // The draft holds a folder's contents as they were when the sheet opened. Undo or a sync may have changed them
-            // since, so the folder keeps its current contents and takes only the edited fields.
+            // The draft is a copy from when the sheet opened. Undo, a sync, or a link check may have changed the item since,
+            // so only the fields the user edited are written, and everything else keeps its current value (contents of a
+            // folder included). A link check's status is kept unless the address itself was changed.
+            let base = state.draftBase
             store.perform("Edit") { $0.update(id) { current in
-                let children = current.children
-                current = node
-                current.children = children
+                var merged = current.applying(node, from: base)
+                merged.linkStatus = merged.url == current.url ? current.linkStatus : nil
+                current = merged
             } }
         case .bulkEdit, .duplicates:
             // These sheets apply their own changes.
