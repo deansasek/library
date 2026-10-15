@@ -46,6 +46,10 @@ jobs:
       # .gitattributes leaves out everything the app does not need to build: tests, workflows, docs, and scripts.
       - name: Zip the source
         run: git archive --format=zip --prefix="Library-$VERSION/" -o "Library-$VERSION.zip" HEAD
+      # The checksum is published next to the zip, so the update in the app and the install command can check the
+      # download before running any of it. The file is in the form `shasum -a 256 -c` reads.
+      - name: Checksum the source
+        run: shasum -a 256 "Library-$VERSION.zip" > "Library-$VERSION.zip.sha256"
       # GitHub's API can return a 500 after it has made part of the release. Each attempt first checks for the release,
       # so a retry after a partial publish never creates a second one. Four attempts, waiting 15, 30, and 60 seconds.
       - name: Publish the release
@@ -59,7 +63,7 @@ jobs:
               echo "Release $tag already exists, so there is nothing to create."
               exit 0
             fi
-            if gh release create "$tag" "Library-$VERSION.zip" --title "Library $VERSION" --generate-notes --target "$GITHUB_SHA"; then
+            if gh release create "$tag" "Library-$VERSION.zip" "Library-$VERSION.zip.sha256" --title "Library $VERSION" --generate-notes --target "$GITHUB_SHA"; then
               exit 0
             fi
             if [ "$attempt" -lt 4 ]; then
