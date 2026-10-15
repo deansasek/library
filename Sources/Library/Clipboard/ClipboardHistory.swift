@@ -485,6 +485,7 @@ final class ClipboardHistory: ObservableObject {
 
     func remove(_ item: ClipItem) {
         items.removeAll { $0.id == item.id }
+        forget([item])
         if item.pinned { savePinned() }
         scheduleHistorySave()
     }
@@ -517,8 +518,18 @@ final class ClipboardHistory: ObservableObject {
 
     /// Removes everything that is not pinned.
     func clear() {
+        let removed = items.filter { !$0.pinned }
         items.removeAll { !$0.pinned }
+        forget(removed)
         scheduleHistorySave()
+    }
+
+    /// Drops removed clips from what still reaches them: the current clip, which the menus suggest adding to the
+    /// library, and the paste queue.
+    private func forget(_ removed: [ClipItem]) {
+        let ids = Set(removed.map(\.id))
+        if let current, ids.contains(current.id) { self.current = nil }
+        pasteQueue.removeAll { ids.contains($0.id) }
     }
 
     // MARK: Paste queue
