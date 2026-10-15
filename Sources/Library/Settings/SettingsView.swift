@@ -17,6 +17,7 @@ struct SettingsView: View {
     @AppStorage(UpdateCheck.automaticKey) private var checksForUpdates = true
     @AppStorage(LinkChecker.enabledKey) private var checksLinks = false
     @AppStorage(SmartTitle.key) private var namesFromPages = false
+    @AppStorage("confirmTerminalCommands") private var confirmTerminalCommands = false
 
     var body: some View {
         TabView {
@@ -87,6 +88,13 @@ struct SettingsView: View {
                 Text("Backup")
             } footer: {
                 Text("Export saves your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at login settings to a file. Restore replaces your library with a backup and can be undone. Clipboard items are not included, because pinned clipboard items are encrypted with a key that stays on this Mac.")
+            }
+            Section {
+                Toggle(isOn: $confirmTerminalCommands) {
+                    Text("Confirm terminal commands", bundle: L10n.bundle)
+                }
+            } footer: {
+                Text("Asks before a terminal command runs, whether it starts from a shortcut, Spotlight, a menu, or Open at Login. The confirmation shows the command, and Cancel is the default.", bundle: L10n.bundle)
             }
             Section {
                 LabeledContent("Welcome Screen") {

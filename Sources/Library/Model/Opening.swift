@@ -186,6 +186,19 @@ private func openInNewWindow(_ link: URL, in browser: URL?) {
     NSWorkspace.shared.openApplication(at: app, configuration: configuration)
 }
 
+/// Asks before a terminal command runs, when the Settings option is on. Cancel is the default button.
+@MainActor
+private func confirmCommand(_ node: LibraryItem, _ command: String) -> Bool {
+    guard UserDefaults.standard.bool(forKey: "confirmTerminalCommands") else { return true }
+    NSApp.activate(ignoringOtherApps: true)
+    let alert = NSAlert()
+    alert.messageText = "Run “\(node.name)” in Terminal?"
+    alert.informativeText = command
+    alert.addButton(withTitle: "Cancel")
+    alert.addButton(withTitle: "Run")
+    return alert.runModal() == .alertSecondButtonReturn
+}
+
 /// Opens a bookmark in the browser, or runs a terminal command. Opens an app,
 /// or brings it to the front when it already runs. `forceNew` overrides the item's own setting.
 /// `value` fills a URL template with a single field without asking. Templates with several fields always ask.
@@ -193,6 +206,7 @@ private func openInNewWindow(_ link: URL, in browser: URL?) {
 func open(_ node: LibraryItem, forceNew: Bool? = nil, value: String? = nil) {
     let openNew = forceNew ?? (node.openNew == true)
     if let command = node.command {
+        guard confirmCommand(node, command) else { return }
         LibraryStore.shared.recordOpen(node.id)
         runInTerminal(command)
     } else if let path = node.appPath {
