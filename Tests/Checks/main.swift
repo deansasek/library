@@ -1941,5 +1941,21 @@ do {
     history.removeFile(at: gone.fileURLs[0])
 }
 
+// A screenshot that cannot be read yet is retried, so the read says so; a readable one is converted to PNG.
+do {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-shot-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let partial = folder.appendingPathComponent("partial.png")
+    try? Data([0x89, 0x50, 0x4E]).write(to: partial)
+    if case .unreadable = ScreenCaptures.readPNG(at: partial) {} else { check(false, "a partly written screenshot is unreadable") }
+    if case .unreadable = ScreenCaptures.readPNG(at: folder.appendingPathComponent("missing.png")) {} else { check(false, "a missing screenshot is unreadable") }
+    let picture = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
+                                   hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)
+    let complete = folder.appendingPathComponent("complete.png")
+    try? picture?.representation(using: .png, properties: [:])?.write(to: complete)
+    if case .png = ScreenCaptures.readPNG(at: complete) {} else { check(false, "a finished screenshot is read as PNG") }
+    try? FileManager.default.removeItem(at: folder)
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

@@ -4,13 +4,26 @@ import AppKit
 ///
 /// Spotlight tags every capture with `kMDItemIsScreenCapture`, so a live metadata query reports new captures.
 /// No folder is watched, and the pasteboard is never changed. Only captures made after the feature was turned on
-/// are added. The newest creation date seen is saved, so a restart does not add the same captures again.
+/// are added. The saved date moves forward only past captures that are added, so a capture that could not be read
+/// yet is tried again on a later update, and after a restart.
+/// The result of reading a screenshot.
+enum ScreenshotRead {
+    case png(Data)
+    /// Over the size limit. Never added, so it is not retried.
+    case tooLarge
+    /// Not readable yet, for example while macOS is still writing the file.
+    case unreadable
+}
+
 @MainActor
 final class ScreenCaptures: ObservableObject {
     static let shared = ScreenCaptures()
     static let enabledKey = "clipboardAddsScreenshots"
     static let sinceKey = "screenshotsSince"
     private static let movieExtensions: Set<String> = ["mov", "mp4", "m4v"]
+
+    /// What happened to one capture. A capture that could not be read yet stays pending and is retried.
+    private enum Outcome { case added, skipped, retry }
 
     @Published var isEnabled: Bool {
         didSet {
@@ -27,7 +40,14 @@ final class ScreenCaptures: ObservableObject {
 
     private var query: NSMetadataQuery?
     private var observers: [NSObjectProtocol] = []
+    /// Captures already added, or skipped for good.
     private var handled: Set<String> = []
+    /// Captures being read now.
+    private var inFlight: Set<String> = []
+    /// Captures seen but not added yet, with their creation dates.
+    private var pending: [String: Date] = [:]
+    /// The newest creation date among captures that are finished.
+    private var finishedNewest: Date = .distantPast
 
     private init() {
         isEnabled = UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
@@ -58,54 +78,92 @@ final class ScreenCaptures: ObservableObject {
         observers.forEach(NotificationCenter.default.removeObserver)
         observers = []
         handled = []
+        inFlight = []
+        pending = [:]
+        finishedNewest = .distantPast
     }
 
-    /// Adds each capture made since the saved date, then moves the date to the newest one.
+    /// Starts each capture made since the saved date, and retries the ones still pending.
     private func received() {
         guard isEnabled, let query else { return }
         query.disableUpdates()
         defer { query.enableUpdates() }
         let since = UserDefaults.standard.object(forKey: Self.sinceKey) as? Date ?? .distantPast
-        var newest = since
         var present: Set<String> = []
         for case let result as NSMetadataItem in query.results {
-            guard let path = result.value(forAttribute: NSMetadataItemPathKey) as? String else { continue }
+            guard let path = result.value(forAttribute: NSMetadataItemPathKey) as? String,
+                  let created = result.value(forAttribute: "kMDItemContentCreationDate") as? Date else { continue }
             present.insert(path)
-            guard let created = result.value(forAttribute: "kMDItemContentCreationDate") as? Date,
-                  created > since, !handled.contains(path) else { continue }
-            handled.insert(path)
-            newest = max(newest, created)
-            ingest(URL(fileURLWithPath: path))
+            guard !handled.contains(path), !inFlight.contains(path), created > since || pending[path] != nil else { continue }
+            pending[path] = created
+            inFlight.insert(path)
+            ingest(URL(fileURLWithPath: path), created: created)
         }
         // A capture that was deleted leaves its reference in history, so the reference goes with it.
         for path in handled.subtracting(present) where !FileManager.default.fileExists(atPath: path) {
             handled.remove(path)
             ClipboardHistory.shared.removeFile(at: URL(fileURLWithPath: path))
         }
-        UserDefaults.standard.set(newest, forKey: Self.sinceKey)
+        // A pending capture that was deleted before it could be read is dropped, so it does not hold the date back.
+        for path in Array(pending.keys) where !inFlight.contains(path) && !FileManager.default.fileExists(atPath: path) {
+            pending.removeValue(forKey: path)
+        }
+        saveProgress(since: since)
     }
 
-    private func ingest(_ url: URL) {
+    private func ingest(_ url: URL, created: Date) {
+        let path = url.path
         if Self.movieExtensions.contains(url.pathExtension.lowercased()) {
             // A recording is large, so history keeps a reference to the file, not a copy.
             let reference: [[NSPasteboard.PasteboardType: Data]] = [[.fileURL: Data(url.absoluteString.utf8)]]
             ClipboardHistory.shared.addCapture(reference, source: "Screen Recording")
+            finish(path, created: created, .added)
             return
         }
         Task.detached(priority: .utility) {
-            guard let png = Self.pngData(at: url) else { return }
+            let read = Self.readPNG(at: url)
             await MainActor.run {
-                ClipboardHistory.shared.addCapture([[.png: png]], source: "Screenshot")
+                switch read {
+                case .png(let png):
+                    ClipboardHistory.shared.addCapture([[.png: png]], source: "Screenshot")
+                    ScreenCaptures.shared.finish(path, created: created, .added)
+                case .tooLarge:
+                    ScreenCaptures.shared.finish(path, created: created, .skipped)
+                case .unreadable:
+                    ScreenCaptures.shared.finish(path, created: created, .retry)
+                }
             }
         }
     }
 
-    /// Reads a screenshot and converts it to PNG, the format history stores images in. Nil when it is unreadable
-    /// or over the size limit.
-    nonisolated private static func pngData(at url: URL) -> Data? {
-        guard let data = try? Data(contentsOf: url), data.count <= ClipboardHistory.maxItemBytes,
-              let image = NSImage(data: data), let tiff = image.tiffRepresentation,
-              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return nil }
-        return png
+    private func finish(_ path: String, created: Date, _ outcome: Outcome) {
+        inFlight.remove(path)
+        switch outcome {
+        case .added, .skipped:
+            handled.insert(path)
+            pending.removeValue(forKey: path)
+            finishedNewest = max(finishedNewest, created)
+        case .retry:
+            break
+        }
+    }
+
+    /// Moves the saved date to the newest finished capture, but not past a capture still waiting, so a restart
+    /// picks that one up again.
+    private func saveProgress(since: Date) {
+        guard finishedNewest > since else { return }
+        let target = pending.values.min().map { min($0, finishedNewest) } ?? finishedNewest
+        if target > since {
+            UserDefaults.standard.set(target, forKey: Self.sinceKey)
+        }
+    }
+
+    /// Reads a screenshot and converts it to PNG, the format history stores images in.
+    nonisolated static func readPNG(at url: URL) -> ScreenshotRead {
+        guard let data = try? Data(contentsOf: url) else { return .unreadable }
+        guard data.count <= ClipboardHistory.maxItemBytes else { return .tooLarge }
+        guard let image = NSImage(data: data), let tiff = image.tiffRepresentation,
+              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return .unreadable }
+        return .png(png)
     }
 }
