@@ -8,25 +8,45 @@ enum Installer {
         return folder == "/Applications" || folder == NSHomeDirectory() + "/Applications"
     }
 
-    /// Copies the app to /Applications, replacing an older copy, puts the original in the Trash, quits this app,
-    /// and opens the new copy. An error is shown to the user and nothing else changes.
+    /// Copies the app to /Applications, replacing an older copy, puts the older copy in the Trash, quits this app,
+    /// and opens the new copy. The new copy is made beside the old one first, so a failed copy leaves the older copy
+    /// where it was. An error is shown to the user.
     @MainActor
     @discardableResult
     static func moveToApplications() -> Bool {
         let fm = FileManager.default
         let destination = URL(fileURLWithPath: "/Applications/\(Bundle.main.bundleURL.lastPathComponent)")
+        let staging = URL(fileURLWithPath: "/Applications/.Library-\(UUID().uuidString).installing")
+        let previous = URL(fileURLWithPath: "/Applications/.Library-\(UUID().uuidString).previous")
         do {
-            if fm.fileExists(atPath: destination.path) {
-                try fm.trashItem(at: destination, resultingItemURL: nil)
-            }
-            try fm.copyItem(at: Bundle.main.bundleURL, to: destination)
+            try fm.copyItem(at: Bundle.main.bundleURL, to: staging)
         } catch {
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = String(localized: "Library Couldn’t Be Moved", bundle: L10n.bundle)
-            alert.informativeText = "\(error.localizedDescription)\n\n" + String(localized: "You can drag Library.app into your Applications folder yourself.", bundle: L10n.bundle)
-            alert.runModal()
+            try? fm.removeItem(at: staging)
+            showFailure(error)
             return false
+        }
+        // Moving the older copy aside and the new copy into place are renames on the same volume. If the second
+        // fails, the older copy goes back, and only then is the older copy trashed.
+        let replacing = fm.fileExists(atPath: destination.path)
+        do {
+            if replacing {
+                try fm.moveItem(at: destination, to: previous)
+            }
+            do {
+                try fm.moveItem(at: staging, to: destination)
+            } catch {
+                if replacing {
+                    try? fm.moveItem(at: previous, to: destination)
+                }
+                throw error
+            }
+        } catch {
+            try? fm.removeItem(at: staging)
+            showFailure(error)
+            return false
+        }
+        if replacing {
+            try? fm.trashItem(at: previous, resultingItemURL: nil)
         }
         // The new copy opens the tour on its last page, so the green check closes the loop.
         UserDefaults.standard.set(true, forKey: "resumeWelcomeAfterMove")
@@ -45,5 +65,15 @@ enum Installer {
         try? fm.trashItem(at: Bundle.main.bundleURL, resultingItemURL: nil)
         NSApp.terminate(nil)
         return true
+    }
+
+    /// Tells the user the move failed, and that the app can be dragged into Applications by hand.
+    @MainActor
+    private static func showFailure(_ error: Error) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Library Couldn’t Be Moved", bundle: L10n.bundle)
+        alert.informativeText = "\(error.localizedDescription)\n\n" + String(localized: "You can drag Library.app into your Applications folder yourself.", bundle: L10n.bundle)
+        alert.runModal()
     }
 }
