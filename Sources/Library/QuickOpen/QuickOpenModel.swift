@@ -446,7 +446,10 @@ final class QuickOpenModel: ObservableObject {
             })
         }
         list.append(QuickOpenAction(id: "quick-look", title: "Quick Look") { lock.perform(item, for: .show) { ClipPreview.shared.show(item) } })
-        list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") { history.togglePin(item) })
+        list.append(QuickOpenAction(id: "pin", title: item.pinned ? "Unpin" : "Pin") {
+            // Unpinning a locked item reveals its text, so it needs the same authentication as showing it.
+            ClipboardLock.shared.perform(item, for: .show) { history.togglePin(item) }
+        })
         list.append(QuickOpenAction(id: "queue", title: String(localized: "Add to Paste Queue", bundle: L10n.bundle)) {
             history.enqueue(item)
         })
