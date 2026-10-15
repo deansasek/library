@@ -149,8 +149,8 @@ struct SnippetsSheet: View {
             }
             Divider()
             HStack {
+                // The label is the visible text, so Voice Control can click it by the name on screen.
                 Button("Add…") { model.editing = .new }
-                    .accessibilityLabel("Add Snippet")
                     .disabled(store.saveBlocked)
                 Button("Edit…") {
                     if let id = model.selection, let snippet = store.snippets.first(where: { $0.id == id }) {
