@@ -220,3 +220,9 @@
 
 /* Footer under Put the Latest Item on the Clipboard When Library Opens, with the password warning. */
 "The newest saved item is copied to the clipboard when Library opens, so you can paste it right away. A password copied before a restart could be pasted by someone else at this Mac." = "The newest saved item is copied to the clipboard when Library opens, so you can paste it right away. A password copied before a restart could be pasted by someone else at this Mac.";
+
+/* Settings toggle that asks before a terminal command runs. Off by default. */
+"Confirm terminal commands" = "Confirm terminal commands";
+
+/* Footer under Confirm terminal commands in Settings > General. */
+"Asks before a terminal command runs, whether it starts from a shortcut, Spotlight, a menu, or Open at Login. The confirmation shows the command, and Cancel is the default." = "Asks before a terminal command runs, whether it starts from a shortcut, Spotlight, a menu, or Open at Login. The confirmation shows the command, and Cancel is the default.";
