@@ -510,6 +510,14 @@ final class ClipboardHistory: ObservableObject {
         pasteQueue.append(item)
     }
 
+    /// Adds a screenshot or recording that macOS saved to disk. The pasteboard and the current item are left alone.
+    func addCapture(_ representations: [[NSPasteboard.PasteboardType: Data]], source: String) {
+        guard isEnabled else { return }
+        let bytes = representations.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } }
+        guard let item = Self.makeItem(representations: representations, bytes: bytes) else { return }
+        add(item, source: source, fromLibrary: false, generation: -1)
+    }
+
     /// Copies the first queued clip and takes it out of the queue. A Command-V in the app in front then pastes it.
     func pasteNext() {
         guard let next = pasteQueue.first else { return }

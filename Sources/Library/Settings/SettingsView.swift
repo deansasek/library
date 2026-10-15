@@ -11,6 +11,7 @@ struct SettingsView: View {
     @ObservedObject var store: LibraryStore
     @ObservedObject private var loginItem = LoginItem.shared
     @ObservedObject private var history = ClipboardHistory.shared
+    @ObservedObject private var screenCaptures = ScreenCaptures.shared
     @ObservedObject private var tracking = TrackingPreferences.shared
     @ObservedObject private var clipLock = ClipboardLock.shared
     @StateObject private var recording = RecordingState()
@@ -171,10 +172,11 @@ struct SettingsView: View {
                 Toggle("Keep clipboard history", isOn: $history.isEnabled)
                 Toggle("Paste into text fields", isOn: $history.pastesIntoFields)
                 Toggle("Play copied GIFs", isOn: $history.playsGIFs)
+                Toggle("Add screenshots and recordings", isOn: $screenCaptures.isEnabled)
                 Button("Clear History") { history.clear() }
                     .disabled(history.items.allSatisfy(\.pinned))
             } footer: {
-                Text("History stays in memory and is gone when Library quits, unless Keep clipboard history across restarts is on. With Paste into text fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps.")
+                Text("History stays in memory and is gone when Library quits, unless Keep clipboard history across restarts is on. With Paste into text fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps. Add screenshots and recordings adds each new screenshot to history as an image, and each recording as a link to its file. It only adds captures made after you turn it on. Library finds them with Spotlight and does not watch a folder.")
             }
             Section {
                 Toggle(isOn: $history.keepsAcrossRestarts) {
