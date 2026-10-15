@@ -76,11 +76,25 @@ enum FrontApp {
         return String(utf16CodeUnits: characters, count: length)
     }
 
-    /// Presses Command-V in the app in front, a moment later so a closing menu or panel has handed the keyboard back.
+    /// Whether a paste may go to the app with this process ID. Never Library itself, so a paste cannot land in Library.
+    static func canPaste(toProcess pid: pid_t, ownProcess own: pid_t) -> Bool {
+        pid != own
+    }
+
+    /// Presses Command-V, a moment later so a closing menu or panel has handed the keyboard back. When `app` is
+    /// given, that app is activated first, and the paste goes to it. Nothing is pasted when it is Library or has quit.
     /// The V key is found on the current layout, so Command-V pastes on Dvorak and other layouts too.
-    static func pasteSoon() {
+    static func pasteSoon(returningTo app: NSRunningApplication? = nil) {
         guard AXIsProcessTrusted() else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+        var delay = 0.08
+        if let app {
+            guard !app.isTerminated,
+                  canPaste(toProcess: app.processIdentifier, ownProcess: ProcessInfo.processInfo.processIdentifier)
+            else { return }
+            app.activate(options: [])
+            delay = 0.2
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             let source = CGEventSource(stateID: .combinedSessionState)
             let pasteKey = keyCode(typing: "v", character: layoutCharacter(for:))
             for isDown in [true, false] {

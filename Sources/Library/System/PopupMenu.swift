@@ -49,9 +49,11 @@ enum PopupMenu {
 
     /// Shows the clipboard history at the mouse pointer. Choosing an item copies it back.
     static func showClipboard(selection: String? = nil, pastes: Bool = false) {
+        // The app that has the keyboard is noted before the menu opens. Library is not activated, so a paste goes
+        // back to that app and never lands in Library.
+        let previous = NSWorkspace.shared.frontmostApplication
         let (menu, target) = makeClipboardMenu(history: .shared, suggestion: LibraryStore.shared.suggestion(selection: selection),
-                                               pastes: pastes)
-        NSApp.activate(ignoringOtherApps: true)
+                                               pastes: pastes, returningTo: previous)
         withExtendedLifetime(target) {
             _ = menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
         }
@@ -59,9 +61,10 @@ enum PopupMenu {
 
     /// The clipboard history as a menu. The first nine items answer to the keys 1 to 9, and Option with the key
     /// picks Copy as Plain Text. The target receives the choices and must stay alive while the menu is open.
+    /// When `pastes` is set, choosing an item re-activates `returningTo` before it pastes.
     static func makeClipboardMenu(history: ClipboardHistory, suggestion: AddSuggestion?,
-                                  pastes: Bool) -> (menu: NSMenu, target: NSObject) {
-        let target = ClipTarget(pastes: pastes)
+                                  pastes: Bool, returningTo previous: NSRunningApplication? = nil) -> (menu: NSMenu, target: NSObject) {
+        let target = ClipTarget(pastes: pastes, returningTo: previous)
         let menu = NSMenu()
         let items = history.displayOrder
         var number = 0
@@ -197,25 +200,28 @@ enum PopupMenu {
     private final class ClipTarget: NSObject {
         /// True when a text field had the keyboard, so choosing an item pastes it.
         let pastes: Bool
+        /// The app that had the keyboard when the menu opened. A paste goes back to it.
+        let previous: NSRunningApplication?
 
-        init(pastes: Bool) {
+        init(pastes: Bool, returningTo previous: NSRunningApplication?) {
             self.pastes = pastes
+            self.previous = previous
         }
 
         @objc func copy(_ sender: NSMenuItem) {
             if let item = clip(sender) {
-                ClipboardLock.shared.perform(item, for: .copy) { [pastes] in
+                ClipboardLock.shared.perform(item, for: .copy) { [pastes, previous] in
                     ClipboardHistory.shared.copy(item)
-                    if pastes { FrontApp.pasteSoon() }
+                    if pastes { FrontApp.pasteSoon(returningTo: previous) }
                 }
             }
         }
 
         @objc func copyPlain(_ sender: NSMenuItem) {
             if let item = clip(sender) {
-                ClipboardLock.shared.perform(item, for: .copy) { [pastes] in
+                ClipboardLock.shared.perform(item, for: .copy) { [pastes, previous] in
                     ClipboardHistory.shared.copyPlainText(item)
-                    if pastes { FrontApp.pasteSoon() }
+                    if pastes { FrontApp.pasteSoon(returningTo: previous) }
                 }
             }
         }
