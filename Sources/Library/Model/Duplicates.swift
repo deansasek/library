@@ -73,6 +73,9 @@ enum Duplicates {
         let inheritedCount: Int
         /// Shortcuts of removed copies that were not moved, as "⌘D (Docs copy)", because the key was already used.
         let conflicts: [String]
+        /// The removed copies as they were, with their notes, colors, icons and Reading List state. The caller moves
+        /// them to Recently Deleted, with `deletedFrom` set to the folder each was in, so nothing is lost.
+        let removed: [LibraryItem]
 
         /// The alert text, such as "Merged 3 items. 1 shortcut was kept from another copy."
         var summary: String {
@@ -105,6 +108,7 @@ enum Duplicates {
         var result = nodes
         var inherited = 0
         var conflicts: [String] = []
+        var removed: [LibraryItem] = []
         for entry in kept {
             var moved: [Shortcut] = []
             for other in entry.others {
@@ -123,11 +127,14 @@ enum Duplicates {
             }
             inherited += moved.count
             for other in entry.others {
+                var copy = other
+                copy.deletedFrom = LibrarySync.parentID(of: other.id, in: nodes)
+                removed.append(copy)
                 result.removeNode(other.id)
             }
         }
         return MergeResult(nodes: result, mergedCount: found.reduce(0) { $0 + $1.items.count },
-                           inheritedCount: inherited, conflicts: conflicts)
+                           inheritedCount: inherited, conflicts: conflicts, removed: removed)
     }
 
     /// Every node in the tree, folders included.

@@ -578,6 +578,23 @@ final class LibraryStore: ObservableObject {
         edit("Restore") { LibrarySync.restore(ids, in: &$0) }
     }
 
+    /// Merges duplicate groups as one undoable step. The removed copies go to Recently Deleted with their data, so
+    /// nothing they held is lost.
+    func mergeDuplicates(keeping choices: [String: UUID]) -> Duplicates.MergeResult? {
+        var outcome: Duplicates.MergeResult?
+        edit("Merge Duplicates") { contents in
+            let result = Duplicates.merge(contents.live, keeping: choices)
+            contents.live = result.nodes
+            let date = Date()
+            for var copy in result.removed {
+                copy.deletedDate = date
+                contents.deleted.append(copy)
+            }
+            outcome = result
+        }
+        return outcome
+    }
+
     /// Removes deleted items for good. The caller confirms first.
     func deleteImmediately(_ ids: Set<UUID>) {
         edit("Delete Immediately") { LibrarySync.deleteImmediately(ids, in: &$0) }

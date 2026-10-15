@@ -1255,6 +1255,18 @@ let twoCopiesResult = Duplicates.merge(twoCopies)
 check(twoCopiesResult.nodes[0].shortcuts == [mergeCmdD] && twoCopiesResult.inheritedCount == 1 && twoCopiesResult.conflicts == ["⌘D (Docs c)"], "two copies with one key: the first wins, the second is listed")
 let plainCopies = [LibraryItem(name: "A", url: "https://a.example.com"), LibraryItem(name: "B", url: "https://a.example.com")]
 check(Duplicates.merge(plainCopies).summary == "Merged 2 items." && Duplicates.merge(plainCopies).nodes[0].shortcuts == nil, "no shortcuts to keep means a plain summary")
+// A removed copy keeps its notes, color and folder, so it can go to Recently Deleted with them.
+do {
+    var noted = LibraryItem(name: "Docs copy", url: "https://docs.example.com")
+    noted.note = "keep me"
+    noted.color = "red"
+    let inFolder = [LibraryItem(name: "Work", children: [LibraryItem(name: "Docs", url: "https://docs.example.com"), noted])]
+    let notedMerge = Duplicates.merge(inFolder)
+    check(notedMerge.removed.map(\.name) == ["Docs copy"] && notedMerge.removed[0].note == "keep me" && notedMerge.removed[0].color == "red",
+          "a removed copy keeps its notes and color")
+    check(notedMerge.removed[0].deletedFrom == inFolder[0].id, "a removed copy remembers its folder")
+    check(Duplicates.merge(plainCopies).removed.count == 1, "one removed copy is listed")
+}
 // An app with other arguments, or a link in another browser, opens something else, so it is not a duplicate.
 let sameApp = [LibraryItem(name: "T1", appPath: "/Applications/Terminal.app", arguments: "-x"), LibraryItem(name: "T2", appPath: "/Applications/Terminal.app", arguments: "-x ")]
 check(Duplicates.groups(in: sameApp).count == 1, "apps with the same arguments are duplicates")
