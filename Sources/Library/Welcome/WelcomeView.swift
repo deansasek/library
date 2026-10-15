@@ -3,7 +3,7 @@ import SwiftUI
 /// The page the welcome window shows. An object instead of `@State` because the `@State` macro plugin
 /// needs a full Xcode install.
 final class WelcomeModel: ObservableObject {
-    static let pageCount = 3
+    static let pageCount = 7
     @Published var page: Int
     /// True from the click on Move to Applications until the app quits, so the page can say what is happening.
     @Published var isMoving = false
@@ -21,8 +21,8 @@ final class WelcomeModel: ObservableObject {
 }
 
 /// A first-launch welcome laid out like Apple's own: the app icon, a large bold title, feature rows with tinted
-/// symbols, and Back and Continue at the bottom as in Setup Assistant. The second page lets you try each
-/// shortcut. The third asks for access and shows whether it was granted.
+/// symbols, and Back and Continue at the bottom as in Setup Assistant. The pages cover each part of Library in
+/// turn. One page lets you try each shortcut, and the last asks for access and shows whether it was granted.
 struct WelcomeView: View {
     @ObservedObject var store: LibraryStore
     @ObservedObject var model: WelcomeModel
@@ -35,7 +35,11 @@ struct WelcomeView: View {
             Group {
                 switch model.page {
                 case 0: intro
-                case 1: shortcuts
+                case 1: find
+                case 2: shortcuts
+                case 3: copy
+                case 4: organize
+                case 5: automate
                 default: access
                 }
             }
@@ -192,6 +196,76 @@ struct WelcomeView: View {
             }
         }
         .padding(14)
+    }
+
+    private var find: some View {
+        VStack(spacing: 28) {
+            Spacer(minLength: 0)
+            header("Find Anything", "Open what you need without leaving what you are doing.")
+            VStack(alignment: .leading, spacing: 20) {
+                feature("books.vertical", .blue, "Library Menu",
+                        "Your bookmarks, apps, folders, and commands, in the menu bar or at the pointer.")
+                feature("magnifyingglass.circle", .purple, "Quick Open",
+                        "Search your library, clipboard history, and snippets. Quick Open also does quick math.")
+                feature("magnifyingglass", .gray, "Spotlight",
+                        "Library items appear in Spotlight, so you can open them from there too.")
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var copy: some View {
+        VStack(spacing: 28) {
+            Spacer(minLength: 0)
+            header("Copy and Paste", "Everything you copy is kept, ready to paste again.")
+            VStack(alignment: .leading, spacing: 20) {
+                feature("doc.on.clipboard", .orange, "Clipboard History",
+                        "Press Control-Command-V (by default) to see what you copied. Pin the items you reuse, and lock them with Touch ID or your password.")
+                feature("list.number", .blue, "Paste Queue",
+                        "Add several items, then paste them one after another, in order.")
+                feature("textformat", .teal, "Copy As",
+                        "Copy text as plain text, without extra spaces, or as a Markdown link.")
+                feature("camera.viewfinder", .green, "Screenshots and Recordings",
+                        "New screenshots are added to your history as you take them. Turn this off in Settings > Clipboard.")
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var organize: some View {
+        VStack(spacing: 28) {
+            Spacer(minLength: 0)
+            header("Organize", "Keep your library tidy, in one place.")
+            VStack(alignment: .leading, spacing: 20) {
+                feature("books.vertical", .blue, "Edit Library",
+                        "Add bookmarks, apps, folders, and commands. Sort, search, and drag to reorder.")
+                feature("paintpalette", .purple, "Colors and Notes",
+                        "Color an item to spot it at a glance, and add a note to remember why it is there.")
+                feature("square.and.arrow.down", .orange, "Import and Backup",
+                        "Import bookmarks from Safari or Chrome. Export a backup, and restore it later.")
+                feature("link", .green, "Check Links",
+                        "Find bookmarks whose pages are gone. Turn on periodic checks in Settings.")
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private var automate: some View {
+        VStack(spacing: 28) {
+            Spacer(minLength: 0)
+            header("Work With Other Apps", "Add and open things from anywhere on your Mac.")
+            VStack(alignment: .leading, spacing: 20) {
+                feature("square.and.arrow.up", .blue, "Add from Any App",
+                        "Select a link or text, then choose Add to Library from the Services menu.")
+                feature("arrow.up.forward.app", .purple, "Library Links",
+                        "A library:// link opens an item. Links never run a terminal command.")
+                feature("terminal", .orange, "Terminal Commands",
+                        "Commands run in Terminal. Turn on Confirm Terminal Commands in Settings to be asked first.")
+                feature("questionmark.circle", .gray, "Help and Support",
+                        "Find Library Help, the keyboard shortcuts, and Support Library under Help in the Library menu.")
+            }
+            Spacer(minLength: 0)
+        }
     }
 
     // MARK: Pieces
