@@ -84,6 +84,26 @@ check(selected == ["Site", "Safari", "Deep"], "open all keeps bookmarks and apps
 check(openAllSelection(in: [LibraryItem(name: "Only", command: "make")]).isEmpty, "a folder of commands opens nothing")
 check(!needsOpenAllConfirmation(5) && needsOpenAllConfirmation(6), "open all asks above five items")
 
+// ---- folder Show Open All ----
+check(LibraryItem(name: "F", children: []).showsOpenAllItem, "a folder with no setting shows Open All")
+check(LibraryItem(name: "F", children: [], showsOpenAll: true).showsOpenAllItem, "a folder set to show shows Open All")
+check(!LibraryItem(name: "F", children: [], showsOpenAll: false).showsOpenAllItem, "a folder set to hide hides Open All")
+let oaOldFolder = Data(#"{"id":"6F1C3E2A-1B2C-4D5E-8F90-123456789ABD","name":"Work","children":[]}"#.utf8)
+let oaDecoded = try? JSONDecoder().decode(LibraryItem.self, from: oaOldFolder)
+check(oaDecoded?.showsOpenAll == nil && oaDecoded?.showsOpenAllItem == true, "a folder file without showsOpenAll loads and shows Open All")
+var oaHidden = LibraryItem(name: "Hidden", children: [], showsOpenAll: false)
+if let data = try? JSONEncoder().encode(oaHidden), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.showsOpenAll == false && !back.showsOpenAllItem, "a hidden Open All round-trips through the file")
+} else {
+    check(false, "a hidden Open All round-trips through the file")
+}
+oaHidden.showsOpenAll = nil
+if let data = try? JSONEncoder().encode(oaHidden), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
+    check(back.showsOpenAll == nil && back.showsOpenAllItem, "a shown Open All round-trips as no field")
+} else {
+    check(false, "a shown Open All round-trips as no field")
+}
+
 var nodes = tree()
 let docs = nodes.leaves.first { $0.name == "Docs" }!
 check(nodes.removeNode(docs.id)?.name == "Docs" && nodes.node(withID: docs.id) == nil, "remove nested")

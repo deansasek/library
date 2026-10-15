@@ -60,6 +60,18 @@ struct EditSheet: View {
                     }
                 }
                 details
+                if node.isFolder {
+                    Section {
+                        Toggle(isOn: Binding(
+                            get: { node.showsOpenAllItem },
+                            set: { state.draft.showsOpenAll = $0 ? nil : false }
+                        )) {
+                            Text("Show Open All", bundle: L10n.bundle)
+                        }
+                    } footer: {
+                        Text("Shows an Open All item for this folder in its menus. Turn this off to hide it.", bundle: L10n.bundle)
+                    }
+                }
                 if node.isOpenable {
                     shortcuts
                 }
@@ -78,7 +90,7 @@ struct EditSheet: View {
         } else if node.appPath != nil {
             base = 805
         } else {
-            base = node.command != nil ? 645 : (node.isFolder ? 276 : 230)
+            base = node.command != nil ? 645 : (node.isFolder ? 370 : 230)
         }
         return min(base, 700)
     }

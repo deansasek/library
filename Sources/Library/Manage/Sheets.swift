@@ -17,6 +17,14 @@ struct AddSheet: View {
                     TextField("URL", text: $state.url, prompt: Text("Required"))
                 case .terminal:
                     TextField("Command", text: $state.command, prompt: Text("Required"))
+                case .folder:
+                    Section {
+                        Toggle(isOn: $state.showsOpenAll) {
+                            Text("Show Open All", bundle: L10n.bundle)
+                        }
+                    } footer: {
+                        Text("Shows an Open All item for this folder in its menus. Turn this off to hide it.", bundle: L10n.bundle)
+                    }
                 default:
                     EmptyView()
                 }
