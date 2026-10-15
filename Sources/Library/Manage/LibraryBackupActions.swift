@@ -59,10 +59,10 @@ enum LibraryBackupActions {
         let incoming = items.allIDs.count
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Replace your library?"
-        alert.informativeText = "Your library has \(count(current)). It will be replaced by the \(count(incoming)) in “\(url.lastPathComponent)”. Undo restores the current library."
-        alert.addButton(withTitle: "Cancel")
-        let replace = alert.addButton(withTitle: "Replace Library")
+        alert.messageText = String(localized: "Replace your library?", bundle: L10n.bundle)
+        alert.informativeText = String(format: String(localized: "Your library has %@. It will be replaced by the %@ in “%@”. Undo restores the current library.", bundle: L10n.bundle), count(current), count(incoming), url.lastPathComponent)
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
+        let replace = alert.addButton(withTitle: String(localized: "Replace Library", bundle: L10n.bundle))
         replace.hasDestructiveAction = true
         // Cancel is the default button, so pressing Return keeps the library.
         guard alert.runModal() == .alertSecondButtonReturn else { return }

@@ -23,8 +23,8 @@ enum Installer {
         } catch {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Library Couldn’t Be Moved"
-            alert.informativeText = "\(error.localizedDescription)\n\nYou can drag Library.app into your Applications folder yourself."
+            alert.messageText = String(localized: "Library Couldn’t Be Moved", bundle: L10n.bundle)
+            alert.informativeText = "\(error.localizedDescription)\n\n" + String(localized: "You can drag Library.app into your Applications folder yourself.", bundle: L10n.bundle)
             alert.runModal()
             return false
         }

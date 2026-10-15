@@ -226,3 +226,90 @@
 
 /* Footer under Confirm terminal commands in Settings > General. */
 "Asks before a terminal command runs, whether it starts from a shortcut, Spotlight, a menu, or Open at Login. The confirmation shows the command, and Cancel is the default." = "Asks before a terminal command runs, whether it starts from a shortcut, Spotlight, a menu, or Open at Login. The confirmation shows the command, and Cancel is the default.";
+
+/* Alert or dialog text. */
+"Library Can’t Read bookmarks.json" = "Library Can’t Read bookmarks.json";
+
+/* Alert or dialog text. */
+"The file may have been edited into something Library doesn’t understand. A copy was saved as bookmarks-damaged.json, and Library started with an empty library. Your next change replaces bookmarks.json." = "The file may have been edited into something Library doesn’t understand. A copy was saved as bookmarks-damaged.json, and Library started with an empty library. Your next change replaces bookmarks.json.";
+
+/* Alert or dialog text. */
+"Show in Finder" = "Show in Finder";
+
+/* Alert or dialog text. */
+"OK" = "OK";
+
+/* Alert or dialog text. */
+"Library Can’t Find bookmarks.json in iCloud Drive" = "Library Can’t Find bookmarks.json in iCloud Drive";
+
+/* Alert or dialog text. */
+"Your library is kept in iCloud Drive, and that copy is missing. It may have been removed on another Mac, or iCloud may still be downloading it. Library won’t change anything until the file is back." = "Your library is kept in iCloud Drive, and that copy is missing. It may have been removed on another Mac, or iCloud may still be downloading it. Library won’t change anything until the file is back.";
+
+/* Alert or dialog text. */
+"The file is there, but Library can’t open it, usually because of its permissions. Library won’t change it. Fix the file’s permissions, then open Library again." = "The file is there, but Library can’t open it, usually because of its permissions. Library won’t change it. Fix the file’s permissions, then open Library again.";
+
+/* Alert or dialog text. */
+"Two versions of your library were edited on different Macs" = "Two versions of your library were edited on different Macs";
+
+/* Alert or dialog text. */
+"Keep one version. Review lists each item that differs, so you can choose for each one." = "Keep one version. Review lists each item that differs, so you can choose for each one.";
+
+/* Alert or dialog text. */
+"Keep This Mac’s Version" = "Keep This Mac’s Version";
+
+/* Alert or dialog text. */
+"Keep the Other Version" = "Keep the Other Version";
+
+/* Alert or dialog text. */
+"Review" = "Review";
+
+/* Alert or dialog text. */
+"Keep Which Library?" = "Keep Which Library?";
+
+/* Alert or dialog text. */
+"iCloud Drive already has a library. Use the iCloud Library to switch to it, or use This Mac’s Library to replace it. Library keeps a backup of the library it replaces in ~/.library." = "iCloud Drive already has a library. Use the iCloud Library to switch to it, or use This Mac’s Library to replace it. Library keeps a backup of the library it replaces in ~/.library.";
+
+/* Alert or dialog text. */
+"Use the iCloud Library" = "Use the iCloud Library";
+
+/* Alert or dialog text. */
+"Use This Mac’s Library" = "Use This Mac’s Library";
+
+/* Alert or dialog text. */
+"Library Couldn’t Save Your Changes" = "Library Couldn’t Save Your Changes";
+
+/* Alert or dialog text. */
+"Library Couldn’t Be Moved" = "Library Couldn’t Be Moved";
+
+/* Alert or dialog text. */
+"Fill in each value." = "Fill in each value.";
+
+/* Alert or dialog text. */
+"Open" = "Open";
+
+/* Alert or dialog text. */
+"Library opens them one after another." = "Library opens them one after another.";
+
+/* Alert or dialog text. */
+"Run" = "Run";
+
+/* Alert or dialog text. */
+"Replace your library?" = "Replace your library?";
+
+/* Alert or dialog text. */
+"Replace Library" = "Replace Library";
+
+/* Alert or dialog text. */
+"Open %lld items?" = "Open %lld items?";
+
+/* Alert or dialog text. */
+"Run “%@” in Terminal?" = "Run “%@” in Terminal?";
+
+/* Alert or dialog text. */
+"Run “%@” in Terminal? The command is:" = "Run “%@” in Terminal? The command is:";
+
+/* Alert or dialog text. */
+"Your library has %@. It will be replaced by the %@ in “%@”. Undo restores the current library." = "Your library has %@. It will be replaced by the %@ in “%@”. Undo restores the current library.";
+
+/* Alert or dialog text. */
+"You can drag Library.app into your Applications folder yourself." = "You can drag Library.app into your Applications folder yourself.";
