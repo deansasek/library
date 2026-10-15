@@ -47,14 +47,19 @@ if ! ./build.sh; then
     fail "the build failed. The messages above show where."
 fi
 
-# Quit the running app, and wait a bounded time for it to exit, so a stuck app cannot stall the install forever.
-pkill -x Library || true
-for _ in {1..75}; do
-    pgrep -x Library >/dev/null || break
-    sleep 0.2
-done
+# Quit the running app through its own quit command, so it saves pending changes on the way out. A signal such as
+# SIGTERM skips those saves. Wait a bounded time for it to exit, so a stuck app cannot stall the install forever.
+quit_library() {
+    pgrep -x Library >/dev/null || return 0
+    osascript -e 'tell application id "com.deansasek.library" to quit' 2>/dev/null || true
+    for _ in {1..75}; do
+        pgrep -x Library >/dev/null || return 0
+        sleep 0.2
+    done
+}
+quit_library
 if pgrep -x Library >/dev/null; then
-    fail "Library is still running. Quit it from the menu bar, then try again."
+    fail "Library is still running. Quit it from the menu bar, wait for it to close, then try again."
 fi
 
 # Copy the new app beside the old one in /Applications (same volume, so the moves are renames), check the copy, and only
