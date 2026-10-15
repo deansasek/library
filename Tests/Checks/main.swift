@@ -850,6 +850,32 @@ if let url = ClipPreviewSource.url(for: clip(.image, reps: [[ClipItem.gifType: g
     check(url.pathExtension == "gif" && (try? Data(contentsOf: url)) == gifBytes, "GIF data written with a .gif name")
 } else { check(false, "gif preview file") }
 try? FileManager.default.removeItem(at: previewDir)
+
+// ---- Quick Open drags: the payload each row carries (pure, no pasteboard) ----
+let dragLink = URL(string: "https://docs.example.com/page")!
+let dragFile = URL(fileURLWithPath: "/tmp/drag-check.pdf")
+let dragPNG = Data([1, 2, 3]), dragTIFF = Data([4, 5, 6])
+let dragLinkNode = LibraryItem(name: "Docs", url: "https://docs.example.com/page")
+check(QuickOpenDrag.payload(for: .item(dragLinkNode, folder: ""), clipHidden: false) == .link(dragLinkNode.shareURL!),
+      "a bookmark drags its address")
+check(QuickOpenDrag.payload(for: .item(LibraryItem(name: "Work", children: []), folder: ""), clipHidden: false) == .nothing,
+      "a folder drags nothing")
+check(QuickOpenDrag.payload(for: .openLink(dragLink), clipHidden: false) == .link(dragLink)
+      && QuickOpenDrag.payload(for: .addLink(dragLink), clipHidden: false) == .link(dragLink), "open and add link rows drag their address")
+check(QuickOpenDrag.payload(for: .snippet(Snippet(name: "Sig", text: "Thanks,\nDean")), clipHidden: false) == .text("Thanks,\nDean"),
+      "a snippet drags its text")
+check(QuickOpenDrag.payload(for: .clip(clip(.text, text: "hello")), clipHidden: false) == .text("hello"), "a text clip drags its text")
+check(QuickOpenDrag.payload(for: .clip(clip(.file, files: [dragFile])), clipHidden: false) == .file(dragFile), "a file clip drags its file")
+check(QuickOpenDrag.payload(for: .clip(clip(.image, reps: [[.png: dragPNG]])), clipHidden: false) == .png(dragPNG),
+      "an image clip drags its PNG")
+check(QuickOpenDrag.payload(for: .clip(clip(.image, reps: [[.tiff: dragTIFF]])), clipHidden: false) == .tiff(dragTIFF),
+      "an image with only TIFF drags its TIFF")
+check(QuickOpenDrag.payload(for: .clip(clip(.image, text: "caption", files: [dragFile], reps: [[.png: dragPNG]])), clipHidden: false) == .png(dragPNG),
+      "an image clip drags its picture before its file or text")
+check(QuickOpenDrag.payload(for: .clip(clip(.text, text: "secret")), clipHidden: true) == .nothing,
+      "a locked pinned clip drags nothing")
+check(QuickOpenDrag.payload(for: .clip(clip(.other)), clipHidden: false) == .nothing, "a clip with no content drags nothing")
+
 // ---- file previews: the CSV and TSV parser (pure, no files) ----
 let csv = DelimitedParser.parse("name,note\n\"Smith, J\",\"a, b, c\"\n")
 check(csv.headers == ["name", "note"] && csv.rows == [["Smith, J", "a, b, c"]] && !csv.truncated, "quoted commas stay in a field")
