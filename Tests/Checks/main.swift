@@ -661,6 +661,18 @@ MainActor.assumeIsolated {
     check(history.pasteQueue.isEmpty, "Clear Queue empties the queue")
     check(PopupMenu.makeClipboardMenu(history: history, suggestion: nil, pastes: false).menu.items.allSatisfy { !($0.title.hasPrefix("Paste Queue")) }, "no queue section when the queue is empty")
     _ = queueTarget
+    // A cleared or removed clip is forgotten: it is no longer the current clip (so it is not suggested) or in the queue.
+    copy("https://forgotten.example.com/clear")
+    check(history.current?.kind == .link, "the copied link is the current clip")
+    history.clear()
+    check(history.current == nil, "clear forgets the current clip")
+    check(AddSuggestion.make(selection: nil, clipboard: history.current, in: tree()) == nil, "a cleared link is not suggested")
+    copy("queued then removed")
+    if let doomed = history.current {
+        history.enqueue(doomed)
+        history.remove(doomed)
+        check(history.current == nil && history.pasteQueue.isEmpty, "removing a clip forgets it and drops it from the queue")
+    } else { check(false, "the copy is the current clip") }
     let node = LibraryItem(name: "docs.example.com", url: "https://docs.example.com")
     let (withAdd, addTarget) = PopupMenu.makeClipboardMenu(history: history, suggestion: AddSuggestion(node: node, source: .selection), pastes: false)
     check(withAdd.items.first?.title == "Add “docs.example.com” to Library", "suggestion first")
