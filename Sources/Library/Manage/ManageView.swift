@@ -4,6 +4,10 @@ struct ManageView: View {
     @ObservedObject var store: LibraryStore
     @StateObject private var state = ManageState()
     @Environment(\.undoManager) private var undoManager
+    // The sort, direction, and search text are kept per window, so they come back on the next launch.
+    @SceneStorage("manage.sortKey") private var storedSortKey: String = ""
+    @SceneStorage("manage.ascending") private var storedAscending = true
+    @SceneStorage("manage.query") private var storedQuery: String = ""
 
     /// Column titles over the list, like the header of a Finder list view. The widths match NodeRow.
     private func header(pathWidth: CGFloat) -> some View {
@@ -135,7 +139,20 @@ struct ManageView: View {
         .frame(minWidth: 680, idealWidth: 780, minHeight: 320, idealHeight: 420)
         // Remembers the window's size and position across launches.
         .background(WindowFrameAutosave(name: "ManageWindow"))
-        .onAppear { store.refreshSyncState() }
+        .onAppear {
+            store.refreshSyncState()
+            restoreSavedState()
+        }
+        .onChange(of: state.sortKey) { _, key in storedSortKey = key?.rawValue ?? "" }
+        .onChange(of: state.ascending) { _, value in storedAscending = value }
+        .onChange(of: state.query) { _, text in storedQuery = text }
+    }
+
+    /// Puts back the sort and search text saved for this window. A saved sort key that no longer exists is ignored.
+    private func restoreSavedState() {
+        state.sortKey = ManageState.SortKey(rawValue: storedSortKey)
+        state.ascending = storedAscending
+        state.query = storedQuery
     }
 
     /// The Reading List when it has items, then the library rows, then Recently Deleted when it has items.

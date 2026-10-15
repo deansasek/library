@@ -16,7 +16,8 @@ final class ManageState: ObservableObject {
 
     /// What the list is sorted by. Sorting only changes what the window shows, not your menu order. The first three
     /// are columns. Most used and recently opened come from the sort menu, and always put the largest value first.
-    enum SortKey { case name, shortcut, path, mostUsed, recentlyOpened }
+    /// String-backed so the window can store it with `@SceneStorage`. The raw values are part of saved state, so keep them.
+    enum SortKey: String { case name, shortcut, path, mostUsed, recentlyOpened }
 
     @Published var sortKey: SortKey?
     @Published var ascending = true
