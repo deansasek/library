@@ -1887,5 +1887,21 @@ MainActor.assumeIsolated {
     try? FileManager.default.removeItem(at: folder)
 }
 
+// A recording that was deleted is neither copied nor left as a dead reference.
+do {
+    let gone = ClipItem(representations: [], digest: "gone", kind: .file, title: "gone.mov", plainText: nil, link: nil, thumbnail: nil,
+                        gifURL: nil, fileURLs: [URL(fileURLWithPath: "/nonexistent/library-check-\(UUID().uuidString).mov")], byteCount: 0, date: Date())
+    check(ClipboardHistory.refersToMissingFile(gone), "a file item whose file is gone is refused")
+    check(!ClipboardHistory.refersToMissingFile(gone, exists: { _ in true }), "a file item whose file exists is copied")
+    let board = NSPasteboard(name: NSPasteboard.Name("library-checks-gone-\(UUID().uuidString)"))
+    let history = ClipboardHistory(pasteboard: board, file: nil, key: { throw ClipboardKey.KeychainError(status: -1) })
+    board.clearContents()
+    board.setString("before", forType: .string)
+    let changeBefore = board.changeCount
+    history.copy(gone)
+    check(board.changeCount == changeBefore && board.string(forType: .string) == "before", "copying a missing file leaves the pasteboard alone")
+    history.removeFile(at: gone.fileURLs[0])
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

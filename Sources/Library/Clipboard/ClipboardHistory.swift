@@ -435,6 +435,11 @@ final class ClipboardHistory: ObservableObject {
     /// Puts the item back on the clipboard in every format it had. A link has its tracking parameters removed
     /// when the setting is on; the history keeps the link as it was copied.
     func copy(_ item: ClipItem) {
+        // A file that was moved or deleted is not copied, so no dead file reference reaches the pasteboard.
+        guard !Self.refersToMissingFile(item) else {
+            NSSound.beep()
+            return
+        }
         let cleans = item.kind == .link && TrackingPreferences.shared.removesOnCopy
         pasteboard.clearContents()
         pasteboard.writeObjects(item.representations.map { representation in
@@ -444,6 +449,11 @@ final class ClipboardHistory: ObservableObject {
             }
             return pasteboardItem
         })
+    }
+
+    /// True when the item names a file that is no longer on disk.
+    static func refersToMissingFile(_ item: ClipItem, exists: (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }) -> Bool {
+        item.fileURLs.contains { !exists($0) }
     }
 
     /// The link text, with tracking parameters removed, for the formats that carry the link. Other data is unchanged.
@@ -476,6 +486,16 @@ final class ClipboardHistory: ObservableObject {
     func remove(_ item: ClipItem) {
         items.removeAll { $0.id == item.id }
         if item.pinned { savePinned() }
+        scheduleHistorySave()
+    }
+
+    /// Removes the clips that refer to a file, such as a screen recording that was deleted.
+    func removeFile(at url: URL) {
+        let pinnedRemoved = items.contains { $0.pinned && $0.fileURLs.contains(url) }
+        let before = items.count
+        items.removeAll { $0.fileURLs.contains(url) }
+        guard items.count != before else { return }
+        if pinnedRemoved { savePinned() }
         scheduleHistorySave()
     }
 
