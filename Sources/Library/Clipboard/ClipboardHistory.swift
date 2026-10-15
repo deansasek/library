@@ -418,9 +418,15 @@ final class ClipboardHistory: ObservableObject {
         items.filter(\.pinned) + items.filter { !$0.pinned }
     }
 
-    /// The apps that copied something in the history, each once, in name order.
+    /// The apps that copied something in the history, each once, in name order. A locked pinned item is left out, so
+    /// its source app is not listed before the user authenticates.
     var sourceApps: [String] {
-        Array(Set(items.compactMap(\.sourceApp))).sorted()
+        Self.sourceApps(in: items) { ClipboardLock.shared.isHidden($0) }
+    }
+
+    /// The source apps of the items that are not hidden, each once, in name order.
+    nonisolated static func sourceApps(in items: [ClipItem], isHidden: (ClipItem) -> Bool) -> [String] {
+        Array(Set(items.filter { !isHidden($0) }.compactMap(\.sourceApp))).sorted()
     }
 
     /// Items whose text contains every word. With `app`, only the items copied while that app was in front.
