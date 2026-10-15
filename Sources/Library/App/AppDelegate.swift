@@ -21,7 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if UserDefaults.standard.bool(forKey: "resumeWelcomeAfterMove") {
             // Library was just moved to Applications. Show the last page of the tour, with its check mark.
             UserDefaults.standard.removeObject(forKey: "resumeWelcomeAfterMove")
-            Welcome.show(store: LibraryStore.shared, page: WelcomeModel.pageCount - 1)
+            Welcome.show(page: WelcomeModel.pageCount - 1)
         } else if LibraryStore.shared.cloudFileMissing {
             DispatchQueue.main.async { Self.reportCloudFileMissing() }
         } else if LibraryStore.shared.fileReadFailed {
@@ -29,7 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else if LibraryStore.shared.hadUnreadableFile {
             DispatchQueue.main.async { Self.reportUnreadableFile() }
         } else {
-            Welcome.showIfNeeded(store: LibraryStore.shared)
+            Welcome.showIfNeeded()
         }
         // macOS marks a login launch in the launch event. Only that launch opens the login items, so a manual launch
         // or a relaunch soon after boot does not open them a second time.

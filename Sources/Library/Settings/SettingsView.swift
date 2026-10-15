@@ -99,7 +99,7 @@ struct SettingsView: View {
             }
             Section {
                 LabeledContent("Welcome Screen") {
-                    Button("Show…") { Welcome.show(store: store) }
+                    Button("Show…") { Welcome.show() }
                 }
                 LabeledContent("Version", value: version)
             } footer: {

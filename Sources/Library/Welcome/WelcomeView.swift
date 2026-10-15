@@ -18,6 +18,13 @@ final class WelcomeModel: ObservableObject {
         forward = step > 0
         page += step
     }
+
+    /// Starts the tour again at `page`, as a new model would.
+    func reset(page: Int) {
+        self.page = page
+        forward = true
+        isMoving = false
+    }
 }
 
 /// A first-launch welcome laid out like Apple's own: the app icon, a large bold title, feature rows with tinted

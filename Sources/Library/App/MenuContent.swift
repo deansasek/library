@@ -111,7 +111,7 @@ struct MenuContent: View {
         Menu {
             Button("Library Help") { NSWorkspace.shared.open(HelpCommands.guide) }
             Button("Keyboard Shortcuts") { NSWorkspace.shared.open(HelpCommands.shortcuts) }
-            Button("Welcome Tour…") { Welcome.show(store: store) }
+            Button("Welcome Tour…") { Welcome.show() }
             Divider()
             Button("Report an Issue…") { NSWorkspace.shared.open(HelpCommands.issues) }
             Button("Support Library…") { NSWorkspace.shared.open(HelpCommands.support) }
