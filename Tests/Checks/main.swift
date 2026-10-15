@@ -484,6 +484,20 @@ try? FileManager.default.removeItem(at: snippetDir)
 check(Shortcut(modifiers: UInt32(controlKey), button: 1) == Shortcut(modifiers: UInt32(controlKey), button: 1), "shortcut equality")
 check(Shortcut(modifiers: UInt32(controlKey), button: 1) != Shortcut(modifiers: UInt32(cmdKey), button: 1), "shortcut inequality")
 
+// ---- an app added through an intent: only the Applications folders are added without a question, and launching asks ----
+do {
+    let home = "/Users/tester"
+    check(IntentLogic.isStandardApplication(atPath: "/Applications/Tool.app", home: home), "an app in /Applications is added without a question")
+    check(IntentLogic.isStandardApplication(atPath: "/Users/tester/Applications/Tool.app", home: home), "an app in ~/Applications is added without a question")
+    check(!IntentLogic.isStandardApplication(atPath: "/Users/tester/Downloads/Tool.app", home: home), "an app in Downloads needs a question")
+    check(!IntentLogic.isStandardApplication(atPath: "/Applications/Sub/Tool.app", home: home), "an app in a subfolder of /Applications needs a question")
+    check(!IntentLogic.isStandardApplication(atPath: "/Applications/../tmp/Tool.app", home: home), "a path that leaves /Applications needs a question")
+    let added = LibraryItem(name: "Tool", appPath: "/Applications/Tool.app", addedByIntent: true)
+    check(IntentLogic.needsLaunchConfirmation(added), "an app added through an intent asks before it launches")
+    check(!IntentLogic.needsLaunchConfirmation(LibraryItem(name: "Tool", appPath: "/Applications/Tool.app")), "an app added by hand launches without a question")
+    check(!IntentLogic.needsLaunchConfirmation(LibraryItem(name: "Jira", url: "https://jira.example.com", addedByIntent: true)), "only apps ask before launch")
+}
+
 // ---- a web page cannot run a terminal command through library://open ----
 MainActor.assumeIsolated {
     let items = [
