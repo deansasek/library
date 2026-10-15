@@ -7,8 +7,17 @@ struct ShortcutField: View {
     let isRecording: Bool
     let setRecording: (Bool) -> Void
     var clearable = true
+    /// The name of the action this shortcut is for, as shown beside it, such as "Show Quick Open". Empty when unnamed.
+    var action = ""
 
     private var isSet: Bool { shortcut.map { !$0.isEmpty } ?? false }
+
+    /// Names the action, so each of the record buttons reads differently. It starts with the visible text.
+    private var recordLabel: String {
+        action.isEmpty
+            ? String(localized: "Record Shortcut", bundle: L10n.bundle)
+            : String(format: String(localized: "Record Shortcut for %@", bundle: L10n.bundle), action)
+    }
 
     var body: some View {
         HStack(spacing: 6) {
@@ -19,6 +28,9 @@ struct ShortcutField: View {
                     .foregroundStyle(isSet && !isRecording ? Color.primary : Color.secondary)
                     .frame(minWidth: 150)
             }
+            .accessibilityLabel(recordLabel)
+            .accessibilityValue(isSet && !isRecording ? (shortcut?.description ?? "") : "")
+            .accessibilityHint(String(localized: "Press the keys for the new shortcut. Escape cancels.", bundle: L10n.bundle))
             .overlay {
                 if isRecording {
                     RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 2)

@@ -364,3 +364,24 @@
 
 /* VoiceOver label for the progress spinner while the app list loads. */
 "Loading applications" = "Loading applications";
+
+/* VoiceOver label for a shortcut's record button when no action is named. The visible text is the same. */
+"Record Shortcut" = "Record Shortcut";
+
+/* VoiceOver label for a shortcut's record button. The name of the action follows, such as "Show Quick Open". */
+"Record Shortcut for %@" = "Record Shortcut for %@";
+
+/* VoiceOver hint for a record shortcut button. */
+"Press the keys for the new shortcut. Escape cancels." = "Press the keys for the new shortcut. Escape cancels.";
+
+/* Settings shortcut action name, shown beside its record button. */
+"Show Library Menu" = "Show Library Menu";
+
+/* Settings shortcut action name, shown beside its record button. */
+"Show Quick Open" = "Show Quick Open";
+
+/* Settings shortcut action name, shown beside its record button. */
+"Show Clipboard Menu" = "Show Clipboard Menu";
+
+/* Settings shortcut action name, shown beside its record button. */
+"Open Copied Link" = "Open Copied Link";
