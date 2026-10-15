@@ -10,9 +10,16 @@ enum SmartTitle {
 
     static var isOn: Bool { UserDefaults.standard.bool(forKey: key) }
 
-    /// Asks for the page of a new bookmark, once, when the setting is on. Only web addresses are asked for.
+    /// True when the address may be asked for its page. Only web addresses are asked for, and an address with a query
+    /// is not: sign-in, unsubscribe, and confirmation links carry a single-use token there, and asking for the page
+    /// could use it up.
+    static func mayFetch(_ url: URL) -> Bool {
+        WebFetch.isWeb(url) && url.query == nil
+    }
+
+    /// Asks for the page of a new bookmark, once, when the setting is on. See `mayFetch` for the addresses asked.
     static func nameFromPage(_ id: UUID, url: URL) {
-        guard isOn, WebFetch.isWeb(url), let host = url.host else { return }
+        guard isOn, mayFetch(url), let host = url.host else { return }
         Task {
             guard let title = await PageTitle.fetch(url) else { return }
             LibraryStore.shared.nameBookmark(id, host: host, title: title)
