@@ -385,11 +385,11 @@ final class LibraryStore: ObservableObject {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Two versions of your library were edited on different Macs"
-        alert.informativeText = "Keep one version. Review lists each item that differs, so you can choose for each one."
-        alert.addButton(withTitle: "Keep This Mac’s Version")
-        alert.addButton(withTitle: "Keep the Other Version")
-        alert.addButton(withTitle: "Review")
+        alert.messageText = String(localized: "Two versions of your library were edited on different Macs", bundle: L10n.bundle)
+        alert.informativeText = String(localized: "Keep one version. Review lists each item that differs, so you can choose for each one.", bundle: L10n.bundle)
+        alert.addButton(withTitle: String(localized: "Keep This Mac’s Version", bundle: L10n.bundle))
+        alert.addButton(withTitle: String(localized: "Keep the Other Version", bundle: L10n.bundle))
+        alert.addButton(withTitle: String(localized: "Review", bundle: L10n.bundle))
         switch alert.runModal() {
         case .alertFirstButtonReturn: return .thisMac
         case .alertSecondButtonReturn: return .other
@@ -808,11 +808,11 @@ final class LibraryStore: ObservableObject {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Keep Which Library?"
-        alert.informativeText = "iCloud Drive already has a library. Use the iCloud Library to switch to it, or use This Mac’s Library to replace it. Library keeps a backup of the library it replaces in ~/.library."
-        alert.addButton(withTitle: "Use the iCloud Library")
-        alert.addButton(withTitle: "Use This Mac’s Library")
-        let cancel = alert.addButton(withTitle: "Cancel")
+        alert.messageText = String(localized: "Keep Which Library?", bundle: L10n.bundle)
+        alert.informativeText = String(localized: "iCloud Drive already has a library. Use the iCloud Library to switch to it, or use This Mac’s Library to replace it. Library keeps a backup of the library it replaces in ~/.library.", bundle: L10n.bundle)
+        alert.addButton(withTitle: String(localized: "Use the iCloud Library", bundle: L10n.bundle))
+        alert.addButton(withTitle: String(localized: "Use This Mac’s Library", bundle: L10n.bundle))
+        let cancel = alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
         alert.buttons[0].keyEquivalent = ""
         alert.buttons[1].keyEquivalent = ""
         cancel.keyEquivalent = "\r"
@@ -829,7 +829,7 @@ final class LibraryStore: ObservableObject {
         alert.alertStyle = .warning
         alert.messageText = title
         alert.informativeText = message
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: String(localized: "OK", bundle: L10n.bundle))
         alert.runModal()
     }
 
@@ -843,7 +843,7 @@ final class LibraryStore: ObservableObject {
             NSApp.activate(ignoringOtherApps: true)
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Library Couldn’t Save Your Changes"
+            alert.messageText = String(localized: "Library Couldn’t Save Your Changes", bundle: L10n.bundle)
             alert.informativeText = reason
             alert.runModal()
         }

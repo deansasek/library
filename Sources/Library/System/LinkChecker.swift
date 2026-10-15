@@ -102,7 +102,7 @@ enum LinkChecker {
         let alert = NSAlert()
         alert.messageText = String(localized: "Check Links", bundle: L10n.bundle)
         alert.informativeText = message
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: String(localized: "OK", bundle: L10n.bundle))
         alert.runModal()
     }
 }

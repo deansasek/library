@@ -98,7 +98,7 @@ private func promptValues(for node: LibraryItem) -> [String: String]? {
         alert.accessoryView = inputs[0]
         alert.window.initialFirstResponder = inputs[0]
     } else {
-        alert.informativeText = "Fill in each value."
+        alert.informativeText = String(localized: "Fill in each value.", bundle: L10n.bundle)
         let stack = NSStackView()
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -115,8 +115,8 @@ private func promptValues(for node: LibraryItem) -> [String: String]? {
         alert.window.initialFirstResponder = inputs.first
         alert.window.recalculateKeyViewLoop()
     }
-    alert.addButton(withTitle: "Open")
-    alert.addButton(withTitle: "Cancel")
+    alert.addButton(withTitle: String(localized: "Open", bundle: L10n.bundle))
+    alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
     alert.buttons[1].keyEquivalent = "\u{1b}"
     guard alert.runModal() == .alertFirstButtonReturn else { return nil }
     var values: [String: String] = [:]
@@ -137,10 +137,10 @@ func openAll(_ nodes: [LibraryItem]) {
     if needsOpenAllConfirmation(items.count) {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
-        alert.messageText = "Open \(items.count) items?"
-        alert.informativeText = "Library opens them one after another."
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Open")
+        alert.messageText = String(format: String(localized: "Open %lld items?", bundle: L10n.bundle), items.count)
+        alert.informativeText = String(localized: "Library opens them one after another.", bundle: L10n.bundle)
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
+        alert.addButton(withTitle: String(localized: "Open", bundle: L10n.bundle))
         guard alert.runModal() == .alertSecondButtonReturn else { return }
     }
     Task { @MainActor in
@@ -192,10 +192,10 @@ private func confirmCommand(_ node: LibraryItem, _ command: String) -> Bool {
     guard UserDefaults.standard.bool(forKey: "confirmTerminalCommands") else { return true }
     NSApp.activate(ignoringOtherApps: true)
     let alert = NSAlert()
-    alert.messageText = "Run “\(node.name)” in Terminal?"
+    alert.messageText = String(format: String(localized: "Run “%@” in Terminal?", bundle: L10n.bundle), node.name)
     alert.informativeText = command
-    alert.addButton(withTitle: "Cancel")
-    alert.addButton(withTitle: "Run")
+    alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
+    alert.addButton(withTitle: String(localized: "Run", bundle: L10n.bundle))
     return alert.runModal() == .alertSecondButtonReturn
 }
 

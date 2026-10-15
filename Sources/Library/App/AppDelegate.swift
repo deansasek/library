@@ -58,10 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Library Can’t Read bookmarks.json"
-        alert.informativeText = "The file may have been edited into something Library doesn’t understand. A copy was saved as bookmarks-damaged.json, and Library started with an empty library. Your next change replaces bookmarks.json."
-        alert.addButton(withTitle: "Show in Finder")
-        alert.addButton(withTitle: "OK")
+        alert.messageText = String(localized: "Library Can’t Read bookmarks.json", bundle: L10n.bundle)
+        alert.informativeText = String(localized: "The file may have been edited into something Library doesn’t understand. A copy was saved as bookmarks-damaged.json, and Library started with an empty library. Your next change replaces bookmarks.json.", bundle: L10n.bundle)
+        alert.addButton(withTitle: String(localized: "Show in Finder", bundle: L10n.bundle))
+        alert.addButton(withTitle: String(localized: "OK", bundle: L10n.bundle))
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.activateFileViewerSelecting([LibraryStore.dir.appendingPathComponent("bookmarks-damaged.json")])
         }
@@ -72,9 +72,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Library Can’t Find bookmarks.json in iCloud Drive"
-        alert.informativeText = "Your library is kept in iCloud Drive, and that copy is missing. It may have been removed on another Mac, or iCloud may still be downloading it. Library won’t change anything until the file is back."
-        alert.addButton(withTitle: "OK")
+        alert.messageText = String(localized: "Library Can’t Find bookmarks.json in iCloud Drive", bundle: L10n.bundle)
+        alert.informativeText = String(localized: "Your library is kept in iCloud Drive, and that copy is missing. It may have been removed on another Mac, or iCloud may still be downloading it. Library won’t change anything until the file is back.", bundle: L10n.bundle)
+        alert.addButton(withTitle: String(localized: "OK", bundle: L10n.bundle))
         alert.runModal()
     }
 
@@ -83,10 +83,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.alertStyle = .warning
-        alert.messageText = "Library Can’t Read bookmarks.json"
-        alert.informativeText = "The file is there, but Library can’t open it, usually because of its permissions. Library won’t change it. Fix the file’s permissions, then open Library again."
-        alert.addButton(withTitle: "Show in Finder")
-        alert.addButton(withTitle: "OK")
+        alert.messageText = String(localized: "Library Can’t Read bookmarks.json", bundle: L10n.bundle)
+        alert.informativeText = String(localized: "The file is there, but Library can’t open it, usually because of its permissions. Library won’t change it. Fix the file’s permissions, then open Library again.", bundle: L10n.bundle)
+        alert.addButton(withTitle: String(localized: "Show in Finder", bundle: L10n.bundle))
+        alert.addButton(withTitle: String(localized: "OK", bundle: L10n.bundle))
         if alert.runModal() == .alertFirstButtonReturn {
             NSWorkspace.shared.activateFileViewerSelecting([LibraryStore.file])
         }

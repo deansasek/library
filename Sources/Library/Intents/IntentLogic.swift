@@ -28,7 +28,7 @@ enum IntentLogic {
 
     /// The question shown before a command runs. It always names the command in full.
     static func confirmation(for node: LibraryItem) -> String {
-        "Run “\(node.name)” in Terminal? The command is:\n\n\(node.command ?? "")"
+        String(format: String(localized: "Run “%@” in Terminal? The command is:", bundle: L10n.bundle), node.name) + "\n\n" + (node.command ?? "")
     }
 
     /// A bookmark for a web link, named by its host. Nil for text that is not a link.
