@@ -30,7 +30,7 @@ Paste this into Terminal. It builds Library and installs `Library.app` in your A
 git clone https://github.com/deansasek/library.git "$HOME/Library/Application Support/Library/Source" && "$HOME/Library/Application Support/Library/Source/install.sh"
 ```
 
-Library checks for updates itself, and **Check for Updates…** installs them. Your library and clipboard history are kept.
+Library checks for updates itself. **Check for Updates…** offers to install a newer version in Terminal. Your library and pinned clipboard items are kept. To update a clone made this way, run `update.sh` in the Source folder.
 
 **Requirements:** macOS 26 or later, and the Xcode Command Line Tools.
 
@@ -57,7 +57,7 @@ Press Control-Space to search everything in your library.
 
 - Type words from a name, keyword, URL, or folder. Press ↑ or ↓, then Return.
 - Type or paste a web address to open it, or add it to your library.
-- Press Tab, or right-click a result, to open it the other way, copy its link, path, or command, or show it in Finder.
+- Press Tab, or right-click a result, to open it the other way, copy its link, path, or command, or, for an app, show it in Finder.
 - Press ⌘1 through ⌘9 to open the first nine results.
 
 ### Keep what you copy
@@ -66,12 +66,12 @@ Press Control-Space to search everything in your library.
   <img src="docs/media/clipboard_menu.png" width="640" alt="The Library clipboard menu listing recent copies, with numbered shortcuts">
 </p>
 
-Library remembers what you copy, including text, links, images, and files, in every format you copied them in.
+Library remembers what you copy, including text, links, images, and files, in the formats you copied them in, keeping one copy of each image.
 
 - Open the **Library** menu or Quick Open to see your latest copies. Choose one to copy it again.
 - Pin an item to keep it after you quit.
 - Press Control-Command-V to open the clipboard menu at the pointer. Press 1 through 9 to copy an item, or hold Option to copy it as plain text.
-- When a text field has the keyboard, choosing an item pastes it. Otherwise it copies. Turn this off in **Settings > Clipboard**. Pasting needs Accessibility access.
+- When a text field has the keyboard, choosing an item pastes it. Otherwise it copies. Turn this off with **Paste into text fields** in **Settings > Clipboard**. Pasting needs Accessibility access.
 - Select an item in Quick Open and press Space to preview it in Quick Look.
 - Copy a link and Library removes tracking codes, such as `utm_source` and `fbclid`. Turn this off in **Settings > General**.
 - Copy as lower or upper case, trimmed, or with its lines joined. Copy a bookmark as a Markdown link.
@@ -95,7 +95,8 @@ Choose **Edit Library…** to manage everything in one window.
 
 - Add items from the **+** menu, or drag an app or a link into the window.
 - Drag rows to reorder them or move them into a folder. Select several rows to move, reorder, or edit them together.
-- Right-click a row to open it, show it in Finder, get info, rename, move, share, or delete it.
+- Right-click a row to open it, edit or rename it, move, share, or delete it. An app can also be shown in Finder.
+- Deleted items go to **Recently Deleted**, where you can restore them or delete them for good. They are removed for good after 30 days.
 - Find and merge duplicate bookmarks from **File > Find Duplicates…**.
 - Import bookmarks from Safari or Chrome with **File > Import Bookmarks…**. They go into one folder, and ⌘Z undoes the import.
 - Add a [note](#add-notes) to any item in Get Info, or add a bookmark to the [Reading List](#read-later).
@@ -136,7 +137,7 @@ The defaults are Control and right-click for the menu, Control-Space for Quick O
 - **Services:** select a link in any app, then choose **Services > Add to Library**. In Finder, select apps or folders and choose the same item.
 - **Share:** right-click a bookmark or app and choose **Share…**. Drag a row into any app to drop its link or file.
 - **URL scheme:** `library://open?name=Jira&value=ABC-123` opens a bookmark and fills its template. `library://menu` shows the menu, and `library://search` opens Quick Open.
-- **Shortcuts app:** actions for opening and searching items, adding bookmarks and apps, and the clipboard.
+- **Shortcuts app:** actions for opening and searching items, adding bookmarks and apps, and the clipboard. They appear only in a build that includes App Intents metadata, which Xcode generates, so a build from `./build.sh` does not show them yet.
 
 ## Smart features
 
@@ -156,12 +157,12 @@ Press ⌘, to open Settings.
 </p>
 
 - **General:** startup, iCloud Drive sync, automatic update checks, link checks, names for new bookmarks, backup and restore, and link cleaning.
-- **Shortcuts:** the global keys for the menu, Quick Open, and the clipboard.
+- **Shortcuts:** the global keys for the menu, Quick Open, the clipboard, and Open Copied Link.
 - **Clipboard:** history, keeping history across restarts, pasting, GIFs, and the Touch ID or password lock for pinned items.
 
 ## Privacy
 
-Your library and clipboard history stay on your Mac. Library connects to the internet only to load site icons, to check for updates, and, if you choose, to check your links, read the titles of new bookmarks' pages, or sync your library through iCloud Drive. Pinned clipboard items are encrypted with a key kept in your Keychain. The [privacy guide](docs/privacy.md) lists exactly what is stored and sent.
+Your library and clipboard history stay on your Mac. Library connects to the internet only to load site icons, to check for updates, and, if you choose, to check your links, read the titles of new bookmarks' pages, download a GIF you copy from a web page, or sync your library through iCloud Drive. Choosing **Update in Terminal** downloads the new release from GitHub. Pinned clipboard items are encrypted with a key kept in your Keychain. The [privacy guide](docs/privacy.md) lists exactly what is stored and sent.
 
 ## Documentation
 
