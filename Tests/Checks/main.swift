@@ -2329,6 +2329,11 @@ check(LibraryItem(name: "L", url: "localhost:8080").link?.absoluteString == "htt
 check(LibraryItem(name: "T", url: "tel:5551234567").link?.absoluteString == "tel:5551234567", "tel keeps its number")
 check(LibraryItem(name: "M", url: "mailto:123@example.com").link?.absoluteString == "mailto:123@example.com", "mailto keeps its address")
 check(LibraryItem(name: "O", url: "obsidian://open?vault=x").link?.absoluteString == "obsidian://open?vault=x", "a scheme with // is kept")
+// A number after the colon is a port only for a host, so the slashless schemes keep their numbers.
+check(LibraryItem(name: "S", url: "sms:5551234567").link?.absoluteString == "sms:5551234567", "sms keeps a numeric address")
+check(LibraryItem(name: "F", url: "facetime:5551234567").link?.absoluteString == "facetime:5551234567", "facetime keeps a numeric address")
+check(LibraryItem(name: "P", url: "mailto:123@example.com").link?.absoluteString == "mailto:123@example.com", "mailto with digits first keeps its address")
+check(LibraryItem(name: "H", url: "example.com:443/path").link?.absoluteString == "https://example.com:443/path", "a host with a numeric port gets https")
 
 // A new window is asked for with the flag each browser family takes; Safari and others have none.
 check(newWindowFlag(bundleID: "org.mozilla.firefox") == "-new-window" && newWindowFlag(bundleID: "com.google.Chrome") == "--new-window", "Firefox and Chromium browsers have a new-window flag")
