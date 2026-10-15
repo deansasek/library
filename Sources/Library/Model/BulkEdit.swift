@@ -35,8 +35,8 @@ struct BulkEdit: Equatable {
         if node.isDivider != true {
             switch color {
             case .keep: break
-            case .clear: node.color = nil
-            case .set(let value): node.color = value
+            case .clear: node.color = nil; node.customColor = nil
+            case .set(let value): node.color = value; node.customColor = nil
             }
         }
         if node.modeLabels != nil {

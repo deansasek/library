@@ -122,6 +122,31 @@ if let back = try? JSONDecoder().decode([LibraryItem].self, from: JSONEncoder().
           && back[1].keywords == "term" && back[1].browser == "com.apple.Safari" && back[2].children?.count == 2, "JSON round trip")
 } else { check(false, "decode") }
 
+// ---- custom color ----
+var ccTinted = LibraryItem(name: "Tinted", url: "https://tinted.example.com")
+ccTinted.color = LibraryItem.customColorName
+ccTinted.customColor = LibraryItem.CustomColor(red: 0.25, green: 0.5, blue: 0.75)
+if let ccBack = try? JSONDecoder().decode(LibraryItem.self, from: JSONEncoder().encode(ccTinted)) {
+    check(ccBack.color == "custom" && ccBack.customColor == LibraryItem.CustomColor(red: 0.25, green: 0.5, blue: 0.75),
+          "a custom color round-trips as three numbers")
+} else { check(false, "a custom color round-trips as three numbers") }
+let ccLegacyJSON = #"{"id":"00000000-0000-0000-0000-0000000000AA","name":"Old","url":"https://old.example.com","color":"blue"}"#
+if let ccLegacy = try? JSONDecoder().decode(LibraryItem.self, from: Data(ccLegacyJSON.utf8)) {
+    check(ccLegacy.color == "blue" && ccLegacy.customColor == nil && ccLegacy.tintColor != nil,
+          "a file without a custom color decodes")
+} else { check(false, "a file without a custom color decodes") }
+check(LibraryItem.colorAccessibilityName(for: ccTinted) != nil && LibraryItem.colorAccessibilityName(for: LibraryItem(name: "Tag", url: "https://t.example.com", color: "blue")) == "blue tag",
+      "a custom color and a tag both have a VoiceOver name")
+let ccCleared = BulkEdit.apply(BulkEdit(color: .clear), to: [ccTinted.id], in: [ccTinted])
+check(ccCleared[0].color == nil && ccCleared[0].customColor == nil, "bulk clear removes the name and the custom color")
+var ccNone = ccTinted
+ccNone.color = nil
+ccNone.customColor = nil
+let ccApplied = ccTinted.applying(ccNone, from: ccTinted)
+check(ccApplied.color == nil && ccApplied.customColor == nil, "the edit sheet's None removes the name and the custom color")
+let ccSet = BulkEdit.apply(BulkEdit(color: .set("green")), to: [ccTinted.id], in: [ccTinted])
+check(ccSet[0].color == "green" && ccSet[0].customColor == nil, "a fixed tag replaces a custom color")
+
 // ---- shortcuts ----
 check(Shortcut(modifiers: UInt32(controlKey), button: 1).description == "⌃Right Click", "click description")
 check(Shortcut(modifiers: 0, gesture: "cornerTopLeft").isCorner, "corner")

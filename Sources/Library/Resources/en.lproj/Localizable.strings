@@ -344,6 +344,12 @@
 "purple" = "purple";
 "gray" = "gray";
 
+/* VoiceOver name for an item's custom color from the system color picker, in place of a tag name. */
+"custom color" = "custom color";
+
+/* Color option in Get Info that removes an item's color, the fixed tag or the custom color. */
+"None" = "None";
+
 /* VoiceOver label for a copied image in Quick Open. */
 "Copied image" = "Copied image";
 
