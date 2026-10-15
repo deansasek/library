@@ -89,15 +89,22 @@ final class QuickOpenModel: ObservableObject {
     }
 
     /// Space previews the selected clip in Quick Look, or closes the preview if it is open. Returns false, so Space
-    /// types a space, when the search has text and the selection is not a clip, or when there is nothing to preview.
+    /// types a space, when the search has text, or when there is nothing to preview.
     /// A locked pinned item asks for authentication first, and Space is used up by that.
     func togglePreview() -> Bool {
-        guard !showActions, query.isEmpty || selected?.clip != nil, let item = selected?.clip else { return false }
+        guard Self.spaceTogglesPreview(query: query, showActions: showActions, selectionIsClip: selected?.clip != nil),
+              let item = selected?.clip else { return false }
         if ClipboardLock.shared.isHidden(item) {
             ClipboardLock.shared.perform(item, for: .show) { ClipPreview.shared.toggle(item) }
             return true
         }
         return ClipPreview.shared.toggle(item)
+    }
+
+    /// Space previews only when the search is empty, so a multi-word search can contain a space. With text in the
+    /// search, Space always types a space.
+    nonisolated static func spaceTogglesPreview(query: String, showActions: Bool, selectionIsClip: Bool) -> Bool {
+        !showActions && query.isEmpty && selectionIsClip
     }
 
     /// Shows a locked pinned item's text in the preview, once the user authenticates.
