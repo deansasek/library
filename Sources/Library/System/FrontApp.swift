@@ -3,11 +3,19 @@ import AppKit
 /// What Library can learn about, and do in, the app in front. All of it uses Accessibility access, which
 /// Library already asks for, and does nothing without it.
 enum FrontApp {
+    /// The system-wide element. Its messaging timeout is the default for every element it reaches, so a hung app in front
+    /// can hold the main thread for only this long, not for the system default of several seconds.
+    private static func systemWide() -> AXUIElement {
+        let element = AXUIElementCreateSystemWide()
+        AXUIElementSetMessagingTimeout(element, 0.5)
+        return element
+    }
+
     /// The control that has the keyboard in the app in front.
     private static func focusedElement() -> AXUIElement? {
         guard AXIsProcessTrusted() else { return nil }
         var focused: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(AXUIElementCreateSystemWide(), kAXFocusedUIElementAttribute as CFString, &focused) == .success,
+        guard AXUIElementCopyAttributeValue(systemWide(), kAXFocusedUIElementAttribute as CFString, &focused) == .success,
               let focused, CFGetTypeID(focused) == AXUIElementGetTypeID()
         else { return nil }
         // Checked by type above. A forced cast would crash if an app ever returned another type.
