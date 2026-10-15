@@ -2086,5 +2086,17 @@ check(ClipboardHistory.thumbnailSizeAllowed(width: 5120, height: 2880), "a 5K sc
 check(!ClipboardHistory.thumbnailSizeAllowed(width: 40_000, height: 40_000), "a picture with a huge header size gets none")
 check(!ClipboardHistory.thumbnailSizeAllowed(width: 0, height: 100) && !ClipboardHistory.thumbnailSizeAllowed(width: -1, height: 100), "a picture with no size gets none")
 
+// A bookmark added to a folder that is gone goes to the top level instead of being dropped.
+do {
+    let folder = LibraryItem(name: "Gone folder", children: [])
+    var lib: [LibraryItem] = [folder]
+    lib.removeNode(folder.id)
+    lib.append(LibraryItem(name: "Lost", url: "a.example.com"), to: folder.id)
+    check(lib.map(\.name) == ["Lost"], "a bookmark for a deleted folder lands at the top level")
+    var moved: [LibraryItem] = [LibraryItem(name: "Plain", url: "b.example.com")]
+    moved.append(LibraryItem(name: "Kept", url: "c.example.com"), to: moved[0].id)
+    check(moved.map(\.name) == ["Plain", "Kept"], "a bookmark for a node that is not a folder lands at the top level")
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

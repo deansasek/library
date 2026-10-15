@@ -315,9 +315,10 @@ extension Array where Element == LibraryItem {
         return removed
     }
 
-    /// Appends to folder `folderID`, or to the top level when `nil`.
+    /// Appends to folder `folderID`, or to the top level when `nil`. A folder that is gone, or is not a folder, gets
+    /// the node at the top level, so it is not dropped.
     mutating func append(_ node: LibraryItem, to folderID: UUID?) {
-        if let folderID {
+        if let folderID, self.node(withID: folderID)?.children != nil {
             update(folderID) { $0.children?.append(node) }
         } else {
             append(node)
