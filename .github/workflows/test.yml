@@ -24,7 +24,9 @@ jobs:
   checks:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       # test.sh compiles the app's sources itself, but it leaves out the app entry point (LibraryApp.swift), Package.swift,
       # and resource processing. The release build of the package covers those on every pull request.
       - name: Run the checks
@@ -37,7 +39,9 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Build
         run: ./build.sh
 
@@ -47,12 +51,14 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Render the screens
         run: Tests/render.sh "$RUNNER_TEMP/renders"
       - name: Upload the renders
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: renders
           path: ${{ runner.temp }}/renders
