@@ -2111,6 +2111,13 @@ undoStore.recordLinkStatuses([linked.id: LinkStatus(kind: .broken, checked: Date
 undoLog.undo()
 check(undoStore.nodes.map(\.name) == ["Linked", "Other"] && undoStore.nodes.first?.linkStatus?.kind == .broken,
       "undo keeps a link check result recorded after the step: \(undoStore.nodes.first?.linkStatus?.kind as Any)")
+
+// Undo does not bring back Recently Deleted items the 30-day purge has removed, but keeps the ones still within it.
+let purgedOld = LibraryItem(name: "Old", url: "https://old.example.com", deletedDate: Date().addingTimeInterval(-31 * 24 * 60 * 60))
+let purgedRecent = LibraryItem(name: "Recent", url: "https://recent.example.com", deletedDate: Date().addingTimeInterval(-29 * 24 * 60 * 60))
+let purgeSnapshot = LibrarySync.Contents(live: [linked], deleted: [purgedOld, purgedRecent])
+check(undoStore.restorable(purgeSnapshot).deleted.map(\.name) == ["Recent"],
+      "an undo leaves out the items the purge removed: \(undoStore.restorable(purgeSnapshot).deleted.map(\.name))")
 try? FileManager.default.removeItem(at: storeHome)
 
 // A thumbnail is made only from a picture whose header size is reasonable.

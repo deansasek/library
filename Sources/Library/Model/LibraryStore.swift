@@ -683,10 +683,18 @@ final class LibraryStore: ObservableObject {
         undoManager?.registerUndo(withTarget: self) { store in
             MainActor.assumeIsolated {
                 let name = store.undoManager?.undoActionName ?? ""
-                store.contents = store.keepingLinkStatuses(of: snapshot)
+                store.contents = store.restorable(snapshot)
                 store.undoManager?.setActionName(name)
             }
         }
+    }
+
+    /// What undo and redo put back: the snapshot with the link check results the library holds now, and without the
+    /// Recently Deleted items that the purge has removed since the snapshot was taken.
+    func restorable(_ snapshot: LibrarySync.Contents) -> LibrarySync.Contents {
+        var restored = keepingLinkStatuses(of: snapshot)
+        LibrarySync.purge(&restored, now: Date())
+        return restored
     }
 
     /// The snapshot with the link check results the library holds now. A check is not an edit, so undo and redo keep
