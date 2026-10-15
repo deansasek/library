@@ -110,7 +110,7 @@ final class SnippetStore: ObservableObject {
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
             let contents = SnippetFile(version: SnippetFile.currentVersion, snippets: snippets)
-            try encoder.encode(contents).write(to: file, options: .atomic)
+            try PrivateFile.write(encoder.encode(contents), to: file)
         } catch {
             NSLog("Library could not save snippets.json: \(error.localizedDescription)")
         }
