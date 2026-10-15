@@ -2287,6 +2287,10 @@ try? FileManager.default.removeItem(at: storeHome)
 
 // A thumbnail is made only from a picture whose header size is reasonable.
 check(ClipboardHistory.thumbnailSizeAllowed(width: 5120, height: 2880), "a 5K screenshot gets a thumbnail")
+// Screenshot capture is off unless the user turned it on, so a password manager's screenshot is not kept by default.
+check(ScreenCaptures.initialEnabled(stored: nil) == false, "screenshot capture is off when never set")
+check(ScreenCaptures.initialEnabled(stored: true) == true, "screenshot capture stays on when the user turned it on")
+check(ScreenCaptures.initialEnabled(stored: false) == false, "screenshot capture stays off when the user turned it off")
 check(!ClipboardHistory.thumbnailSizeAllowed(width: 40_000, height: 40_000), "a picture with a huge header size gets none")
 check(!ClipboardHistory.thumbnailSizeAllowed(width: 0, height: 100) && !ClipboardHistory.thumbnailSizeAllowed(width: -1, height: 100), "a picture with no size gets none")
 

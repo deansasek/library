@@ -243,7 +243,7 @@ struct WelcomeView: View {
                 feature("textformat", .teal, "Copy As",
                         "Copy text as plain text, without extra spaces, or as a Markdown link.")
                 feature("camera.viewfinder", .green, "Screenshots and Recordings",
-                        "New screenshots are added to your history as you take them. Turn this off in Settings > Clipboard.")
+                        String(localized: "Off by default. Turn it on in Settings > Clipboard to add new screenshots to your history as you take them. Screenshots skip the privacy filters, so only turn it on if you accept that.", bundle: L10n.bundle))
             }
             Spacer(minLength: 0)
         }
