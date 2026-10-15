@@ -49,8 +49,14 @@ final class ScreenCaptures: ObservableObject {
     /// The newest creation date among captures that are finished.
     private var finishedNewest: Date = .distantPast
 
+    /// Off unless the user turned it on. Screenshots do not pass through the privacy filters that copies do,
+    /// so a screenshot of a password manager could be kept, and only a user who accepts that should opt in.
+    nonisolated static func initialEnabled(stored: Any?) -> Bool {
+        stored as? Bool ?? false
+    }
+
     private init() {
-        isEnabled = UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true
+        isEnabled = Self.initialEnabled(stored: UserDefaults.standard.object(forKey: Self.enabledKey))
         if isEnabled { start() }
     }
 
