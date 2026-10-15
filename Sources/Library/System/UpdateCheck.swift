@@ -118,8 +118,7 @@ enum UpdateCheck {
     /// nothing changed, and the tag stands in for that answer.
     private static let etagKey = "updateETag"
     private static let latestTagKey = "updateLatestTag"
-    /// Written by install.sh: the clone that holds update.sh.
-    private static let sourcePathKey = "sourcePath"
+    private static let repositoryURL = "https://github.com/deansasek/library.git"
     private static let latestURL = URL(string: "https://api.github.com/repos/deansasek/library/releases/latest")!
     private static let releasePage = URL(string: "https://github.com/deansasek/library/releases/latest")!
     private static var automaticTask: Task<Void, Never>?
@@ -230,33 +229,22 @@ enum UpdateCheck {
         }
     }
 
-    /// Offers the update. With a clone that holds update.sh, the first button runs it in Terminal. Otherwise the
-    /// first button opens the release page.
+    /// Offers the update. The first button downloads that release, builds it, installs it, and deletes the download,
+    /// in Terminal, so no source copy is kept on the Mac.
     private static func offer(_ latestTag: String) {
         let title = "Library \(UpdateRules.displayVersion(latestTag)) Is Available"
-        if let path = clonePath() {
-            let response = show(title: title,
-                                message: "You have Library \(currentVersion). Update in Terminal runs update.sh in your clone of Library. It pulls the new version and reinstalls it.",
-                                buttons: ["Update in Terminal", "Later"])
-            if response == .alertFirstButtonReturn {
-                runInTerminal("cd \(shellQuoted(path)) && ./update.sh")
-            }
-        } else {
-            let response = show(title: title,
-                                message: "You have Library \(currentVersion). This copy was not installed from a clone of the repository, so update from the release page.",
-                                buttons: ["View Release", "Later"])
-            if response == .alertFirstButtonReturn {
-                NSWorkspace.shared.open(releasePage)
-            }
+        let response = show(title: title,
+                            message: "You have Library \(currentVersion). Update in Terminal downloads this version, builds it, installs it in Applications, and removes the download afterward. Your library is kept.",
+                            buttons: ["Update in Terminal", "Later"])
+        if response == .alertFirstButtonReturn {
+            runInTerminal(installCommand(tag: latestTag))
         }
     }
 
-    /// The clone recorded by install.sh, if it still holds an executable update.sh.
-    private static func clonePath() -> String? {
-        guard let path = UserDefaults.standard.string(forKey: sourcePathKey),
-              FileManager.default.isExecutableFile(atPath: path + "/update.sh")
-        else { return nil }
-        return path
+    /// Downloads one release into a temporary folder, runs its install script, and removes the folder whether or not
+    /// the install succeeded.
+    static func installCommand(tag: String) -> String {
+        "T=\"$(mktemp -d)\" && git clone --depth 1 --branch \(shellQuoted(tag)) \(repositoryURL) \"$T\" && \"$T/install.sh\"; rm -rf \"$T\""
     }
 
     private static func shellQuoted(_ text: String) -> String {
