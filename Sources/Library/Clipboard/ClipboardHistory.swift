@@ -723,9 +723,23 @@ final class ClipboardHistory: ObservableObject {
         return nil
     }
 
-    /// A picture of at most 16 pt, decoded straight to that size so the full image is never kept.
+    /// The most pixels a clipboard picture may have before it gets a thumbnail. ImageIO decodes the picture to make a
+    /// thumbnail, so the size is checked from the header first. A 5K screenshot is well under this.
+    nonisolated static let maxThumbnailPixels = 40_000_000
+
+    /// Whether a picture of this size may be decoded for a thumbnail.
+    nonisolated static func thumbnailSizeAllowed(width: Int, height: Int) -> Bool {
+        width > 0 && height > 0 && width * height <= maxThumbnailPixels
+    }
+
+    /// A picture of at most 16 pt, decoded straight to that size so the full image is never kept. Nil when the header
+    /// does not give a size, or the picture is larger than `maxThumbnailPixels`.
     nonisolated private static func thumbnail(of data: Data) -> NSImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int,
+              thumbnailSizeAllowed(width: width, height: height),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                   kCGImageSourceCreateThumbnailFromImageAlways: true,
                   kCGImageSourceThumbnailMaxPixelSize: 16,
