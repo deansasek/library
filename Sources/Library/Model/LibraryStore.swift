@@ -1019,8 +1019,11 @@ final class LibraryStore: ObservableObject {
         }.joined(separator: "\n")
         let digest = SHA256.hash(data: Data(signature.utf8)).map { String(format: "%02x", $0) }.joined()
         guard digest != UserDefaults.standard.string(forKey: "spotlightDigest") else { return }
-        UserDefaults.standard.set(digest, forKey: "spotlightDigest")
-        Spotlight.index(leaves)
+        // The digest is saved only once Spotlight has indexed the items, so a failed index is tried again on the next launch.
+        Spotlight.index(leaves) { ok in
+            guard ok else { return }
+            Task { @MainActor in UserDefaults.standard.set(digest, forKey: "spotlightDigest") }
+        }
     }
 }
 
