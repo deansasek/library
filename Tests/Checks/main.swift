@@ -875,6 +875,11 @@ if let url = ClipPreviewSource.url(for: clip(.image, reps: [[ClipItem.gifType: g
     check(url.pathExtension == "gif" && (try? Data(contentsOf: url)) == gifBytes, "GIF data written with a .gif name")
 } else { check(false, "gif preview file") }
 try? FileManager.default.removeItem(at: previewDir)
+// The plan is what the main actor decides before a preview file is written off it (pure, no file written).
+check(ClipPreviewSource.plan(for: clip(.file, files: [filePath])) == .file(filePath), "a file clip is planned in place")
+check(ClipPreviewSource.plan(for: clip(.text, text: "hi")) == .write(Data("hi".utf8), ext: "txt"), "text is planned as a .txt write")
+check(ClipPreviewSource.plan(for: clip(.other)) == nil, "nothing is planned for other items")
+check(ClipPreview.followDelay == .milliseconds(150), "a selection rests 150 ms before its preview is written")
 
 // ---- Quick Open drags: the payload each row carries (pure, no pasteboard) ----
 let dragLink = URL(string: "https://docs.example.com/page")!
