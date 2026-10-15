@@ -237,7 +237,8 @@ struct EditSheet: View {
                         ),
                         isRecording: state.recordingIndex == index,
                         setRecording: { state.recordingIndex = $0 ? index : nil },
-                        clearable: false
+                        clearable: false,
+                        action: node.name
                     )
                     Spacer()
                     if let labels = node.modeLabels {

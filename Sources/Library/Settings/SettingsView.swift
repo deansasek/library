@@ -121,10 +121,18 @@ struct SettingsView: View {
     var shortcuts: some View {
         Form {
             Section {
-                LabeledContent("Show Library Menu") { field(0, $store.extraHotkeys[0]) }
-                LabeledContent("Show Quick Open") { field(1, $store.extraHotkeys[1]) }
-                LabeledContent("Show Clipboard Menu") { field(3, $store.extraHotkeys[3]) }
-                LabeledContent("Open Copied Link") { field(2, $store.extraHotkeys[2]) }
+                LabeledContent("Show Library Menu") {
+                    field(0, String(localized: "Show Library Menu", bundle: L10n.bundle), $store.extraHotkeys[0])
+                }
+                LabeledContent("Show Quick Open") {
+                    field(1, String(localized: "Show Quick Open", bundle: L10n.bundle), $store.extraHotkeys[1])
+                }
+                LabeledContent("Show Clipboard Menu") {
+                    field(3, String(localized: "Show Clipboard Menu", bundle: L10n.bundle), $store.extraHotkeys[3])
+                }
+                LabeledContent("Open Copied Link") {
+                    field(2, String(localized: "Open Copied Link", bundle: L10n.bundle), $store.extraHotkeys[2])
+                }
             } footer: {
                 Text("These work in every app. Quick Open searches your library and your clipboard history. Open Copied Link opens the web link you last copied. A beep means the clipboard has no link.")
             }
@@ -194,7 +202,7 @@ struct SettingsView: View {
         .fixedSize(horizontal: false, vertical: true)
     }
 
-    private func field(_ index: Int, _ shortcut: Binding<Shortcut?>) -> some View {
+    private func field(_ index: Int, _ name: String, _ shortcut: Binding<Shortcut?>) -> some View {
         HStack {
             if store.failedExtras.contains(index) {
                 Image(systemName: "exclamationmark.triangle")
@@ -204,7 +212,8 @@ struct SettingsView: View {
             }
             ShortcutField(shortcut: shortcut,
                           isRecording: recording.target == index,
-                          setRecording: { recording.target = $0 ? index : nil })
+                          setRecording: { recording.target = $0 ? index : nil },
+                          action: name)
         }
     }
 }
