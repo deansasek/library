@@ -62,6 +62,7 @@ struct AppPickerSheet: View {
             .overlay {
                 if state.apps.isEmpty {
                     ProgressView()
+                        .accessibilityLabel(String(localized: "Loading applications", bundle: L10n.bundle))
                 }
             }
 
