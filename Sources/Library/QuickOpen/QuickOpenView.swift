@@ -237,6 +237,12 @@ struct QuickOpenView: View {
         .frame(minHeight: 200, maxHeight: 340)
     }
 
+    /// The color tag of a library item, as VoiceOver reads it. Empty for other results and for items without a color.
+    private func tagName(for result: QuickOpenResult) -> String {
+        guard case .item(let node, _) = result.kind else { return "" }
+        return LibraryItem.tagAccessibilityName(node.color) ?? ""
+    }
+
     /// The action's title, with its symbol when it has one. Actions without a symbol keep plain text.
     @ViewBuilder
     private func actionLabel(_ action: QuickOpenAction) -> some View {
@@ -289,6 +295,7 @@ struct QuickOpenView: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityValue(tagName(for: result))
         .onDrag { model.dragProvider(for: result) }
         .onContinuousHover { phase in
             if case .active = phase { model.hover(result.id) }
