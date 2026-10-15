@@ -10,6 +10,9 @@ struct IconPicker: View {
 
     private static let recentsKey = "recentEmoji"
 
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiate
+
     private static let symbols = [
         "star.fill", "heart.fill", "bookmark.fill", "flag.fill", "tag.fill", "bell.fill", "bolt.fill",
         "flame.fill", "leaf.fill", "moon.fill", "sun.max.fill", "cloud.fill", "drop.fill", "snowflake",
@@ -108,10 +111,27 @@ struct IconPicker: View {
                 Button {
                     choose(item)
                 } label: {
+                    let selected = icon.wrappedValue == item
                     content(item)
                         .frame(width: 28, height: 28)
-                        .background(icon.wrappedValue == item ? Color.accentColor.opacity(0.25) : .clear,
+                        .background(selected ? Color.accentColor.opacity(0.25) : .clear,
                                     in: RoundedRectangle(cornerRadius: 6))
+                        // The tint alone is faint, so Increase Contrast adds a solid outline to the chosen icon.
+                        .overlay {
+                            if selected && contrast == .increased {
+                                RoundedRectangle(cornerRadius: 6).strokeBorder(Color.accentColor, lineWidth: 2)
+                            }
+                        }
+                        // Differentiate Without Color adds a checkmark, so the choice does not rest on the tint.
+                        .overlay(alignment: .bottomTrailing) {
+                            if selected && differentiate {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.accentColor)
+                                    .background(.background, in: Circle())
+                                    .accessibilityHidden(true)
+                            }
+                        }
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(label(item))

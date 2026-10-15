@@ -5,6 +5,8 @@ struct EditSheet: View {
     @ObservedObject var store: LibraryStore
     @ObservedObject var state: ManageState
     let action: () -> Void
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityDifferentiateWithoutColor) private var differentiate
 
     private var node: LibraryItem { state.draft }
     private let browsers = installedBrowsers()
@@ -107,6 +109,25 @@ struct EditSheet: View {
         )
     }
 
+    /// The ring that marks the selected swatch. Increase Contrast makes it solid and heavier.
+    private var selectionRing: some View {
+        Circle()
+            .strokeBorder(Color.primary.opacity(contrast == .increased ? 1 : 0.6), lineWidth: contrast == .increased ? 3 : 2)
+            .padding(-3)
+    }
+
+    /// A checkmark on the selected swatch under Differentiate Without Color, so the choice does not rest on its color.
+    @ViewBuilder
+    private func checkBadge(_ selected: Bool) -> some View {
+        if selected && differentiate {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.caption2)
+                .foregroundStyle(.primary)
+                .background(.background, in: Circle())
+                .accessibilityHidden(true)
+        }
+    }
+
     private var colorSwatches: some View {
         HStack(spacing: 8) {
             Button {
@@ -119,10 +140,11 @@ struct EditSheet: View {
                     .frame(width: 18, height: 18)
                     .overlay {
                         if node.color == nil {
-                            Circle().strokeBorder(Color.primary.opacity(0.6), lineWidth: 2).padding(-3)
+                            selectionRing
                         }
                     }
                     .frame(width: 24, height: 24)
+                    .overlay(alignment: .bottomTrailing) { checkBadge(node.color == nil) }
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -137,11 +159,12 @@ struct EditSheet: View {
                         .frame(width: 18, height: 18)
                         .overlay {
                             if node.color == name {
-                                Circle().strokeBorder(Color.primary.opacity(0.6), lineWidth: 2).padding(-3)
+                                selectionRing
                             }
                         }
                         // The clickable area is the 24 pt frame, not the 18 pt dot. The selection ring sits within it.
                         .frame(width: 24, height: 24)
+                        .overlay(alignment: .bottomTrailing) { checkBadge(node.color == name) }
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -158,9 +181,10 @@ struct EditSheet: View {
             .frame(width: 24, height: 24)
             .overlay {
                 if node.color == LibraryItem.customColorName {
-                    Circle().strokeBorder(Color.primary.opacity(0.6), lineWidth: 2).padding(-3)
+                    selectionRing
                 }
             }
+            .overlay(alignment: .bottomTrailing) { checkBadge(node.color == LibraryItem.customColorName) }
         }
     }
 
