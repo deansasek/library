@@ -421,9 +421,11 @@ final class LibraryStore: ObservableObject {
         QuickOpenResult.link(from: NSPasteboard.general.string(forType: .string) ?? "")
     }
 
-    /// Opens the copied link in the browser. A beep means the clipboard holds no link.
+    /// Opens the copied link in the browser. Without a link on the clipboard, it says so.
     func openClipboardLink() {
-        guard let link = clipboardLink else { return NSSound.beep() }
+        guard let link = clipboardLink else {
+            return announceFailure(String(localized: "The clipboard has no link to open.", bundle: L10n.bundle))
+        }
         NSWorkspace.shared.open(link)
     }
 
@@ -439,9 +441,18 @@ final class LibraryStore: ObservableObject {
         NSSound(named: "Pop")?.play()
     }
 
+    /// Says why an action did nothing. A beep alone tells a VoiceOver user nothing, or anyone with sound off, so the
+    /// message is announced too and the beep stays as an extra.
+    private func announceFailure(_ message: String) {
+        NSSound.beep()
+        AccessibilityNotification.Announcement(message).post()
+    }
+
     /// Adds what a clipboard item holds to the library.
     func addToLibrary(_ item: ClipItem) {
-        guard let node = item.libraryNode else { return NSSound.beep() }
+        guard let node = item.libraryNode else {
+            return announceFailure(String(localized: "This clipboard item can’t be added to the library.", bundle: L10n.bundle))
+        }
         add(AddSuggestion(node: node, source: .clipboard))
     }
 
