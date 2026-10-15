@@ -323,6 +323,8 @@ let trackingTable: [(link: String, clean: String)] = [
     ("https://example.com/a", "https://example.com/a"),
     ("https://example.com/a?", "https://example.com/a?"),
     ("https://example.com/a#x?utm_source=1", "https://example.com/a#x?utm_source=1"),
+    ("https://example.com/a?q=2&msclkid=9&mkt_tok=x&yclid=3&_hsenc=4", "https://example.com/a?q=2"),
+    ("https://example.com/a?utm%5Fsource=1&id=7", "https://example.com/a?id=7"),
 ]
 for row in trackingTable {
     check(TrackingParameters.clean(row.link) == row.clean, "cleaning \(row.link): got \(TrackingParameters.clean(row.link)), want \(row.clean)")

@@ -176,7 +176,7 @@ struct SettingsView: View {
                 Toggle("Paste into text fields", isOn: $history.pastesIntoFields)
                 Toggle("Play copied GIFs", isOn: $history.playsGIFs)
                 Toggle("Add screenshots and recordings", isOn: $screenCaptures.isEnabled)
-                Toggle("Remove tracking parameters when copying links", isOn: $tracking.removesOnCopy)
+                Toggle("Remove tracking parameters when copying from history", isOn: $tracking.removesOnCopy)
                 Button("Clear History") { history.clear() }
                     .disabled(history.items.allSatisfy(\.pinned))
             } footer: {
