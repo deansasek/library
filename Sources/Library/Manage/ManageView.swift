@@ -368,7 +368,10 @@ struct ManageView: View {
             let command = state.command.trimmingCharacters(in: .whitespaces)
             store.perform("Add Terminal Command") { $0.append(LibraryItem(name: name, command: command), to: folder) }
         case .folder:
-            store.perform("Add Folder") { $0.append(LibraryItem(name: name, children: []), to: folder) }
+            let shows = state.showsOpenAll
+            store.perform("Add Folder") {
+                $0.append(LibraryItem(name: name, children: [], showsOpenAll: shows ? nil : false), to: folder)
+            }
         case .divider:
             store.perform("Add Divider") { $0.append(LibraryItem(name: name, isDivider: true), to: folder) }
         case .application:
@@ -419,7 +422,7 @@ struct ManageView: View {
             if node.isOpenable {
                 Button("Open") { open(node) }
             }
-            if let children = node.children {
+            if let children = node.children, node.showsOpenAllItem {
                 Button("Open All") { openAll(children) }
                     .disabled(openAllSelection(in: children).isEmpty)
             }

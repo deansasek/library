@@ -127,6 +127,12 @@
 /* Footer under the notes field in Get Info. */
 "Notes appear under the name in Quick Open and in Spotlight." = "Notes appear under the name in Quick Open and in Spotlight.";
 
+/* Toggle in the New Folder and Get Info sheets: shows or hides the folder's Open All item in its menus. */
+"Show Open All" = "Show Open All";
+
+/* Footer under Show Open All in the folder sheets. */
+"Shows an Open All item for this folder in its menus. Turn this off to hide it." = "Shows an Open All item for this folder in its menus. Turn this off to hide it.";
+
 /* Section title of the Reading List in the manager window, and in the menus. */
 "Reading List" = "Reading List";
 

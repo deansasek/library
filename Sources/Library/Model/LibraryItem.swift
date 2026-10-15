@@ -40,6 +40,11 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     var readLater: ReadLaterState?
     /// What the last link check found, and when. Nil until a check runs, so files written before the check decode unchanged.
     var linkStatus: LinkStatus?
+    /// Whether a folder's menus show its Open All item. Nil means shown, so files written before this setting decode unchanged.
+    var showsOpenAll: Bool?
+
+    /// True when a folder's menus show Open All. Nil counts as shown.
+    var showsOpenAllItem: Bool { showsOpenAll ?? true }
 
     var isFolder: Bool { children != nil }
 

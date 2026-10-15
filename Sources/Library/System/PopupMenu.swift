@@ -167,12 +167,14 @@ enum PopupMenu {
                 empty.isEnabled = false
                 submenu.addItem(empty)
             } else {
-                let openEach = NSMenuItem(title: "Open All", action: #selector(Target.openFolder(_:)), keyEquivalent: "")
-                openEach.target = target
-                openEach.representedObject = node.id
-                openEach.isEnabled = !openAllSelection(in: children).isEmpty
-                submenu.addItem(openEach)
-                submenu.addItem(.separator())
+                if node.showsOpenAllItem {
+                    let openEach = NSMenuItem(title: "Open All", action: #selector(Target.openFolder(_:)), keyEquivalent: "")
+                    openEach.target = target
+                    openEach.representedObject = node.id
+                    openEach.isEnabled = !openAllSelection(in: children).isEmpty
+                    submenu.addItem(openEach)
+                    submenu.addItem(.separator())
+                }
                 fill(submenu, with: children, target: target)
             }
             item.submenu = submenu

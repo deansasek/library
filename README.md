@@ -51,7 +51,7 @@ Bookmarks, apps, folders, and terminal commands open from the menu bar, a keyboa
 - **Bookmarks** open in a new tab or a new window.
 - **Apps** come to the front. Add launch arguments, such as `--profile work`, to start a new instance.
 - **Terminal commands** run in a login shell in a new Terminal window. Add only commands you trust.
-- **Folders** open all of their bookmarks and apps at once. Library asks first when there are more than five.
+- **Folders** open all of their bookmarks and apps at once. Library asks first when there are more than five. Turn off **Show Open All** when you create or edit a folder to hide that item from its menus.
 
 ### Find it with Quick Open
 

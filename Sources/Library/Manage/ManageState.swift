@@ -41,6 +41,8 @@ final class ManageState: ObservableObject {
     @Published var apps: [InstalledApp] = []
     @Published var search = ""
     @Published var appSelection: InstalledApp.ID?
+    /// The New Folder sheet's Show Open All toggle.
+    @Published var showsOpenAll = true
 
     // Edit sheet.
     @Published var draft = LibraryItem(name: "")
@@ -136,6 +138,7 @@ final class ManageState: ObservableObject {
         arguments = ""
         search = ""
         appSelection = nil
+        showsOpenAll = true
         keepChoices = [:]
         recordingIndex = nil
         showIconPicker = false
