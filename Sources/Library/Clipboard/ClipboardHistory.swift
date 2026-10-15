@@ -559,7 +559,8 @@ final class ClipboardHistory: ObservableObject {
               Set(pasteboardItems.flatMap { $0.types.map(\.rawValue) }).isDisjoint(with: Self.privateTypes),
               let copied = Self.collect(pasteboardItems) else { return }
         let front = NSWorkspace.shared.frontmostApplication
-        let source = front?.bundleIdentifier == Bundle.main.bundleIdentifier ? nil : front?.localizedName
+        let fromLibrary = front?.bundleIdentifier == Bundle.main.bundleIdentifier
+        let source = fromLibrary ? nil : front?.localizedName
         pendingCaptures += 1
         Task {
             defer { pendingCaptures -= 1 }
@@ -567,17 +568,21 @@ final class ClipboardHistory: ObservableObject {
                 Self.makeItem(representations: copied.representations, bytes: copied.bytes)
             }.value
             guard let built else { return }
-            add(built, source: source, generation: generation)
+            add(built, source: source, fromLibrary: fromLibrary, generation: generation)
         }
     }
 
-    private func add(_ copy: ClipItem, source: String?, generation: Int) {
+    private func add(_ copy: ClipItem, source: String?, fromLibrary: Bool, generation: Int) {
         var item = copy
         // Copying something again, or copying an item back from the history, moves it to the top.
+        var previous: ClipItem?
         if let index = items.firstIndex(where: { $0.digest == item.digest }) {
-            item.pinned = items.remove(at: index).pinned
+            previous = items.remove(at: index)
+            item.pinned = previous?.pinned ?? false
         }
-        item.sourceApp = source
+        // When Library itself is in front, the copy came from choosing an item in its own menu. Keep the source
+        // the item already had instead of replacing it with nothing.
+        item.sourceApp = fromLibrary ? previous?.sourceApp : source
         // Builds can finish out of order, so each item goes where its copy time puts it. The newest stays first.
         items.insert(item, at: items.firstIndex { $0.date < item.date } ?? items.count)
         if generation == captureGeneration { current = item }
