@@ -115,6 +115,8 @@ struct IconPicker: View {
                 }
                 .buttonStyle(.borderless)
                 .accessibilityLabel(label(item))
+                // The tinted background alone does not reach VoiceOver, so the chosen icon is marked as selected too.
+                .accessibilityAddTraits(icon.wrappedValue == item ? .isSelected : [])
             }
         }
     }
