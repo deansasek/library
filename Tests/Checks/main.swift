@@ -1649,6 +1649,7 @@ check(PinnedLock.access(pinned: true, required: false, unlocked: false) == .now,
 check(PinnedLock.displayed("card 4111", pinned: true, required: true, unlocked: false) == "Pinned Item", "a locked pinned item's title is replaced")
 check(PinnedLock.displayed("card 4111", pinned: true, required: true, unlocked: true) == "card 4111", "an unlocked pinned item's title is shown")
 check(PinnedLock.displayed("notes", pinned: false, required: true, unlocked: false) == "notes", "an unpinned title is shown")
+check(historyFixture("kind", .link, date: Date()).kindName == "Link" && historyFixture("kind", .file, date: Date()).kindName == "File", "a clip's kind is named for its subtitle")
 check(PinnedLock.displayed("notes", pinned: true, required: false, unlocked: false) == "notes", "the title is shown with the setting off")
 // Touch ID and the Mac password may both be missing: enabling is refused, and a locked item explains instead of prompting.
 check(LockAvailability.decide(canAuthenticate: true, enabling: true, needsAuthentication: false) == .available, "with Touch ID or a password, the setting turns on")
