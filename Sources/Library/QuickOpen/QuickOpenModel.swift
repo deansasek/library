@@ -243,29 +243,10 @@ final class QuickOpenModel: ObservableObject {
         }
     }
 
-    /// What dragging a row into another app drops: its picture, file, link, or text.
-    func dragProvider(for result: QuickOpenResult) -> NSItemProvider {
-        let provider = NSItemProvider()
-        isDragging = true
-        switch result.kind {
-        case .clip(let item) where !ClipboardLock.shared.isHidden(item):
-            if let image = item.image {
-                provider.registerObject(image, visibility: .all)
-            } else if let url = item.fileURLs.first {
-                provider.registerObject(url as NSURL, visibility: .all)
-            } else if let text = item.plainText {
-                provider.registerObject(text as NSString, visibility: .all)
-            }
-        case .item(let node, _):
-            if let url = node.shareURL { provider.registerObject(url as NSURL, visibility: .all) }
-        case .openLink(let url), .addLink(let url):
-            provider.registerObject(url as NSURL, visibility: .all)
-        case .snippet(let snippet):
-            provider.registerObject(snippet.text as NSString, visibility: .all)
-        default:
-            break
-        }
-        return provider
+    /// What dragging a row into another app carries: its picture, file, link, or text.
+    func dragPayload(for result: QuickOpenResult) -> QuickOpenDrag {
+        let hidden = result.clip.map { ClipboardLock.shared.isHidden($0) } ?? false
+        return QuickOpenDrag.payload(for: result.kind, clipHidden: hidden)
     }
 
     private func symbol(_ name: String) -> NSImage {

@@ -302,7 +302,8 @@ struct QuickOpenView: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityValue(tagName(for: result))
-        .onDrag { model.dragProvider(for: result) }
+        .draggable(model.dragPayload(for: result))
+        .onDragSessionUpdated { _ in MainActor.assumeIsolated { model.isDragging = true } }
         .onContinuousHover { phase in
             if case .active = phase { model.hover(result.id) }
         }
