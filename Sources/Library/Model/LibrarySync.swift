@@ -179,13 +179,31 @@ enum LibrarySync {
                 chosen[id] = record
             }
         }
+        // The parent a chosen item keeps, if any. Two folders that were each moved into the other, one on each Mac,
+        // would both become children and neither would be shown, so an item whose parent chain leads back to itself
+        // is shown at the top level instead.
+        func keptParent(_ id: UUID) -> UUID? {
+            guard let record = chosen[id], record.item.deletedDate == nil, let parent = record.parent, chosen[parent] != nil else {
+                return nil
+            }
+            return parent
+        }
+        func inCycle(_ id: UUID) -> Bool {
+            var current = keptParent(id)
+            for _ in 0...chosen.count {
+                guard let step = current else { return false }
+                if step == id { return true }
+                current = keptParent(step)
+            }
+            return false
+        }
         var children: [UUID: [UUID]] = [:]
         var liveRoots: [UUID] = [], deletedRoots: [UUID] = []
         for id in order {
             guard let record = chosen[id] else { continue }
             if record.item.deletedDate != nil {
                 deletedRoots.append(id)
-            } else if let parent = record.parent, chosen[parent] != nil {
+            } else if let parent = keptParent(id), !inCycle(id) {
                 children[parent, default: []].append(id)
             } else {
                 liveRoots.append(id)
