@@ -8,6 +8,7 @@ struct MenuContent: View {
     @ObservedObject private var clipLock = ClipboardLock.shared
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         // Shown only when an automatic or manual check found a newer version. Choosing it opens the update alert.
@@ -19,6 +20,8 @@ struct MenuContent: View {
                     Text("Update Available — Version \(UpdateRules.displayVersion(version))", bundle: L10n.bundle)
                 } icon: {
                     Image(systemName: "arrow.down.circle")
+                        // Bounces once when an update is found. Reduce Motion leaves it still.
+                        .symbolEffect(.bounce, options: .nonRepeating, value: reduceMotion ? nil : version)
                 }
             }
             Divider()

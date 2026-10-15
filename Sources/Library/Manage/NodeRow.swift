@@ -7,6 +7,7 @@ struct NodeRow: View {
     let node: LibraryItem
     @ObservedObject var store: LibraryStore
     @ObservedObject var state: ManageState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 12) {
@@ -36,6 +37,9 @@ struct NodeRow: View {
                     // A book for unread, a check for read: the Reading List state, shown beside the name.
                     Image(systemName: readLater == .read ? "checkmark.circle" : "book")
                         .foregroundStyle(.secondary)
+                        // The book turns into a check in place. Reduce Motion swaps it at once.
+                        .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+                        .animation(reduceMotion ? nil : .smooth, value: readLater)
                         .help(readLater == .read ? String(localized: "Read", bundle: L10n.bundle) : String(localized: "Unread", bundle: L10n.bundle))
                         .accessibilityHidden(true)
                 }
