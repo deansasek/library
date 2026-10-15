@@ -6,6 +6,8 @@
 
 <p><strong>Everything you open and copy, one shortcut away.</strong></p>
 
+<p><a href="https://getlibrary.app">getlibrary.app</a> · <a href="https://github.com/deansasek/library-site">Website source</a></p>
+
 </div>
 
 Library lives in your menu bar. Keep your bookmarks, apps, folders, and terminal commands in one place, open any of them from the menu or a shortcut, and bring back anything you copied a moment ago.
