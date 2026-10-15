@@ -105,11 +105,6 @@ struct SettingsView: View {
             } footer: {
                 Text("The welcome screen explains Library, lists your shortcuts, and asks for access. The build number changes with every build, so you can tell which one is running after an update.")
             }
-            Section {
-                Toggle("Remove tracking parameters when copying links", isOn: $tracking.removesOnCopy)
-            } footer: {
-                Text("Removes tracking codes such as utm_source, fbclid, and gclid from a link you copy. The other parts of the link stay the same, and the saved link is not changed.")
-            }
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
@@ -173,10 +168,11 @@ struct SettingsView: View {
                 Toggle("Paste into text fields", isOn: $history.pastesIntoFields)
                 Toggle("Play copied GIFs", isOn: $history.playsGIFs)
                 Toggle("Add screenshots and recordings", isOn: $screenCaptures.isEnabled)
+                Toggle("Remove tracking parameters when copying links", isOn: $tracking.removesOnCopy)
                 Button("Clear History") { history.clear() }
                     .disabled(history.items.allSatisfy(\.pinned))
             } footer: {
-                Text("History stays in memory and is gone when Library quits, unless Keep clipboard history across restarts is on. With Paste into text fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps. Add screenshots and recordings adds each new screenshot to history as an image, and each recording as a link to its file. It only adds captures made after you turn it on. Library finds them with Spotlight and does not watch a folder.")
+                Text("History stays in memory and is gone when Library quits, unless Keep clipboard history across restarts is on. With Paste into text fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps. Add screenshots and recordings adds each new screenshot to history as an image, and each recording as a link to its file. Remove tracking parameters removes tracking codes such as utm_source, fbclid, and gclid from a link you copy back from the history. The rest of the link stays the same, and the saved link is not changed. It only adds captures made after you turn it on. Library finds them with Spotlight and does not watch a folder.")
             }
             Section {
                 Toggle(isOn: $history.keepsAcrossRestarts) {
