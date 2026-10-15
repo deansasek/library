@@ -67,13 +67,20 @@ final class ScreenCaptures: ObservableObject {
         defer { query.enableUpdates() }
         let since = UserDefaults.standard.object(forKey: Self.sinceKey) as? Date ?? .distantPast
         var newest = since
+        var present: Set<String> = []
         for case let result as NSMetadataItem in query.results {
-            guard let path = result.value(forAttribute: NSMetadataItemPathKey) as? String,
-                  let created = result.value(forAttribute: "kMDItemContentCreationDate") as? Date,
+            guard let path = result.value(forAttribute: NSMetadataItemPathKey) as? String else { continue }
+            present.insert(path)
+            guard let created = result.value(forAttribute: "kMDItemContentCreationDate") as? Date,
                   created > since, !handled.contains(path) else { continue }
             handled.insert(path)
             newest = max(newest, created)
             ingest(URL(fileURLWithPath: path))
+        }
+        // A capture that was deleted leaves its reference in history, so the reference goes with it.
+        for path in handled.subtracting(present) where !FileManager.default.fileExists(atPath: path) {
+            handled.remove(path)
+            ClipboardHistory.shared.removeFile(at: URL(fileURLWithPath: path))
         }
         UserDefaults.standard.set(newest, forKey: Self.sinceKey)
     }
