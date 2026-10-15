@@ -210,7 +210,13 @@ enum SnippetEditorWindow {
     private static var window: NSWindow?
 
     static func show(_ snippet: Snippet?) {
-        window?.close()
+        // An editor that is already open may hold text not yet saved. Bring it forward instead of closing it.
+        if let window, window.isVisible || window.isMiniaturized {
+            if window.isMiniaturized { window.deminiaturize(nil) }
+            NSApp.activate(ignoringOtherApps: true)
+            window.makeKeyAndOrderFront(nil)
+            return
+        }
         let window = NSWindow(contentViewController: NSHostingController(
             rootView: SnippetForm(snippet: snippet) { SnippetEditorWindow.window?.close() }))
         window.title = snippet == nil ? "New Snippet" : "Edit Snippet"
