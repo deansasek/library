@@ -4,10 +4,17 @@ import SwiftUI
 /// A throwaway `.command` file avoids the Automation permission that AppleScript needs.
 func runInTerminal(_ command: String) {
     removeStaleCommandFiles()
-    guard let file = writeCommandFile(commandScript(command), in: FileManager.default.temporaryDirectory),
-          let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal")
-    else { return }
-    NSWorkspace.shared.open([file], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration())
+    guard let file = writeCommandFile(commandScript(command), in: FileManager.default.temporaryDirectory) else { return }
+    // A file that Terminal does not open is deleted now, since the script never runs to delete itself.
+    guard let terminal = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Terminal") else {
+        try? FileManager.default.removeItem(at: file)
+        return
+    }
+    NSWorkspace.shared.open([file], withApplicationAt: terminal, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+        if error != nil {
+            try? FileManager.default.removeItem(at: file)
+        }
+    }
 }
 
 /// The script Terminal runs. It deletes itself first, then runs the command, then leaves a shell open.
@@ -25,8 +32,8 @@ func writeCommandFile(_ script: String, in folder: URL) -> URL? {
 }
 
 /// Deletes `library-*.command` files in the temporary folder that are over an hour old. The script deletes
-/// itself when Terminal runs it, so any left behind were never run. Called each time a new one is written.
-private func removeStaleCommandFiles(now: Date = .now) {
+/// itself when Terminal runs it, so any left behind were never run. Called at launch and each time a new one is written.
+func removeStaleCommandFiles(now: Date = .now) {
     let folder = FileManager.default.temporaryDirectory
     let keys: Set<URLResourceKey> = [.contentModificationDateKey]
     guard let urls = try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: Array(keys)) else { return }

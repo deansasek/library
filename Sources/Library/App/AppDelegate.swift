@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = ClipboardHistory.shared  // starts watching the clipboard
         _ = ScreenCaptures.shared  // starts the Spotlight query for new screenshots and recordings, when on
         ClipPreviewSource.removeLeftovers()
+        removeStaleCommandFiles()  // command files Terminal never opened, left by an earlier run
         _ = ClipboardLock.shared  // starts watching for sleep, so the pinned items lock
         if UserDefaults.standard.bool(forKey: "reenableLoginItemAfterMove") {
             UserDefaults.standard.removeObject(forKey: "reenableLoginItemAfterMove")
