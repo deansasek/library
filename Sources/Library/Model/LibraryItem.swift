@@ -18,8 +18,11 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     var icon: String?
     /// Bundle id of the browser that opens a bookmark. Nil uses the default browser.
     var browser: String?
-    /// A Finder-style color tag, one of `tagNames`.
+    /// A Finder-style color tag, one of `tagNames`, or `customColorName` when `customColor` is set.
     var color: String?
+    /// The color picked from the system color picker. Set only with `color == customColorName`. Nil otherwise, so files
+    /// written before custom colors decode unchanged.
+    var customColor: CustomColor?
     /// Open the item when the Mac starts, if Library opens at login.
     var openAtLogin: Bool?
     /// Extra words that find the item in Quick Open and Spotlight, separated by spaces.
@@ -53,6 +56,43 @@ struct LibraryItem: Codable, Identifiable, Equatable {
         "red": .systemRed, "orange": .systemOrange, "yellow": .systemYellow, "green": .systemGreen,
         "blue": .systemBlue, "purple": .systemPurple, "gray": .systemGray,
     ]
+    /// The value of `color` for an item with a custom color. It is not one of `tagNames`.
+    static let customColorName = "custom"
+
+    /// An RGB color from the system color picker, each component from 0 to 1, stored as three numbers.
+    struct CustomColor: Codable, Equatable {
+        var red: Double
+        var green: Double
+        var blue: Double
+
+        init(red: Double, green: Double, blue: Double) {
+            self.red = min(max(red, 0), 1)
+            self.green = min(max(green, 0), 1)
+            self.blue = min(max(blue, 0), 1)
+        }
+
+        /// The color in sRGB, or nil when the color has no sRGB form (such as a pattern).
+        init?(_ color: NSColor) {
+            guard let rgb = color.usingColorSpace(.sRGB) else { return nil }
+            self.init(red: Double(rgb.redComponent), green: Double(rgb.greenComponent), blue: Double(rgb.blueComponent))
+        }
+
+        var nsColor: NSColor { NSColor(srgbRed: red, green: green, blue: blue, alpha: 1) }
+    }
+
+    /// The dot's color: the custom color when set, else the fixed tag color. Nil for an item without a color.
+    var tintColor: NSColor? {
+        if color == Self.customColorName { return customColor?.nsColor }
+        return color.flatMap { Self.tagColors[$0] }
+    }
+
+    /// The color as VoiceOver reads it: the tag name such as "red tag", or "custom color". Nil without a color.
+    static func colorAccessibilityName(for item: LibraryItem) -> String? {
+        if item.color == customColorName {
+            return item.customColor == nil ? nil : String(localized: "custom color", bundle: L10n.bundle)
+        }
+        return tagAccessibilityName(item.color)
+    }
 
     /// The color tag as VoiceOver reads it, such as "red tag". Nil for an item without a color. The dot alone is not
     /// enough, because VoiceOver cannot see it.
@@ -126,6 +166,7 @@ struct LibraryItem: Codable, Identifiable, Equatable {
         take(\.icon)
         take(\.browser)
         take(\.color)
+        take(\.customColor)
         take(\.openAtLogin)
         take(\.keywords)
         take(\.promptLabel)

@@ -540,7 +540,7 @@ final class LibraryStore: ObservableObject {
     /// The 16 pt icon: the custom icon, else by type: folder, divider, app icon, terminal, favicon, or link symbol.
     func icon(for node: LibraryItem) -> NSImage {
         let icon = baseIcon(for: node)
-        guard let tint = node.color.flatMap({ LibraryItem.tagColors[$0] }) else { return icon }
+        guard let tint = node.tintColor else { return icon }
         // The tag is a dot in the corner of the icon, so it shows in menus and lists alike.
         return NSImage(size: NSSize(width: 16, height: 16), flipped: false) { rect in
             icon.draw(in: rect)
@@ -1015,7 +1015,7 @@ final class LibraryStore: ObservableObject {
     /// Updates Spotlight only when what it shows changed, including since the last launch.
     private func indexInSpotlight(_ leaves: [LibraryItem]) {
         let signature = leaves.filter(\.isOpenable).map {
-            "\($0.id)|\($0.name)|\($0.url ?? "")|\($0.command ?? "")|\($0.appPath ?? "")|\($0.keywords ?? "")|\($0.color ?? "")|\($0.noteText ?? "")"
+            "\($0.id)|\($0.name)|\($0.url ?? "")|\($0.command ?? "")|\($0.appPath ?? "")|\($0.keywords ?? "")|\($0.color ?? "")|\($0.customColor.map { "\($0.red),\($0.green),\($0.blue)" } ?? "")|\($0.noteText ?? "")"
         }.joined(separator: "\n")
         let digest = SHA256.hash(data: Data(signature.utf8)).map { String(format: "%02x", $0) }.joined()
         guard digest != UserDefaults.standard.string(forKey: "spotlightDigest") else { return }
@@ -1041,6 +1041,7 @@ struct TreeFingerprint: Equatable {
         let shortcuts: [Shortcut]?
         let keywords: String?
         let color: String?
+        let customColor: LibraryItem.CustomColor?
         let icon: String?
         let browser: String?
         let promptLabel: String?
@@ -1059,6 +1060,7 @@ struct TreeFingerprint: Equatable {
             shortcuts = node.shortcuts
             keywords = node.keywords
             color = node.color
+            customColor = node.customColor
             icon = node.icon
             browser = node.browser
             promptLabel = node.promptLabel

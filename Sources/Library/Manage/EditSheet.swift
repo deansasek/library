@@ -95,11 +95,42 @@ struct EditSheet: View {
         return min(base, 700)
     }
 
+    /// The color picker's value. Picking a color stores it with the custom color name and its RGB values.
+    private var customColor: Binding<Color> {
+        Binding(
+            get: { Color(nsColor: node.customColor?.nsColor ?? .systemGray) },
+            set: { picked in
+                guard let rgb = LibraryItem.CustomColor(NSColor(picked)) else { return }
+                state.draft.color = LibraryItem.customColorName
+                state.draft.customColor = rgb
+            }
+        )
+    }
+
     private var colorSwatches: some View {
         HStack(spacing: 8) {
+            Button {
+                state.draft.color = nil
+                state.draft.customColor = nil
+            } label: {
+                Image(systemName: "circle.slash")
+                    .imageScale(.large)
+                    .accessibilityLabel(String(localized: "None", bundle: L10n.bundle))
+                    .frame(width: 18, height: 18)
+                    .overlay {
+                        if node.color == nil {
+                            Circle().strokeBorder(Color.primary.opacity(0.6), lineWidth: 2).padding(-3)
+                        }
+                    }
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(node.color == nil ? .isSelected : [])
             ForEach(LibraryItem.tagNames, id: \.self) { name in
                 Button {
                     state.draft.color = node.color == name ? nil : name
+                    state.draft.customColor = nil
                 } label: {
                     Circle()
                         .fill(Color(nsColor: LibraryItem.tagColors[name] ?? .gray))
@@ -116,6 +147,19 @@ struct EditSheet: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(name.capitalized)
                 .accessibilityAddTraits(node.color == name ? .isSelected : [])
+            }
+            // The system color picker, which shows the custom color and its own rainbow well.
+            ColorPicker(selection: customColor, supportsOpacity: false) {
+                Text("custom color", bundle: L10n.bundle)
+            }
+            .labelsHidden()
+            .accessibilityLabel(String(localized: "custom color", bundle: L10n.bundle))
+            .accessibilityAddTraits(node.color == LibraryItem.customColorName ? .isSelected : [])
+            .frame(width: 24, height: 24)
+            .overlay {
+                if node.color == LibraryItem.customColorName {
+                    Circle().strokeBorder(Color.primary.opacity(0.6), lineWidth: 2).padding(-3)
+                }
             }
         }
     }

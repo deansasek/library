@@ -96,7 +96,7 @@ struct NodeRow: View {
     /// The target and shortcut are included so two rows with the same name can be told apart.
     private var accessibilityName: String {
         var label = "\(node.name), \(kindName)"
-        if let tag = LibraryItem.tagAccessibilityName(node.color) {
+        if let tag = LibraryItem.colorAccessibilityName(for: node) {
             label += ", \(tag)"
         }
         let target = detail.trimmingCharacters(in: .whitespaces)
