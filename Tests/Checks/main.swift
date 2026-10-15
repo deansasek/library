@@ -791,6 +791,14 @@ check(SourceFilter.parse("from google chrome", apps: ["Google"]) == SourceFilter
 check(SourceFilter.parse("hello from safari", apps: fromApps) == nil && SourceFilter.parse("fromage cheese", apps: fromApps) == nil, "from must start the query")
 check(SourceFilter.parse("from safari", apps: ["", "  "]) == nil, "blank app names never match")
 check(SourceFilter.includes("Safari", app: "safari") && !SourceFilter.includes("Notes", app: "Safari") && !SourceFilter.includes(nil, app: "Safari"), "clips match their source app, case-insensitively")
+// A locked clip's source app is not listed in the "from" completions.
+let openedClip = clip(.text, text: "open")
+let lockedClip = clip(.text, text: "locked")
+var appClips = [openedClip, lockedClip]
+appClips[0].sourceApp = "Notes"
+appClips[1].sourceApp = "Password Manager"
+check(ClipboardHistory.sourceApps(in: appClips) { $0.id == lockedClip.id } == ["Notes"], "a locked clip's source app is not listed")
+check(ClipboardHistory.sourceApps(in: appClips) { _ in false } == ["Notes", "Password Manager"], "every unlocked source app is listed, in name order")
 
 // ---- Quick Look sources ----
 func clip(_ kind: ClipItem.Kind, text: String? = nil, files: [URL] = [], reps: [[NSPasteboard.PasteboardType: Data]] = [],
