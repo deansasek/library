@@ -15,9 +15,8 @@ enum LinkProbe {
         return LinkCheck.outcome(statusCode: get.statusCode, redirectRefused: get.refused)
     }
 
-    /// One request with `method`. It reads the body only up to `LinkCheck.getBodyLimit` bytes, which a HEAD does not
-    /// have, and then ends the request, so the rest of a large page is never downloaded. The status is taken before
-    /// the body is read, so an error in the body does not change it.
+    /// One request with `method`. Only the status is needed, so the body is never read: the response's status is
+    /// returned as soon as the headers arrive, and ending the session cancels the rest of the download.
     private static func fetch(_ url: URL, method: String, version: String) async -> (statusCode: Int?, refused: Bool) {
         var request = URLRequest(url: url, timeoutInterval: LinkCheck.timeout)
         request.httpMethod = method
@@ -35,16 +34,8 @@ enum LinkProbe {
         defer { session.invalidateAndCancel() }
         let redirects = RedirectGate()
         do {
-            let (body, response) = try await session.bytes(for: request, delegate: redirects)
-            let statusCode = (response as? HTTPURLResponse)?.statusCode
-            var read = 0
-            do {
-                for try await _ in body {
-                    read += 1
-                    if read == LinkCheck.getBodyLimit { break }
-                }
-            } catch {}
-            return (statusCode, redirects.refused)
+            let (_, response) = try await session.bytes(for: request, delegate: redirects)
+            return ((response as? HTTPURLResponse)?.statusCode, redirects.refused)
         } catch {
             return (nil, redirects.refused)
         }

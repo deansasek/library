@@ -35,8 +35,6 @@ enum LinkCheck {
     static let recheckInterval: TimeInterval = 24 * 60 * 60
     /// The background check runs at most once in this interval.
     static let dailyInterval: TimeInterval = 24 * 60 * 60
-    /// The most body bytes a GET reads, when a server refuses HEAD. The rest of the page is never downloaded.
-    static let getBodyLimit = 64 * 1024
 
     /// The status for an HTTP status code. 2xx and 3xx are ok, 4xx and 5xx broken. Anything else is no usable answer.
     static func kind(forHTTPCode code: Int) -> LinkStatus.Kind {
