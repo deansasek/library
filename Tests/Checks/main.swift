@@ -2241,5 +2241,12 @@ check(HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, sc
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 0.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "a corner with no display beside it is a corner")
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "the right edge of a lone display is a corner")
 
+// The English strings that build.sh puts in the app's bundle are in the source tree, where the bundle is made from.
+do {
+    let repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let strings = repoRoot.appendingPathComponent("Sources/Library/Resources/en.lproj/Localizable.strings")
+    check(FileManager.default.fileExists(atPath: strings.path), "the English strings file is in the Resources folder the bundle is made from")
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
