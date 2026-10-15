@@ -48,23 +48,22 @@ struct LibraryItemQuery: EntityStringQuery {
     }
 }
 
-/// A terminal command in the library. Running one always asks first.
+/// A terminal command in the library, by name. Running one always asks first. The command text is not part of the
+/// entity, so a Shortcut action that reads the entity cannot read it. The confirmation shows the text to the person.
 struct LibraryCommandEntity: AppEntity {
     static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "Terminal Command")
     static let defaultQuery = LibraryCommandQuery()
 
     let id: String
     let name: String
-    let command: String
 
     var displayRepresentation: DisplayRepresentation {
-        DisplayRepresentation(title: "\(name)", subtitle: "\(command)")
+        DisplayRepresentation(title: "\(name)")
     }
 
     init(_ node: LibraryItem) {
         id = node.id.uuidString
         name = node.name
-        command = node.command ?? ""
     }
 }
 
@@ -82,7 +81,7 @@ struct LibraryCommandQuery: EntityStringQuery {
     @MainActor
     func entities(matching string: String) async throws -> [LibraryCommandEntity] {
         IntentLogic.commands(in: LibraryStore.shared.nodes)
-            .filter { $0.name.localizedCaseInsensitiveContains(string) || ($0.command ?? "").localizedCaseInsensitiveContains(string) }
+            .filter { $0.name.localizedCaseInsensitiveContains(string) }
             .map(LibraryCommandEntity.init)
     }
 
