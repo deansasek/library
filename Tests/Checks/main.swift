@@ -1219,6 +1219,17 @@ check(edited[3].icon == "star.fill" && edited[3].color == nil, "dividers take an
 let cleared = BulkEdit.apply(BulkEdit(icon: .clear, color: .clear, openNew: .set(true)), to: bulkIDs, in: edited)
 check(cleared[0].icon == nil && cleared[0].color == nil && cleared[1].openNew == true && cleared[1].icon == nil, "clear removes, Opens In sets new")
 check(BulkEdit.apply(BulkEdit(openNew: .set(true)), to: [bulkTree[2].id], in: bulkTree)[2].children?.first?.openNew == nil, "a bookmark in a folder is not changed unless selected")
+// ---- update command: the release's checksum is checked before install.sh runs ----
+do {
+    let command = UpdateCheck.installCommand(tag: "v1.6.5")
+    check(command.contains("shasum -a 256 -c"), "update checks the checksum")
+    check(command.contains("releases/download/v1.6.5/Library-1.6.5.zip.sha256"), "update downloads the release checksum")
+    let verifyAt = command.range(of: "shasum -a 256 -c")!.lowerBound
+    let installAt = command.range(of: "install.sh")!.lowerBound
+    check(verifyAt < installAt, "the checksum is checked before install.sh runs")
+    check(!command.contains("git clone"), "update no longer clones the repository")
+}
+
 // ---- library backup: export, restore, and refusals (pure; no panels, no files) ----
 /// The refusal a backup gets, or nil when it is read.
 func backupError(_ data: Data) -> LibraryBackup.BackupError? {

@@ -244,7 +244,13 @@ enum UpdateCheck {
     /// Downloads one release into a temporary folder, runs its install script, and removes the folder whether or not
     /// the install succeeded.
     static func installCommand(tag: String) -> String {
-        "T=\"$(mktemp -d)\" && git clone --depth 1 --branch \(shellQuoted(tag)) \(repositoryURL) \"$T\" && \"$T/install.sh\"; rm -rf \"$T\""
+        // The tag is already checked to be numeric. The zip and its SHA-256 come from the release, and the install
+        // script runs only if the checksum matches.
+        let version = String(tag.drop(while: { $0 == "v" }))
+        let base = "https://github.com/deansasek/library/releases/download/\(tag)/Library-\(version)"
+        return "T=\"$(mktemp -d)\" && cd \"$T\" && curl -fsSL -O \(shellQuoted(base + ".zip")) -O \(shellQuoted(base + ".zip.sha256")) "
+            + "&& shasum -a 256 -c \(shellQuoted("Library-\(version).zip.sha256")) "
+            + "&& unzip -q \(shellQuoted("Library-\(version).zip")) && \"./Library-\(version)/install.sh\"; cd /; rm -rf \"$T\""
     }
 
     private static func shellQuoted(_ text: String) -> String {
