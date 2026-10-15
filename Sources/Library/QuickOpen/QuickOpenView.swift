@@ -80,6 +80,18 @@ struct QuickOpenView: View {
             }
         }
         .onChange(of: model.query) { _, _ in model.resetSelection() }
+        // Results arrive after typing settles, so the count is announced when the list changes, not when the query does.
+        .onChange(of: results.map(\.id)) { _, ids in announceResultCount(ids.count) }
+    }
+
+    /// Tells VoiceOver how many results the query found. The highlighted row is marked as selected in the list.
+    private func announceResultCount(_ count: Int) {
+        let text = switch count {
+        case 0: String(localized: "No results", bundle: L10n.bundle)
+        case 1: String(localized: "1 result", bundle: L10n.bundle)
+        default: String(localized: "\(count) results", bundle: L10n.bundle)
+        }
+        AccessibilityNotification.Announcement(text).post()
     }
 
     private func header(_ text: String) -> some View {
@@ -276,6 +288,7 @@ struct QuickOpenView: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .onDrag { model.dragProvider(for: result) }
         .onContinuousHover { phase in
             if case .active = phase { model.hover(result.id) }
