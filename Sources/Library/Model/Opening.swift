@@ -50,8 +50,17 @@ func removeStaleCommandFiles(now: Date = .now) {
 /// The names, among `files`, of this app's `.command` files that are more than an hour old at `now`.
 func staleCommandFiles(among files: [(name: String, modified: Date)], now: Date) -> [String] {
     files.filter { file in
-        file.name.hasPrefix("library-") && file.name.hasSuffix(".command") && now.timeIntervalSince(file.modified) > 3600
+        isCommandFileName(file.name) && now.timeIntervalSince(file.modified) > 3600
     }.map(\.name)
+}
+
+/// True for the exact name this app writes, `library-<UUID>.command`. Another file that only starts and ends the same
+/// way is not this app's, so it is left alone.
+func isCommandFileName(_ name: String) -> Bool {
+    let prefix = "library-", suffix = ".command"
+    guard name.hasPrefix(prefix), name.hasSuffix(suffix), name.count > prefix.count + suffix.count else { return false }
+    let middle = name.dropFirst(prefix.count).dropLast(suffix.count)
+    return UUID(uuidString: String(middle)) != nil
 }
 
 /// Splits a command line into arguments. Single or double quotes group words.
