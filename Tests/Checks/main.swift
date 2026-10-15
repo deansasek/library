@@ -850,6 +850,97 @@ if let url = ClipPreviewSource.url(for: clip(.image, reps: [[ClipItem.gifType: g
     check(url.pathExtension == "gif" && (try? Data(contentsOf: url)) == gifBytes, "GIF data written with a .gif name")
 } else { check(false, "gif preview file") }
 try? FileManager.default.removeItem(at: previewDir)
+// ---- file previews: the CSV and TSV parser (pure, no files) ----
+let csv = DelimitedParser.parse("name,note\n\"Smith, J\",\"a, b, c\"\n")
+check(csv.headers == ["name", "note"] && csv.rows == [["Smith, J", "a, b, c"]] && !csv.truncated, "quoted commas stay in a field")
+check(DelimitedParser.parse("q\n\"say \"\"hi\"\"\"\n").rows == [["say \"hi\""]], "doubled quotes are one quote")
+check(DelimitedParser.parse("a,b\r\n1,2\r\n3,4").rows == [["1", "2"], ["3", "4"]], "CRLF ends records, with no CR left in a field")
+check(DelimitedParser.parse("a,b\n1,2\n").rows == [["1", "2"]] && DelimitedParser.parse("a\r1\r").rows == [["1"]], "LF and CR end records")
+check(DelimitedParser.parse("a\n\"x\r\ny\"\n").rows == [["x\r\ny"]], "a quoted field keeps its line break")
+check(DelimitedParser.parse("a,,c\n,,\n").headers == ["a", "", "c"] && DelimitedParser.parse("a,,c\n,,\n").rows == [["", "", ""]],
+      "empty fields are kept")
+check(DelimitedParser.parse("a\n\n1\n\n").rows == [["1"]], "blank lines are skipped")
+check(DelimitedParser.parse("a,b\n1,\"\"").rows == [["1", ""]], "a quoted empty field at the end")
+check(DelimitedParser.parse("a,b\n1,2").rows == [["1", "2"]], "last line without a line break")
+check(DelimitedParser.parse("a\tb\n\"x\ty\"\tz\n", delimiter: "\t")
+      == DelimitedTable(headers: ["a", "b"], rows: [["x\ty", "z"]], truncated: false), "TSV: tab in quotes, tab delimiter")
+check(DelimitedParser.parse("a,b\n1,2", delimiter: "\t").rows == [["1,2"]], "the delimiter is configurable")
+check(DelimitedParser.parse("\u{FEFF}a,b\n").headers == ["a", "b"], "byte order mark is skipped")
+check(DelimitedParser.parse("a,b\n\"open,1\n").rows == [["open,1\n"]], "an unclosed quote runs to the end")
+check(DelimitedParser.parse("x\"y,z\n").headers == ["x\"y", "z"], "a quote inside a field is a character")
+let manyRows = "id\n" + (1...600).map { "\($0)" }.joined(separator: "\n") + "\n"
+let capped = DelimitedParser.parse(manyRows)
+check(capped.rows.count == 500 && capped.truncated && capped.rows.last == ["500"], "500 rows at most, and truncated past that")
+let exactRows = "id\n" + (1...500).map { "\($0)" }.joined(separator: "\n") + "\n"
+check(DelimitedParser.parse(exactRows).rows.count == 500 && !DelimitedParser.parse(exactRows).truncated, "exactly 500 rows is not truncated")
+let oneRow = DelimitedParser.parse("a,b\n1,2\n3,4\n", maxRows: 1)
+check(oneRow.rows == [["1", "2"]] && oneRow.truncated, "the row limit is a parameter")
+check(DelimitedParser.parse("a,b\n1,2\n3,").rows == [["1", "2"], ["3", ""]], "a line without a break at the end is kept")
+check(DelimitedParser.parse("a,b\n1,2\n3,", inputIsPartial: true) == DelimitedTable(headers: ["a", "b"], rows: [["1", "2"]], truncated: true),
+      "a cut file drops its last, possibly partial, record")
+let cutAtLineEnd = DelimitedParser.parse("a,b\n1,2\n", inputIsPartial: true)
+check(cutAtLineEnd.rows == [["1", "2"]] && cutAtLineEnd.truncated, "a cut at a line end keeps every record")
+check(DelimitedParser.parse("").headers.isEmpty && DelimitedParser.parse("").rows.isEmpty, "empty text has no table")
+check(FilePreviewKind(URL(fileURLWithPath: "/x/a.CSV")) == .table(delimiter: ",") && FilePreviewKind(URL(fileURLWithPath: "/x/a.tsv")) == .table(delimiter: "\t")
+      && FilePreviewKind(URL(fileURLWithPath: "/x/a.pdf")) == .quickLook, "CSV and TSV get a table, other files Quick Look")
+
+// ---- file previews: access rules and loading (temporary files, never the user's files) ----
+let fpDir = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-files-\(UUID().uuidString)", isDirectory: true)
+try? FileManager.default.createDirectory(at: fpDir, withIntermediateDirectories: true)
+let regularCSV = fpDir.appendingPathComponent("data.csv")
+try? Data("a,b\n1,2\n".utf8).write(to: regularCSV)
+let linkToCSV = fpDir.appendingPathComponent("link.csv")
+try? FileManager.default.createSymbolicLink(at: linkToCSV, withDestinationURL: regularCSV)
+let realDir = fpDir.appendingPathComponent("real", isDirectory: true)
+try? FileManager.default.createDirectory(at: realDir, withIntermediateDirectories: true)
+try? Data("x".utf8).write(to: realDir.appendingPathComponent("inside.txt"))
+let dirLink = fpDir.appendingPathComponent("dirlink", isDirectory: true)
+try? FileManager.default.createSymbolicLink(at: dirLink, withDestinationURL: realDir)
+check(FilePreviewAccess.check(regularCSV) == .regular(size: 8), "a regular file is readable")
+check(FilePreviewAccess.check(linkToCSV) == .symlink, "a symbolic link to a file is refused")
+check(FilePreviewAccess.check(dirLink.appendingPathComponent("inside.txt")) == .symlink, "a file reached through a linked folder is refused")
+check(FilePreviewAccess.check(realDir.appendingPathComponent("inside.txt")) == .regular(size: 1), "a file in a real folder is readable")
+check(FilePreviewAccess.check(realDir) == .notRegular, "a folder is not previewed")
+check(FilePreviewAccess.check(fpDir.appendingPathComponent("missing.csv")) == .missing, "a missing file is reported")
+check((try? FilePreviewLoader.state(for: realDir)) == .unavailable, "a folder is not loaded")
+check((try? FilePreviewLoader.state(for: regularCSV)) == .table(DelimitedTable(headers: ["a", "b"], rows: [["1", "2"]], truncated: false)),
+      "a small CSV loads as a table")
+check((try? FilePreviewLoader.state(for: linkToCSV)) == .unavailable, "a symbolic link is not loaded")
+let loadedTSV = fpDir.appendingPathComponent("data.tsv")
+try? Data("a\tb\n1\t2\n".utf8).write(to: loadedTSV)
+check((try? FilePreviewLoader.state(for: loadedTSV)) == .table(DelimitedTable(headers: ["a", "b"], rows: [["1", "2"]], truncated: false)),
+      "a TSV loads with a tab delimiter")
+let pdfFile = fpDir.appendingPathComponent("paper.pdf")
+try? Data("%PDF-1.4".utf8).write(to: pdfFile)
+check((try? FilePreviewLoader.state(for: pdfFile)) == .quickLook(pdfFile), "a PDF goes to Quick Look in place")
+// The async load runs off the main actor. The check waits for it on a semaphore, so this file stays synchronous.
+final class LoadBox: @unchecked Sendable { var state: FilePreviewState? }
+let loadBox = LoadBox()
+let loadDone = DispatchSemaphore(value: 0)
+Task.detached {
+    loadBox.state = await FilePreviewLoader.load(pdfFile)
+    loadDone.signal()
+}
+loadDone.wait()
+check(loadBox.state == .quickLook(pdfFile), "the async load gives the same result")
+let bigCSV = fpDir.appendingPathComponent("big.csv")
+let bigText = "id,name\n" + (1...2_000).map { "\($0),\(String(repeating: "x", count: 200))" }.joined(separator: "\n") + "\n"
+try? Data(bigText.utf8).write(to: bigCSV)
+if case .table(let cut)? = try? FilePreviewLoader.state(for: bigCSV) {
+    check(cut.headers == ["id", "name"] && cut.rows.count < 500 && cut.rows.count > 0 && cut.truncated, "a large CSV is cut at 64 KB and says so")
+    check(cut.rows.last?.first.map { Int($0) != nil } == true, "the cut rows are whole")
+} else {
+    check(false, "a large CSV loads")
+}
+let hugeCSV = fpDir.appendingPathComponent("huge.csv")
+FileManager.default.createFile(atPath: hugeCSV.path, contents: nil)
+if let handle = try? FileHandle(forWritingTo: hugeCSV) {
+    try? handle.truncate(atOffset: UInt64(FilePreviewLoader.maxTableBytes) + 1)
+    try? handle.close()
+}
+check((try? FilePreviewLoader.state(for: hugeCSV)) == .tooLarge, "a CSV over 25 MB is refused")
+try? FileManager.default.removeItem(at: fpDir)
+
 // ---- bookmark import ----
 let safariPlist = Data("""
 <?xml version="1.0" encoding="UTF-8"?>
