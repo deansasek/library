@@ -115,13 +115,13 @@ struct WelcomeView: View {
                 HStack(spacing: 14) {
                     icon("power.circle", .accentColor)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Open at Login").font(.headline)
+                        Text("Open at login").font(.headline)
                         Text("Start Library when you log in, so the shortcuts are always ready.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()
-                    Toggle("Open at Login", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.set($0) }))
+                    Toggle("Open at login", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.set($0) }))
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }

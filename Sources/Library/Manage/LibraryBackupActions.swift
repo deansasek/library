@@ -4,7 +4,7 @@ import UniformTypeIdentifiers
 /// File > Export Library… and Settings > Backup. Writes and reads the files that `LibraryBackup` encodes and decodes.
 @MainActor
 enum LibraryBackupActions {
-    static let exportNote = "The backup has your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at Login settings. It doesn’t include clipboard items. Pinned clipboard items are encrypted with a key that stays on this Mac, so they aren’t exported."
+    static let exportNote = "The backup has your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at login settings. It doesn’t include clipboard items. Pinned clipboard items are encrypted with a key that stays on this Mac, so they aren’t exported."
 
     static func export(_ store: LibraryStore) {
         let panel = NSSavePanel()

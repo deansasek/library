@@ -55,6 +55,9 @@
 /* Toggle that starts Library when the user logs in. */
 "Open at Login" = "Open at Login";
 
+/* Settings toggle that opens Library when you log in. Sentence case, unlike the menu item. */
+"Open at login" = "Open at login";
+
 /* Menu item that quits the app. */
 "Quit Library" = "Quit Library";
 
@@ -68,7 +71,7 @@
 "Check for Updates…" = "Check for Updates…";
 
 /* Settings toggle that checks GitHub for a newer version every hour while Library runs. */
-"Check for Updates Automatically" = "Check for Updates Automatically";
+"Check for updates automatically" = "Check for updates automatically";
 
 /* Menu item at the top of the Library menu when a newer version exists. The argument is the version number. */
 "Update Available — Version %@" = "Update Available — Version %@";
@@ -148,13 +151,13 @@
 /* Footer under the Reading List section of the manager window. */
 "Unread items are listed first. Removing an item from the Reading List leaves it in the library." = "Unread items are listed first. Removing an item from the Reading List leaves it in the library.";
 /* Settings toggle that turns on the daily check of every bookmark's address. */
-"Check Links Periodically" = "Check Links Periodically";
+"Check links periodically" = "Check links periodically";
 /* File menu item and alert title that checks every bookmark's address now. */
 "Check Links" = "Check Links";
 /* Get Info row label for the result of the last link check. */
-"Link Status" = "Link Status";
+"Link status" = "Link status";
 /* Get Info row label for the date and time of the last link check. */
-"Last Checked" = "Last Checked";
+"Last checked" = "Last checked";
 /* Link check result for a page that loads. */
 "Working" = "Working";
 /* Link check result for a page that returned an error code. */
@@ -175,13 +178,13 @@
 "Every bookmark was checked in the last 24 hours, so there was nothing to check." = "Every bookmark was checked in the last 24 hours, so there was nothing to check.";
 /* Alert after Check Links. The counts are links checked, broken, and unreachable. */
 "Checked %lld links. %lld are broken, and %lld can’t be reached." = "Checked %lld links. %lld are broken, and %lld can’t be reached.";
-/* Footer under Check Links Periodically in Settings > General. */
+/* Footer under Check links periodically in Settings > General. */
 "Once a day while Library runs, Library requests each bookmark’s address with a HEAD request, which reads no page content. A server that refuses HEAD gets a GET request, which reads at most 64 KB. Each address is requested once per check, and one checked in the last 24 hours is skipped. Bookmarks whose page fails or can’t be reached get a warning in Edit Library. Off by default. Check Links in the File menu checks now." = "Once a day while Library runs, Library requests each bookmark’s address with a HEAD request, which reads no page content. A server that refuses HEAD gets a GET request, which reads at most 64 KB. Each address is requested once per check, and one checked in the last 24 hours is skipped. Bookmarks whose page fails or can’t be reached get a warning in Edit Library. Off by default. Check Links in the File menu checks now.";
 /* Settings toggle that names a new bookmark from the title of its page. Off by default. */
-"Name New Bookmarks from Their Pages" = "Name New Bookmarks from Their Pages";
+"Name new bookmarks from their pages" = "Name new bookmarks from their pages";
 
 /* Settings footer under the toggle that names new bookmarks from their pages. */
-"Library requests each new bookmark's page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host." = "Library requests each new bookmark's page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.";
+"Library requests each new bookmark’s page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host." = "Library requests each new bookmark’s page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.";
 
 /* Header menu in the manager that chooses how the list is sorted. Its accessibility label too. */
 "Sort" = "Sort";
@@ -201,9 +204,9 @@
 /* Sort menu item that sorts the most recently opened items first. */
 "Recently Opened" = "Recently Opened";
 /* Settings toggle that saves unpinned clipboard history, encrypted, so it is there after a restart. */
-"Keep Clipboard Across Restarts" = "Keep Clipboard Across Restarts";
+"Keep clipboard history across restarts" = "Keep clipboard history across restarts";
 
-/* Footer under Keep Clipboard Across Restarts: what is saved, what is never saved, and that turning it off deletes the history. */
+/* Footer under Keep clipboard history across restarts: what is saved, what is never saved, and that turning it off deletes the history. */
 "Saves your unpinned clipboard history, encrypted with a key kept in your Keychain, so it is there after you restart. Pinned items are saved either way. Copies from password managers and copies marked private are never saved. Images over 5 MB are never saved, to keep the file small. Turning this off deletes the saved history." = "Saves your unpinned clipboard history, encrypted with a key kept in your Keychain, so it is there after you restart. Pinned items are saved either way. Copies from password managers and copies marked private are never saved. Images over 5 MB are never saved, to keep the file small. Turning this off deletes the saved history.";
 
 /* Settings toggle that copies the newest restored clipboard item when Library opens. Off unless history is kept. */

@@ -110,7 +110,7 @@ final class UpdateStatus: ObservableObject {
 /// check from Check for Updates… always answers with an alert.
 @MainActor
 enum UpdateCheck {
-    /// The UserDefaults key of the "Check for Updates Automatically" setting. On by default, unless the user has
+    /// The UserDefaults key of the "Check for updates automatically" setting. On by default, unless the user has
     /// chosen otherwise.
     static let automaticKey = "checkForUpdatesAutomatically"
     private static let lastCheckKey = "lastUpdateCheck"

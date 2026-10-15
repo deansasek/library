@@ -36,7 +36,7 @@ struct SettingsView: View {
     var general: some View {
         Form {
             Section {
-                Toggle("Open at Login", isOn: Binding(
+                Toggle("Open at login", isOn: Binding(
                     get: { loginItem.isEnabled },
                     set: { loginItem.set($0) }
                 ))
@@ -45,10 +45,10 @@ struct SettingsView: View {
             }
             Section {
                 Toggle(isOn: $namesFromPages) {
-                    Text("Name New Bookmarks from Their Pages", bundle: L10n.bundle)
+                    Text("Name new bookmarks from their pages", bundle: L10n.bundle)
                 }
             } footer: {
-                Text("Library requests each new bookmark's page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.", bundle: L10n.bundle)
+                Text("Library requests each new bookmark’s page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.", bundle: L10n.bundle)
             }
             Section {
                 Toggle("Keep Library in iCloud Drive", isOn: Binding(
@@ -62,7 +62,7 @@ struct SettingsView: View {
             }
             Section {
                 Toggle(isOn: $checksForUpdates) {
-                    Text("Check for Updates Automatically", bundle: L10n.bundle)
+                    Text("Check for updates automatically", bundle: L10n.bundle)
                 }
                 .onChange(of: checksForUpdates) { _, _ in UpdateCheck.startAutomaticChecks() }
             } footer: {
@@ -70,7 +70,7 @@ struct SettingsView: View {
             }
             Section {
                 Toggle(isOn: $checksLinks) {
-                    Text("Check Links Periodically", bundle: L10n.bundle)
+                    Text("Check links periodically", bundle: L10n.bundle)
                 }
                 .onChange(of: checksLinks) { _, _ in LinkChecker.startSchedule(store: store) }
             } footer: {
@@ -86,7 +86,7 @@ struct SettingsView: View {
             } header: {
                 Text("Backup")
             } footer: {
-                Text("Export saves your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at Login settings to a file. Restore replaces your library with a backup and can be undone. Clipboard items are not included, because pinned clipboard items are encrypted with a key that stays on this Mac.")
+                Text("Export saves your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at login settings to a file. Restore replaces your library with a backup and can be undone. Clipboard items are not included, because pinned clipboard items are encrypted with a key that stays on this Mac.")
             }
             Section {
                 LabeledContent("Welcome Screen") {
@@ -125,7 +125,7 @@ struct SettingsView: View {
                 Text("These work in every app. Quick Open searches your library and your clipboard history. Open Copied Link opens the web link you last copied. A beep means the clipboard has no link.")
             }
             Section {
-                Picker("Library Menu Opens", selection: $store.menuMode) {
+                Picker("Library menu opens", selection: $store.menuMode) {
                     Text("At the Pointer").tag(MenuMode.cursor)
                     Text("From the Menu Bar").tag(MenuMode.menuBar)
                 }
@@ -160,17 +160,17 @@ struct SettingsView: View {
                 Text("Pinned items show as Pinned Item until you authenticate with Touch ID or your Mac password. They stay unlocked until you choose Lock Pinned Items in the Library menu, the Mac sleeps, or Library quits.")
             }
             Section {
-                Toggle("Keep Clipboard History", isOn: $history.isEnabled)
-                Toggle("Paste Into Text Fields", isOn: $history.pastesIntoFields)
-                Toggle("Play Copied GIFs", isOn: $history.playsGIFs)
+                Toggle("Keep clipboard history", isOn: $history.isEnabled)
+                Toggle("Paste into text fields", isOn: $history.pastesIntoFields)
+                Toggle("Play copied GIFs", isOn: $history.playsGIFs)
                 Button("Clear History") { history.clear() }
                     .disabled(history.items.allSatisfy(\.pinned))
             } footer: {
-                Text("History stays in memory and is gone when Library quits, unless Keep Clipboard Across Restarts is on. With Paste Into Text Fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps.")
+                Text("History stays in memory and is gone when Library quits, unless Keep clipboard history across restarts is on. With Paste into text fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps.")
             }
             Section {
                 Toggle(isOn: $history.keepsAcrossRestarts) {
-                    Text("Keep Clipboard Across Restarts", bundle: L10n.bundle)
+                    Text("Keep clipboard history across restarts", bundle: L10n.bundle)
                 }
             } footer: {
                 Text("Saves your unpinned clipboard history, encrypted with a key kept in your Keychain, so it is there after you restart. Pinned items are saved either way. Copies from password managers and copies marked private are never saved. Images over 5 MB are never saved, to keep the file small. Turning this off deletes the saved history.", bundle: L10n.bundle)

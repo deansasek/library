@@ -43,7 +43,7 @@ struct EditSheet: View {
                             set: { state.draft.openAtLogin = $0 ? true : nil }
                         ))
                     } footer: {
-                        Text("Keywords find this item in Quick Open and Spotlight, such as “tix” for Jira. Items that open at login need Open at Login turned on in Settings.")
+                        Text("Keywords find this item in Quick Open and Spotlight, such as “tix” for Jira. Items that open at login need Open at login turned on in Settings.")
                     }
                 }
                 if node.isOpenable {
@@ -159,8 +159,8 @@ struct EditSheet: View {
                     }
                 }
                 if let status = store.nodes.node(withID: node.id)?.linkStatus {
-                    LabeledContent("Link Status") { linkStatusName(status.kind) }
-                    LabeledContent("Last Checked") {
+                    LabeledContent("Link status") { linkStatusName(status.kind) }
+                    LabeledContent("Last checked") {
                         Text(status.checked.formatted(date: .abbreviated, time: .shortened))
                             .foregroundStyle(.secondary)
                     }
