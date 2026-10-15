@@ -3,12 +3,13 @@ import SwiftUI
 /// Removes tracking parameters from a link. Only the copy changes: the link saved in the library is not touched.
 enum TrackingParameters {
     /// Parameters that exist only to track where a click came from. Compared in lowercase.
-    static let names: Set<String> = ["fbclid", "gclid", "mc_eid", "mc_cid", "igshid", "ref_src"]
+    static let names: Set<String> = ["fbclid", "gclid", "msclkid", "yclid", "mc_eid", "mc_cid", "mkt_tok", "_hsenc", "igshid", "ref_src"]
     /// Any parameter that starts with one of these, such as `utm_source`.
     static let prefixes = ["utm_"]
 
+    /// True for a tracking name. A name written with percent-encoding, such as `utm%5Fsource`, is decoded first.
     static func isTracking(_ name: String) -> Bool {
-        let name = name.lowercased()
+        let name = (name.removingPercentEncoding ?? name).lowercased()
         return names.contains(name) || prefixes.contains { name.hasPrefix($0) }
     }
 
