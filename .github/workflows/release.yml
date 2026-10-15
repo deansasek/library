@@ -11,14 +11,20 @@ on:
         description: Version to release, such as 1.2.0
         required: true
 
+# Read only by default. The build job runs repository code, so it never gets a write token. Only the publish job
+# below, which runs no repository code, gets write access.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  # Builds and tests the code with a read-only token. The checkout keeps no credentials in .git/config, so the code
+  # that build.sh and test.sh run cannot reach the token either.
+  build:
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - name: Work out the version
         env:
           INPUT_VERSION: ${{ inputs.version }}
@@ -32,7 +38,7 @@ jobs:
       # Reuses SwiftPM's .build between runs. The key changes with the manifest, the lockfile, or any source file. A
       # partial match falls back to the same manifest, and swift build then compiles only what changed.
       - name: Cache the SwiftPM build
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: .build
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.swift') }}-${{ hashFiles('Package.resolved') }}-${{ hashFiles('Sources/**/*.swift') }}
@@ -50,11 +56,41 @@ jobs:
       # download before running any of it. The file is in the form `shasum -a 256 -c` reads.
       - name: Checksum the source
         run: shasum -a 256 "Library-$VERSION.zip" > "Library-$VERSION.zip.sha256"
+      - name: Keep the source and its checksum
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-files
+          path: Library-*.zip*
+          if-no-files-found: error
+
+  # Publishes the files the build job made. It downloads them and runs no repository code, so the write token is
+  # used only for the release calls.
+  publish:
+    needs: build
+    runs-on: macos-26
+    permissions:
+      contents: write
+    steps:
+      - name: Work out the version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            version="$INPUT_VERSION"
+          else
+            version="${GITHUB_REF_NAME#v}"
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - name: Download the source and its checksum
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-files
       # GitHub's API can return a 500 after it has made part of the release. Each attempt first checks for the release,
       # so a retry after a partial publish never creates a second one. Four attempts, waiting 15, 30, and 60 seconds.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           tag="v$VERSION"
           delays=(15 30 60)
