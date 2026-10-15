@@ -281,6 +281,8 @@ struct ManageView: View {
                 Button("Edit…", systemImage: "pencil") {
                     state.editSelection(in: store)
                 }
+                // Same action as Get Info, which owns ⌘I. This button has no shortcut of its own.
+                .help("Edit the selected items")
                 .disabled(state.selection.isEmpty)
             }
             ToolbarItem(placement: .primaryAction) {
