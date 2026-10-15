@@ -31,11 +31,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             Welcome.showIfNeeded(store: LibraryStore.shared)
         }
-        // macOS marks a login launch in the launch event. Right after boot also counts, in case it does not.
+        // macOS marks a login launch in the launch event. Only that launch opens the login items, so a manual launch
+        // or a relaunch soon after boot does not open them a second time.
         let event = NSAppleEventManager.shared().currentAppleEvent
         let byLoginItem = event?.paramDescriptor(forKeyword: AEKeyword(keyAEPropData))?.enumCodeValue
             == OSType(keyAELaunchedAsLogInItem)
-        if byLoginItem || ProcessInfo.processInfo.systemUptime < 120 {
+        if byLoginItem {
             openLoginItems()
         }
         UpdateCheck.start()
