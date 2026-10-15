@@ -116,7 +116,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
             if url.host == "open", let name = value("name"),
                let node = Self.item(named: name, in: store.nodes) {
-                open(node, value: value("value"))
+                let linkValue = value("value")
+                if linkOpenNeedsConfirmation(node, value: linkValue), !confirmLinkOpen(node, value: linkValue) { continue }
+                open(node, value: linkValue)
             }
         }
     }

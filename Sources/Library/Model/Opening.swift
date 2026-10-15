@@ -219,6 +219,30 @@ private func confirmCommand(_ node: LibraryItem, _ command: String) -> Bool {
     return alert.runModal() == .alertSecondButtonReturn
 }
 
+/// Whether a `library://open` link must ask before it opens the item. An app with arguments asks, and so does a
+/// template that the link fills with a value. Bookmarks and plain apps open without a prompt.
+func linkOpenNeedsConfirmation(_ node: LibraryItem, value: String?) -> Bool {
+    if node.command != nil { return false }
+    if node.appPath != nil { return !splitArguments(node.arguments ?? "").isEmpty }
+    return node.isTemplate && value != nil
+}
+
+/// Asks before a web page's link opens an app with arguments or fills a template. Cancel is the default button.
+@MainActor
+func confirmLinkOpen(_ node: LibraryItem, value: String?) -> Bool {
+    NSApp.activate(ignoringOtherApps: true)
+    let alert = NSAlert()
+    alert.messageText = String(format: String(localized: "Open “%@” from a link?", bundle: L10n.bundle), node.name)
+    if node.appPath != nil {
+        alert.informativeText = String(format: String(localized: "The link opens this app with the arguments: %@", bundle: L10n.bundle), node.arguments ?? "")
+    } else {
+        alert.informativeText = String(format: String(localized: "The link fills this address with: %@", bundle: L10n.bundle), value ?? "")
+    }
+    alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
+    alert.addButton(withTitle: String(localized: "Open", bundle: L10n.bundle))
+    return alert.runModal() == .alertSecondButtonReturn
+}
+
 /// Opens a bookmark in the browser, or runs a terminal command. Opens an app,
 /// or brings it to the front when it already runs. `forceNew` overrides the item's own setting.
 /// `value` fills a URL template with a single field without asking. Templates with several fields always ask.

@@ -414,3 +414,11 @@
 
 /* Settings footer warning that screenshot capture skips the privacy filters, so it is off by default. */
 "Screenshots and recordings skip the privacy filters that copies pass through, so a screenshot of a password manager can be kept. It is off by default. Turn it on only if you accept that." = "Screenshots and recordings skip the privacy filters that copies pass through, so a screenshot of a password manager can be kept. It is off by default. Turn it on only if you accept that.";
+/* Asks before a library:// link opens an app with arguments or fills a template. */
+"Open “%@” from a link?" = "Open “%@” from a link?";
+
+/* Confirmation text: the arguments an app opens with, from a library:// link. */
+"The link opens this app with the arguments: %@" = "The link opens this app with the arguments: %@";
+
+/* Confirmation text: the value a library:// link fills a template with. */
+"The link fills this address with: %@" = "The link fills this address with: %@";
