@@ -2234,5 +2234,12 @@ check(LibraryItem(name: "O", url: "obsidian://open?vault=x").link?.absoluteStrin
 check(newWindowFlag(bundleID: "org.mozilla.firefox") == "-new-window" && newWindowFlag(bundleID: "com.google.Chrome") == "--new-window", "Firefox and Chromium browsers have a new-window flag")
 check(newWindowFlag(bundleID: "com.apple.Safari") == nil && newWindowFlag(bundleID: "") == nil, "Safari has no new-window flag, so it gets the link itself")
 
+// A hot corner at the seam between two displays is not a corner; a corner with nothing beside it is.
+let seamLeft = CGRect(x: 0, y: 0, width: 1000, height: 800)
+let seamRight = CGRect(x: 1000, y: 0, width: 1000, height: 800)
+check(HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft, seamRight]), "the top edge at a seam has a neighbour")
+check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 0.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "a corner with no display beside it is a corner")
+check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "the right edge of a lone display is a corner")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

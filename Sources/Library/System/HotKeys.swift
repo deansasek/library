@@ -279,12 +279,25 @@ enum HotKeys {
             if dx > 40 || dy > 40 { cornerArmed = true }
             return
         }
+        // A point at the edge where another display begins is a seam, not a corner.
+        guard !hasNeighbour(beyond: point, in: frame, screens: screenFrames) else { return }
         guard cornerArmed else { return }
         cornerArmed = false
         let name = top ? (left ? "cornerTopLeft" : "cornerTopRight") : (left ? "cornerBottomLeft" : "cornerBottomRight")
         let held = carbonModifiers(NSEvent.modifierFlags)
         for entry in cornerEntries where entry.shortcut.gesture == name && entry.shortcut.modifiers == held {
-            entry.action()
+            // Run after the monitor returns, as the other triggers do, so the action is not run inside the monitor.
+            DispatchQueue.main.async { MainActor.assumeIsolated { entry.action() } }
+        }
+    }
+
+    /// True when another display lies just past `point` on any side outside `frame`, so `point` is where two displays
+    /// meet and not a corner of `frame`.
+    static func hasNeighbour(beyond point: CGPoint, in frame: CGRect, screens: [CGRect]) -> Bool {
+        let offsets: [(x: CGFloat, y: CGFloat)] = [(-3, 0), (3, 0), (0, -3), (0, 3)]
+        return offsets.contains { offset in
+            let probe = CGPoint(x: point.x + offset.x, y: point.y + offset.y)
+            return !frame.contains(probe) && screens.contains { $0.contains(probe) }
         }
     }
 
