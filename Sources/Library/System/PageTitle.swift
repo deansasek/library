@@ -33,7 +33,9 @@ enum PageTitle {
     /// The text of the first `<title>` element in `html`, with entities decoded and whitespace collapsed. Nil when
     /// there is no title or it is empty. A title split over several lines is joined with single spaces.
     static func extract(from html: String) -> String? {
-        guard let regex = try? NSRegularExpression(pattern: #"<title(?:\s[^>]*)?>(.*?)</title\s*>"#,
+        // A page with no closing title tag has no title, so the scan is skipped.
+        guard html.range(of: "</title", options: .caseInsensitive) != nil,
+              let regex = try? NSRegularExpression(pattern: #"<title(?:\s[^>]{0,200})?>(.{0,1024}?)</title\s*>"#,
                                                    options: [.caseInsensitive, .dotMatchesLineSeparators]),
               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
               let range = Range(match.range(at: 1), in: html) else { return nil }

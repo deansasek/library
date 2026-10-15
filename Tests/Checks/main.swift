@@ -1658,6 +1658,14 @@ let splitCharacter = Data("<title>Ok</title>".utf8) + Data(Array(repeating: [UIn
 check(PageTitle.title(in: splitCharacter) == "Ok", "a character cut by the limit does not hide the title")
 check(PageTitle.collapsingWhitespace("  a \t b\n\nc  ") == "a b c", "whitespace collapses and is trimmed")
 
+// ---- Hostile pages: the scans are bounded, so unclosed tags cannot stall a favicon load ----
+let hostileStart = Date()
+check(Favicon.iconHref(in: String(repeating: "<link ", count: 40_000)) == nil, "unclosed link tags give no icon")
+check(PageTitle.extract(from: String(repeating: "<title>", count: 10_000)) == nil && PageTitle.extract(from: String(repeating: "<title ", count: 10_000)) == nil, "unclosed title tags give no title")
+check(Date().timeIntervalSince(hostileStart) < 2, "hostile markup is scanned in bounded time")
+check(Favicon.iconHref(in: "<link rel=\"icon\" href=\"/a.png\">") == "/a.png", "a normal icon link is read")
+check(Favicon.iconHref(in: String(repeating: " ", count: 70_000) + "<link rel='icon' href='/b'>") == nil, "an icon link past the first 64 KB is not read")
+
 // ---- Most Used and Recently Opened: largest first, never opened last, ties in tree order ----
 let orderA = LibraryItem(name: "A", url: "https://a.example.com")
 let orderB = LibraryItem(name: "B", url: "https://b.example.com")
