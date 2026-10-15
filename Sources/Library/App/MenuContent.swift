@@ -105,7 +105,7 @@ struct MenuContent: View {
             Text("Check for Updates…", bundle: L10n.bundle)
         }
         Menu {
-            Button("Library Help") { NSWorkspace.shared.open(HelpCommands.readme) }
+            Button("Library Help") { NSWorkspace.shared.open(HelpCommands.guide) }
             Button("Keyboard Shortcuts") { NSWorkspace.shared.open(HelpCommands.shortcuts) }
             Button("Welcome Tour…") { Welcome.show(store: store) }
             Divider()
