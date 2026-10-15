@@ -8,10 +8,13 @@ final class SnippetDraft: ObservableObject {
     @Published var name: String
     @Published var keywords: String
     @Published var text: String
+    /// The snippet as the editor opened it, or nil for a new snippet. A save compares the edit with it.
+    let original: Snippet?
 
     init(_ snippet: Snippet?) {
         id = snippet?.id ?? UUID()
         isNew = snippet == nil
+        original = snippet
         name = snippet?.name ?? ""
         keywords = snippet?.keywords ?? ""
         text = snippet?.text ?? ""
@@ -28,11 +31,12 @@ final class SnippetDraft: ObservableObject {
     }
 }
 
-/// Says that snippets cannot be saved, because snippets.json cannot be read.
-struct SnippetSaveNotice: View {
+/// A notice above the snippet lists and forms, such as that saving is blocked.
+struct SnippetNotice: View {
+    let message: String
+
     var body: some View {
-        Label("snippets.json cannot be read, so snippets cannot be saved. Check the file in your library folder.",
-              systemImage: "exclamationmark.triangle")
+        Label(message, systemImage: "exclamationmark.triangle")
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 20)
             .padding(.vertical, 10)
@@ -53,10 +57,17 @@ struct SnippetForm: View {
         self.close = close
     }
 
+    /// The snippet was removed in another window. Its text stays on screen, so it can be copied, but it cannot be saved.
+    private var isRemoved: Bool {
+        !isNew && !store.snippets.contains { $0.id == draft.id }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if store.saveBlocked {
-                SnippetSaveNotice()
+                SnippetNotice(message: "snippets.json cannot be read, so snippets cannot be saved. Check the file in your library folder.")
+            } else if isRemoved {
+                SnippetNotice(message: "This snippet was removed in another window, so these changes cannot be saved. Copy the text before closing.")
             }
             Form {
                 Section {
@@ -81,16 +92,16 @@ struct SnippetForm: View {
                 Button("Cancel", role: .cancel) { close() }
                     .keyboardShortcut(.cancelAction)
                 Button(isNew ? "Add" : "Save") {
-                    guard draft.isValid, !store.saveBlocked else { return }
+                    guard draft.isValid, !store.saveBlocked, !isRemoved else { return }
                     if isNew {
                         SnippetStore.shared.add(draft.snippet)
-                    } else {
-                        SnippetStore.shared.update(draft.snippet)
+                    } else if let original = draft.original {
+                        guard SnippetStore.shared.update(draft.snippet, changedFrom: original) else { return }
                     }
                     close()
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(!draft.isValid || store.saveBlocked)
+                .disabled(!draft.isValid || store.saveBlocked || isRemoved)
             }
             .padding([.horizontal, .bottom], 20)
         }
@@ -107,7 +118,7 @@ struct SnippetsSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             if store.saveBlocked {
-                SnippetSaveNotice()
+                SnippetNotice(message: "snippets.json cannot be read, so snippets cannot be saved. Check the file in your library folder.")
                 Divider()
             }
             List(store.snippets, selection: $model.selection) { snippet in
@@ -121,7 +132,7 @@ struct SnippetsSheet: View {
                         .truncationMode(.middle)
                 }
                 .tag(snippet.id)
-                .onTapGesture(count: 2) { model.editing = .edit(snippet.id) }
+                .onTapGesture(count: 2) { model.editing = .edit(snippet) }
             }
             .listStyle(.inset(alternatesRowBackgrounds: true))
             .frame(height: 300)
@@ -142,7 +153,9 @@ struct SnippetsSheet: View {
                     .accessibilityLabel("Add Snippet")
                     .disabled(store.saveBlocked)
                 Button("Edit…") {
-                    if let id = model.selection { model.editing = .edit(id) }
+                    if let id = model.selection, let snippet = store.snippets.first(where: { $0.id == id }) {
+                        model.editing = .edit(snippet)
+                    }
                 }
                 .disabled(model.selection == nil)
                 Button("Delete", role: .destructive) {
@@ -161,7 +174,7 @@ struct SnippetsSheet: View {
         .frame(width: 480)
         .onExitCommand { dismiss() }
         .sheet(item: $model.editing) { editing in
-            SnippetForm(snippet: editing.snippet(in: store.snippets)) { model.editing = nil }
+            SnippetForm(snippet: editing.snippet) { model.editing = nil }
         }
     }
 }
@@ -171,18 +184,19 @@ struct SnippetsSheet: View {
 final class SnippetListModel: ObservableObject {
     enum Editing: Identifiable {
         case new
-        case edit(UUID)
+        /// The snippet as it was when its editor opened. Its editor keeps this copy even if the snippet is removed.
+        case edit(Snippet)
 
         var id: String {
             switch self {
             case .new: return "new"
-            case .edit(let id): return id.uuidString
+            case .edit(let snippet): return snippet.id.uuidString
             }
         }
 
-        func snippet(in snippets: [Snippet]) -> Snippet? {
-            guard case .edit(let id) = self else { return nil }
-            return snippets.first { $0.id == id }
+        var snippet: Snippet? {
+            guard case .edit(let snippet) = self else { return nil }
+            return snippet
         }
     }
 
