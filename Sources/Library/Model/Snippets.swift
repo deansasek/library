@@ -20,6 +20,18 @@ struct Snippet: Codable, Identifiable, Equatable {
     }
 }
 
+/// The shape of snippets.json. `version` lets a later release tell its own file from an older or newer one.
+private struct SnippetFile: Codable {
+    static let currentVersion = 1
+    var version: Int
+    var snippets: [Snippet]
+}
+
+/// Just the version of snippets.json, so a file from a newer release can be recognized even if its list changed.
+private struct SnippetFileVersion: Decodable {
+    let version: Int
+}
+
 /// The saved snippets, in snippets.json in the library folder.
 @MainActor
 final class SnippetStore: ObservableObject {
@@ -45,15 +57,27 @@ final class SnippetStore: ObservableObject {
             saveBlocked = true
             return
         }
-        guard let loaded = try? JSONDecoder().decode([Snippet].self, from: data) else {
-            // Like a damaged bookmarks.json: keep the file aside for inspection and start with no snippets.
-            let damaged = file.deletingLastPathComponent().appendingPathComponent("snippets-damaged.json")
-            try? FileManager.default.removeItem(at: damaged)
-            try? FileManager.default.moveItem(at: file, to: damaged)
-            NSLog("Library: snippets.json could not be read, so it was moved to snippets-damaged.json")
+        if let version = try? JSONDecoder().decode(SnippetFileVersion.self, from: data).version,
+           version > SnippetFile.currentVersion {
+            // Written by a newer release. Leave it as it is, and do not save over it.
+            NSLog("Library: snippets.json was written by a newer version of Library, so changes to snippets are not saved")
+            saveBlocked = true
             return
         }
-        snippets = loaded
+        if let loaded = try? JSONDecoder().decode(SnippetFile.self, from: data) {
+            snippets = loaded.snippets
+            return
+        }
+        // Files from before the version was added hold a bare list.
+        if let loaded = try? JSONDecoder().decode([Snippet].self, from: data) {
+            snippets = loaded
+            return
+        }
+        // Like a damaged bookmarks.json: keep the file aside for inspection and start with no snippets.
+        let damaged = file.deletingLastPathComponent().appendingPathComponent("snippets-damaged.json")
+        try? FileManager.default.removeItem(at: damaged)
+        try? FileManager.default.moveItem(at: file, to: damaged)
+        NSLog("Library: snippets.json could not be read, so it was moved to snippets-damaged.json")
     }
 
     func add(_ snippet: Snippet) {
@@ -85,7 +109,8 @@ final class SnippetStore: ObservableObject {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         do {
             try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try encoder.encode(snippets).write(to: file, options: .atomic)
+            let contents = SnippetFile(version: SnippetFile.currentVersion, snippets: snippets)
+            try encoder.encode(contents).write(to: file, options: .atomic)
         } catch {
             NSLog("Library could not save snippets.json: \(error.localizedDescription)")
         }
