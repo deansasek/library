@@ -6,7 +6,7 @@ import Foundation
 /// `LinkCheck.timeout`. Foundation only, so a harness outside the app can run it.
 enum LinkProbe {
     static func check(_ url: URL, version: String) async -> LinkStatus.Kind {
-        guard WebFetch.isWeb(url) else { return .unreachable }
+        guard await WebFetch.isAllowed(url) else { return .unreachable }
         let head = await fetch(url, method: "HEAD", version: version)
         guard LinkCheck.retriesWithGET(afterHEAD: head.statusCode) else {
             return LinkCheck.outcome(statusCode: head.statusCode, redirectRefused: head.refused)
@@ -50,7 +50,8 @@ final class RedirectGate: NSObject, URLSessionTaskDelegate, @unchecked Sendable 
 
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
-        if LinkCheck.followsRedirect(after: followed, from: response.url, to: request.url) {
+        if LinkCheck.followsRedirect(after: followed, from: response.url, to: request.url),
+           request.url.map({ !WebFetch.isLocalTarget($0) }) == true {
             followed += 1
             completionHandler(request)
         } else {
