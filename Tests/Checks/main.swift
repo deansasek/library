@@ -1022,14 +1022,17 @@ check(Favicon.failureWindow == 24 * 60 * 60, "failure window is 24 h")
 
 // ---- stale Terminal command files (pure; no files touched) ----
 let commandNow = Date(timeIntervalSince1970: nowStamp)
+let oldCommand = "library-\(UUID().uuidString).command"
 let commandFiles: [(name: String, modified: Date)] = [
-    ("library-old.command", commandNow.addingTimeInterval(-3601)),
-    ("library-fresh.command", commandNow.addingTimeInterval(-600)),
-    ("library-edge.command", commandNow.addingTimeInterval(-3600)),
-    ("other-old.command", commandNow.addingTimeInterval(-7200)),
-    ("library-old.txt", commandNow.addingTimeInterval(-7200)),
+    (oldCommand, commandNow.addingTimeInterval(-3601)),
+    ("library-\(UUID().uuidString).command", commandNow.addingTimeInterval(-600)),
+    ("library-\(UUID().uuidString).command", commandNow.addingTimeInterval(-3600)),
+    ("other-\(UUID().uuidString).command", commandNow.addingTimeInterval(-7200)),
+    ("library-\(UUID().uuidString).txt", commandNow.addingTimeInterval(-7200)),
+    ("library-notes.command", commandNow.addingTimeInterval(-7200)),
+    ("library-old.command.bak", commandNow.addingTimeInterval(-7200)),
 ]
-check(staleCommandFiles(among: commandFiles, now: commandNow) == ["library-old.command"], "only old library command files are stale")
+check(staleCommandFiles(among: commandFiles, now: commandNow) == [oldCommand], "only old library command files with a UUID name are stale")
 // ---- SF Symbols: every name the app asks for resolves ----
 // The scan reads the app's Swift files, so a symbol added or renamed in source is checked without editing this file.
 // Names the code builds at runtime (no string literal in the argument) are listed below with the reason they are safe.
