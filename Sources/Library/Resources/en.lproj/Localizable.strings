@@ -317,6 +317,9 @@
 /* Alert or dialog text. */
 "Applications already has a different app named Library.app. Move it out of the way yourself, then try again. Nothing was changed." = "Applications already has a different app named Library.app. Move it out of the way yourself, then try again. Nothing was changed.";
 
+/* Alert or dialog text. */
+"Library was copied to Applications, but the new copy could not be started. This copy keeps running. Open Library from Applications." = "Library was copied to Applications, but the new copy could not be started. This copy keeps running. Open Library from Applications.";
+
 /* VoiceOver label for a Manage row: the shortcut that opens it, such as "⌘⇧K". */
 "shortcut %@" = "shortcut %@";
 
