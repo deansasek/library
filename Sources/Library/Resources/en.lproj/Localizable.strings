@@ -346,3 +346,9 @@
 
 /* VoiceOver label for a copied image in Quick Open. */
 "Copied image" = "Copied image";
+
+/* VoiceOver announcement when Open Clipboard Link finds no link on the clipboard. */
+"The clipboard has no link to open." = "The clipboard has no link to open.";
+
+/* VoiceOver announcement when a clipboard item cannot be added to the library. */
+"This clipboard item can’t be added to the library." = "This clipboard item can’t be added to the library.";
