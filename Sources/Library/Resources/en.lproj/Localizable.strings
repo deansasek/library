@@ -390,3 +390,15 @@
 "Up to date" = "Up to date";
 "Waiting for iCloud…" = "Waiting for iCloud…";
 "Uploading…" = "Uploading…";
+
+/* Quick Open preview of a CSV or TSV file: the table is cut at this many rows and bytes. */
+"Showing the first %lld rows and the first 64 KB. The rest of the file is not shown." = "Showing the first %lld rows and the first 64 KB. The rest of the file is not shown.";
+
+/* Quick Open preview of a CSV or TSV file: the table is cut at this many columns. */
+"Showing the first %lld columns." = "Showing the first %lld columns.";
+
+/* Quick Open preview of a CSV or TSV file that is too large to read. */
+"This file is larger than 25 MB, so it is not previewed." = "This file is larger than 25 MB, so it is not previewed.";
+
+/* Quick Open preview of a file that cannot be read or is not a regular file. */
+"This file can't be previewed." = "This file can't be previewed.";

@@ -167,6 +167,10 @@ struct QuickOpenView: View {
                         Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                     }
                 }
+                // A single file shows its contents. Several files show only their names.
+                if item.fileURLs.count == 1, let url = item.fileURLs.first {
+                    FilePreviewView(url: url)
+                }
             case .other:
                 Text("\(item.representations.first?.count ?? 0) formats")
                     .foregroundStyle(.secondary)
