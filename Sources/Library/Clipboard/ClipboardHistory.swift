@@ -491,11 +491,22 @@ final class ClipboardHistory: ObservableObject {
         pasteboard.setString(text, forType: .string)
     }
 
-    func togglePin(_ item: ClipItem) {
-        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+    /// Pins or unpins an item. Pinning is refused, and says so, when the pinned items would pass the total size limit.
+    @discardableResult
+    func togglePin(_ item: ClipItem) -> Bool {
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return false }
+        if !items[index].pinned {
+            let pinnedBytes = items.reduce(0) { $0 + ($1.pinned ? $1.byteCount : 0) }
+            guard HistoryRestart.canPin(byteCount: items[index].byteCount, pinnedBytes: pinnedBytes) else {
+                NSSound.beep()
+                AccessibilityNotification.Announcement(String(localized: "Pinned clips can’t total more than 200 MB. Unpin a clip to make room.", bundle: L10n.bundle)).post()
+                return false
+            }
+        }
         items[index].pinned.toggle()
         savePinned()
         scheduleHistorySave()
+        return true
     }
 
     func remove(_ item: ClipItem) {
