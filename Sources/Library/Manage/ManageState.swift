@@ -30,6 +30,8 @@ final class ManageState: ObservableObject {
     @Published var pendingPurge: Set<UUID>?
     /// The text in the window's search field. Separate from `search`, which filters the app picker.
     @Published var query = ""
+    /// The search field's scope bar. It narrows the results of `query`.
+    @Published var scope = SearchScope.all
     /// The search result for `query`, kept between redraws.
     let searches = SearchCache()
 

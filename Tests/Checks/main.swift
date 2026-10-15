@@ -2464,5 +2464,26 @@ let sortKeys: [ManageState.SortKey] = [.name, .shortcut, .path, .mostUsed, .rece
 check(sortKeys.allSatisfy { ManageState.SortKey(rawValue: $0.rawValue) == $0 }, "every sort key round-trips through its saved raw value")
 check(ManageState.SortKey(rawValue: "") == nil && ManageState.SortKey(rawValue: "gone") == nil, "an unknown saved sort key is ignored")
 
+// Search scopes narrow the same results the query does.
+let scopedTree = tree()
+check(scopedTree.matching("", scope: .all).leaves.count == scopedTree.leaves.count && scopedTree.matching("", scope: .all).folderCount == 2,
+      "the All scope with no query keeps everything")
+check(scopedTree.matching("", scope: .apps).leaves.map(\.name) == ["Safari"], "the Apps scope keeps only apps")
+check(scopedTree.matching("", scope: .bookmarks).leaves.map(\.name) == ["Jira", "Docs"], "the Bookmarks scope keeps only bookmarks")
+check(scopedTree.matching("", scope: .commands).isEmpty, "the Commands scope is empty when there are no commands")
+check(scopedTree.matching("", scope: .folders).folderCount == 2 && scopedTree.matching("", scope: .folders).leaves.isEmpty,
+      "the Folders scope keeps folders and no items")
+check(scopedTree.matching("docs", scope: .bookmarks).leaves.map(\.name) == ["Docs"], "a query and a scope narrow together")
+check(scopedTree.matching("safari", scope: .bookmarks).isEmpty, "a query match outside the scope is not shown")
+check(scopedTree.matching("jira", scope: .apps).isEmpty, "a bookmark does not match the Apps scope")
+check(scopedTree.matching("work", scope: .bookmarks).leaves.map(\.name) == ["Jira", "Docs"], "a folder whose name matches keeps its bookmarks in the scope")
+check(scopedTree.matching("docs", scope: .folders).isEmpty, "the Folders scope shows no bookmarks for a query")
+check(scopedTree.searchSuggestions(for: "") == [] && scopedTree.searchSuggestions(for: "doc") == ["Docs"],
+      "suggestions are names that match the query, and none for an empty query")
+let cache = SearchCache()
+check(cache.result(for: "", scope: .apps, revision: 1, in: scopedTree).count == 1
+      && cache.result(for: "", scope: .folders, revision: 1, in: scopedTree).count == 2,
+      "the cached result follows the scope")
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

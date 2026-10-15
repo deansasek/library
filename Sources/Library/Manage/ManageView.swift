@@ -202,8 +202,8 @@ struct ManageView: View {
 
     private func list(pathWidth: CGFloat) -> some View {
         // The search runs once per change to the query or the library, not on every redraw.
-        let found = state.searches.result(for: state.query, revision: store.revision, in: store.nodes)
-        let trashed = store.deleted.matching(state.query)
+        let found = state.searches.result(for: state.query, scope: state.scope, revision: store.revision, in: store.nodes)
+        let trashed = store.deleted.matching(state.query, scope: state.scope)
         let reading = ReadingList.ordered(found.tree.leaves)
         let shown = found.count
         // Rows the search hid must not stay selected: Delete and Get Info act on the selection.
@@ -214,6 +214,17 @@ struct ManageView: View {
         .listStyle(.inset(alternatesRowBackgrounds: true))
         .navigationSubtitle("\(shown) \(shown == 1 ? "item" : "items")")
         .searchable(text: $state.query, placement: .toolbar, prompt: "Name, URL, command, or keyword")
+        .searchScopes($state.scope) {
+            ForEach(SearchScope.allCases, id: \.self) { scope in
+                Text(scope.title).tag(scope)
+            }
+        }
+        .searchSuggestions {
+            // Names of matching items, so a click fills in the field with that name.
+            ForEach(store.nodes.searchSuggestions(for: state.query), id: \.self) { name in
+                Text(name).searchCompletion(name)
+            }
+        }
         .focusedSceneValue(\.manageState, state)
         .onAppear { store.undoManager = undoManager }
         .overlay {
@@ -237,6 +248,7 @@ struct ManageView: View {
             }
         }
         .onChange(of: state.query) { _, _ in state.selection.formIntersection(visible) }
+        .onChange(of: state.scope) { _, _ in state.selection.formIntersection(visible) }
         // An undo, a removal, or a sync can take a selected item out of both the library and Recently Deleted. Delete and
         // Get Info act on the selection, so such an item is dropped from it, and the commands follow the pruned set.
         .onChange(of: store.revision) { _, _ in
