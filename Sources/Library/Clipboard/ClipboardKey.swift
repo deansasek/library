@@ -46,6 +46,18 @@ enum ClipboardKey {
         ]
     }
 
+    /// Deletes the stored key, so the next call makes a new one. Pinned items sealed with the old key cannot be read after
+    /// this, so the caller removes them too. Used only by the user's Reset Clipboard Key.
+    static func reset() {
+        cache.withLock { $0 = nil }
+        SecItemDelete(query() as CFDictionary)
+    }
+
+    /// A key is exactly 32 bytes. Any other stored size is corrupt, so it is never used.
+    static func isValidKeyData(_ data: Data) -> Bool {
+        data.count == 32
+    }
+
     private static func read() throws -> SymmetricKey? {
         var lookup = query()
         lookup[kSecReturnData as String] = true
@@ -53,14 +65,20 @@ enum ClipboardKey {
         var result: AnyObject?
         let status = SecItemCopyMatching(lookup as CFDictionary, &result)
         if status == errSecItemNotFound { return nil }
-        guard status == errSecSuccess, let data = result as? Data, data.count == 32 else {
+        guard status == errSecSuccess, let data = result as? Data else {
             throw KeychainError(status: status)
         }
+        guard isValidKeyData(data) else { throw CorruptKeyError() }
         return SymmetricKey(data: data)
     }
 
     struct KeychainError: Error, CustomStringConvertible {
         let status: OSStatus
         var description: String { "Keychain error \(status)" }
+    }
+
+    /// The stored item is not a 32-byte key. Pinned items cannot be opened with it, and only a reset replaces it.
+    struct CorruptKeyError: Error, CustomStringConvertible {
+        var description: String { "The stored clipboard key is not 32 bytes" }
     }
 }

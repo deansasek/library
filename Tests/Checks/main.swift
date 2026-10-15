@@ -782,6 +782,10 @@ MainActor.assumeIsolated {
     // A paste goes back to the app that had the keyboard, and never to Library itself.
     check(FrontApp.canPaste(toProcess: 42, ownProcess: 7), "a paste may go to another app")
     check(!FrontApp.canPaste(toProcess: 7, ownProcess: 7), "a paste never goes to Library")
+    // A stored clipboard key must be exactly 32 bytes; any other size is corrupt and never used.
+    check(ClipboardKey.isValidKeyData(Data(repeating: 1, count: 32)), "a 32-byte clipboard key is valid")
+    check(!ClipboardKey.isValidKeyData(Data(repeating: 1, count: 31)), "a clipboard key of the wrong size is corrupt")
+    check(!ClipboardKey.isValidKeyData(Data()), "an empty clipboard key is corrupt")
 
     for index in 1...12 { copy("menu copy \(index)") }
     let (menu, target) = PopupMenu.makeClipboardMenu(history: history, suggestion: nil, pastes: false)
