@@ -388,6 +388,8 @@ final class ClipboardHistory: ObservableObject {
             NSLog("Library: pinned clipboard items were not saved, because clipboard.json was not opened this launch")
             return
         }
+        // Only the copy of the clips is made here. Sealing them can wait for the Keychain, so it runs on the write
+        // queue, in the order the saves were requested.
         let clips = items.filter(\.pinned).map { item in
             PinnedFile.Clip(source: item.sourceApp, date: item.date, representations: item.representations.map { representation in
                 Dictionary(uniqueKeysWithValues: representation.map { ($0.key.rawValue, $0.value) })
@@ -397,17 +399,18 @@ final class ClipboardHistory: ObservableObject {
             Self.writeQueue.async { try? FileManager.default.removeItem(at: file) }
             return
         }
-        let data: Data
-        do {
-            data = try PinnedFile.encode(clips, key: loadKey())
-        } catch {
-            NSLog("Library: pinned clipboard items were not saved, because the key is unavailable: \(error)")
-            return
-        }
+        let loadKey = self.loadKey
         // The temporary file is private from the moment it is created, then renamed over the old one, so the
         // text is never readable by anyone else, not even briefly.
         let temporary = file.deletingLastPathComponent().appendingPathComponent(".clipboard-\(UUID().uuidString).tmp")
         Self.writeQueue.async {
+            let data: Data
+            do {
+                data = try PinnedFile.encode(clips, key: loadKey())
+            } catch {
+                NSLog("Library: pinned clipboard items were not saved, because the key is unavailable: \(error)")
+                return
+            }
             guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return }
             if rename(temporary.path, file.path) != 0 { try? FileManager.default.removeItem(at: temporary) }
         }
