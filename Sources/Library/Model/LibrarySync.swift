@@ -207,6 +207,18 @@ enum LibrarySync {
     }
 
     /// Marks the conflict versions resolved and removes the rest, after the user has chosen and the choice is saved.
+    /// Copies every conflict version to `folder` before any of them is removed. Two or more diverged copies can hold
+    /// edits the chosen version does not include, so none is deleted without a copy kept on this Mac.
+    static func preserve(_ versions: [NSFileVersion], in folder: URL) throws {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
+        let stamp = ISO8601DateFormatter().string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        for (index, version) in versions.enumerated() {
+            let copy = folder.appendingPathComponent("bookmarks-\(stamp)-\(index).json")
+            try FileManager.default.copyItem(at: version.url, to: copy)
+        }
+    }
+
     static func resolveConflicts(_ versions: [NSFileVersion], at url: URL) throws {
         for version in versions { version.isResolved = true }
         try NSFileVersion.removeOtherVersionsOfItem(at: url)
