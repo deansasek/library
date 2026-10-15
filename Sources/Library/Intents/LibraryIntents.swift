@@ -69,6 +69,8 @@ struct AddBookmarkIntent: AppIntent {
             throw LibraryIntentError("That is not a web link.")
         }
         LibraryStore.shared.perform("Add Bookmark") { $0.append(node, to: nil) }
+        // Same as adding from the menus: the name comes from the page when the setting is on.
+        if let page = node.link { SmartTitle.nameFromPage(node.id, url: page) }
         return .result(dialog: "Added \(node.name) to Library.")
     }
 }
