@@ -1957,5 +1957,38 @@ do {
     try? FileManager.default.removeItem(at: folder)
 }
 
+
+
+// ---- undo in the library store (the real store, in a temporary library folder) ----
+let storeHome = FileManager.default.temporaryDirectory.appendingPathComponent("library-store-checks-\(UUID().uuidString)", isDirectory: true)
+setenv("LIBRARY_HOME", storeHome.path, 1)
+let undoStore = LibraryStore()
+let undoLog = UndoManager()
+// Every change is grouped by hand, so a whole check runs in one run loop turn and still has one step per action.
+undoLog.groupsByEvent = false
+undoStore.undoManager = undoLog
+/// Runs one user action as its own undo step, the way a menu action or a finished rename does.
+@MainActor func step(_ body: () -> Void) {
+    undoLog.beginUndoGrouping()
+    body()
+    undoLog.endUndoGrouping()
+}
+
+// A rename whose item is deleted while the field is open does not restore the copy from before the delete.
+let renamedA = LibraryItem(name: "A", url: "https://a.example.com")
+let renamedB = LibraryItem(name: "B", url: "https://b.example.com")
+step { undoStore.nodes = [renamedA, renamedB] }
+undoLog.removeAllActions()
+step { undoStore.rename(renamedA.id, to: "A2") }
+step { undoStore.delete([renamedA.id]) }
+step {
+    undoStore.rename(renamedB.id, to: "B2")
+    undoStore.endRename()
+}
+undoLog.undo()
+check(undoStore.nodes.map(\.name) == ["B"] && undoStore.deleted.map(\.id) == [renamedA.id],
+      "a rename after its item was deleted does not undo the delete: \(undoStore.nodes.map(\.name))")
+try? FileManager.default.removeItem(at: storeHome)
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)

@@ -124,6 +124,8 @@ final class LibraryStore: ObservableObject {
     private var undoSuppressed = false
     private var loadingFromDisk = false
     private var renameBase: LibrarySync.Contents?
+    /// The item whose rename `renameBase` belongs to.
+    private var renamingID: UUID?
 
     /// The shortcuts that register: the extras, and each item's shortcuts with the item they open.
     private struct HotKeyLayout: Equatable {
@@ -275,6 +277,7 @@ final class LibraryStore: ObservableObject {
         undoManager?.removeAllActions()
         // A rename in progress would otherwise undo back to the copy from before this reload.
         renameBase = nil
+        renamingID = nil
     }
 
     /// Records that the file now matches the library, so later edits are the only unsynced changes.
@@ -353,6 +356,7 @@ final class LibraryStore: ObservableObject {
         undoSuppressed = false
         undoManager?.removeAllActions()
         renameBase = nil
+        renamingID = nil
         guard writeLibrary() else { return }
         guard !versions.isEmpty else { return }
         // Keep a copy of every conflict version first. If the copy fails, the versions stay for the next check.
@@ -566,7 +570,10 @@ final class LibraryStore: ObservableObject {
 
     /// Renames without one undo step per keystroke. `endRename` records a single step.
     func rename(_ id: UUID, to name: String) {
+        // A different item's rename ends the one in progress, so its old base is never reused.
+        if renamingID != id { endRename() }
         renameBase = renameBase ?? contents
+        renamingID = id
         undoSuppressed = true
         var edited = nodes
         edited.update(id) { $0.name = name }
@@ -574,9 +581,14 @@ final class LibraryStore: ObservableObject {
         undoSuppressed = false
     }
 
+    /// Records the rename as one undo step. Nothing is recorded when the renamed item is gone, since restoring the
+    /// base would also bring back whatever changed after it.
     func endRename() {
-        guard let base = renameBase else { return }
+        let base = renameBase
+        let id = renamingID
         renameBase = nil
+        renamingID = nil
+        guard let base, let id, nodes.node(withID: id) != nil else { return }
         registerUndo(restoring: base)
         undoManager?.setActionName("Rename")
     }
