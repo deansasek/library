@@ -1,7 +1,7 @@
 import AppKit
 
-// Timings for the changes of the security and performance audit (docs/audit-2026-10.md). Printing only, never
-// failing, like the rest of Tests/Bench. The "before" rows run the code the fix replaced, where that code still exists.
+// Timings for the changes of the security and performance audit of October 2026. Printing only, never failing, like the
+// rest of Tests/Bench. The "before" rows run the code the fix replaced, where that code still exists.
 
 /// Holds the result of `blockingRun`, written on another thread before the main thread reads it.
 private final class ResultBox<T>: @unchecked Sendable {
