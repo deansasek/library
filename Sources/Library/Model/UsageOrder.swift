@@ -26,6 +26,22 @@ enum UsageOrder {
         ordered(items) { opened[$0.id.uuidString]?.timeIntervalSince1970 }
     }
 
+    /// Applies `order` to each run of nodes between dividers. Dividers keep their places, so no node moves across one.
+    static func withinSections(_ nodes: [LibraryItem], _ order: ([LibraryItem]) -> [LibraryItem]) -> [LibraryItem] {
+        var result: [LibraryItem] = []
+        var section: [LibraryItem] = []
+        for node in nodes {
+            if node.isDivider == true {
+                result += order(section)
+                result.append(node)
+                section = []
+            } else {
+                section.append(node)
+            }
+        }
+        return result + order(section)
+    }
+
     private static func positive(_ value: Double?) -> Double? {
         guard let value, value > 0 else { return nil }
         return value

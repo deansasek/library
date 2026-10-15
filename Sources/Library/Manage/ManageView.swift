@@ -86,13 +86,16 @@ struct ManageView: View {
             return node
         }
         if key == .mostUsed || key == .recentlyOpened {
-            // Folders keep their places first, as they do in the other orders. Items are ordered by their use.
-            let folders = result.filter(\.isFolder)
-            let items = result.filter { !$0.isFolder }
-            let ordered = key == .mostUsed
-                ? UsageOrder.mostUsed(items, counts: store.openCounts)
-                : UsageOrder.recentlyOpened(items, opened: store.lastOpened)
-            return folders + ordered
+            // Within each section between dividers, folders keep their places first, as they do in the other orders, and
+            // the items are ordered by their use. A divider stays where it is, so no item moves across it.
+            return UsageOrder.withinSections(result) { section in
+                let folders = section.filter(\.isFolder)
+                let items = section.filter { !$0.isFolder }
+                let ordered = key == .mostUsed
+                    ? UsageOrder.mostUsed(items, counts: store.openCounts)
+                    : UsageOrder.recentlyOpened(items, opened: store.lastOpened)
+                return folders + ordered
+            }
         }
         result.sort { a, b in
             if a.isFolder != b.isFolder { return a.isFolder }

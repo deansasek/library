@@ -1771,6 +1771,11 @@ let opened: [String: Date] = [
 check(names(UsageOrder.recentlyOpened(treeOrder, opened: opened)) == ["C", "B", "D", "A", "E"],
       "recently opened: most recent first, equal dates keep tree order, never opened last")
 check(names(UsageOrder.recentlyOpened(treeOrder, opened: [:])) == ["A", "B", "C", "D", "E"], "nothing opened keeps the tree order by date too")
+// Sections between dividers: an item opened most stays in its own section, and the divider keeps its place.
+let sectionTree = [orderA, LibraryItem(name: "Work", isDivider: true), orderB, orderC]
+let sectionCounts = [orderC.id.uuidString: 5]
+let sectioned = UsageOrder.withinSections(sectionTree) { UsageOrder.mostUsed($0, counts: sectionCounts) }
+check(sectioned.map(\.name) == ["A", "Work", "C", "B"], "most used stays inside its section, and the divider does not move: \(sectioned.map(\.name))")
 // ---- clipboard history kept across restarts. The pure rules first, then a private pasteboard, a temporary folder and a test key ----
 func historyFixture(_ digest: String, _ kind: ClipItem.Kind = .text, bytes: Int = 10, date: Date, pinned: Bool = false) -> ClipItem {
     ClipItem(representations: [], digest: digest, kind: kind, title: digest, plainText: nil, link: nil, thumbnail: nil,
