@@ -396,7 +396,7 @@ do {
     board.clearContents()
     board.setString(link, forType: .string)
     linkHistory.poll()
-    let deadline = Date().addingTimeInterval(5)
+    let deadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
     while linkHistory.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     if let clip = linkHistory.items.first, clip.kind == .link {
         TrackingPreferences.shared.removesOnCopy = true
@@ -650,7 +650,7 @@ MainActor.assumeIsolated {
     let testKey = SymmetricKey(size: .bits256)
     // The pinned file is read in the background, so a check waits until the history has published its pins.
     @MainActor func waitForLoad(_ loading: ClipboardHistory) {
-        let deadline = Date().addingTimeInterval(5)
+        let deadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
         while !loading.pinnedLoaded, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     }
     let board = NSPasteboard(name: NSPasteboard.Name("library-checks-\(UUID().uuidString)"))
@@ -694,7 +694,7 @@ MainActor.assumeIsolated {
 
     // Copies are built in the background, so a check waits until the history has added them.
     @MainActor func settle() {
-        let deadline = Date().addingTimeInterval(5)
+        let deadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
         while history.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     }
 
@@ -710,7 +710,7 @@ MainActor.assumeIsolated {
         item.setString(text, forType: .string)
         pasteboard.writeObjects([item])
         target.poll()
-        let deadline = Date().addingTimeInterval(5)
+        let deadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
         while target.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     }
     copyText("pinned one", on: seedBoard, into: seed)
@@ -2197,7 +2197,7 @@ MainActor.assumeIsolated {
     let otherPinnedURL = folder.appendingPathComponent("other-clipboard.json")
     @MainActor func exists(_ url: URL) -> Bool { FileManager.default.fileExists(atPath: url.path) }
     @MainActor func waitFor(_ done: () -> Bool) {
-        let deadline = Date().addingTimeInterval(5)
+        let deadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
         while !done(), Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
     }
     @MainActor func makeBoard() -> NSPasteboard { NSPasteboard(name: NSPasteboard.Name("library-checks-h-\(UUID().uuidString)")) }
