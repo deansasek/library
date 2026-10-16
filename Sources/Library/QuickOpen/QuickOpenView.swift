@@ -23,7 +23,7 @@ struct QuickOpenView: View {
                     .font(.title2)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
-                TextField("Library Search", text: $model.query)
+                TextField(String(localized: "Search Library", bundle: L10n.bundle), text: $model.query)
                     .textFieldStyle(.plain)
                     .font(.title2.weight(.light))
                     .accessibilityLabel("Search Library")

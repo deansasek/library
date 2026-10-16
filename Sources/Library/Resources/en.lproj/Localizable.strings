@@ -467,3 +467,6 @@
 
 /* Alert title when Library cannot unregister from opening at login. */
 "Library Can’t Stop Opening at Login" = "Library Can’t Stop Opening at Login";
+
+/* Placeholder in the Quick Open search field, which searches everything in the library. */
+"Search Library" = "Search Library";
