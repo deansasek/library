@@ -110,18 +110,31 @@ struct QuickOpenView: View {
             .padding(.bottom, 4)
     }
 
+    /// Rows sit 8 pt in from the card's sides, as the old hand-drawn list did. The panel's own key handling runs before
+    /// List sees a key (see QuickOpenPanel.sendEvent), so List's keyboard handling never takes arrows, Return, and so on.
+    private static let rowInsets = EdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
+
     private func resultsList(_ results: [QuickOpenResult]) -> some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
-                        if let title = result.section { header(title) }
-                        row(result, index: index, selected: result.id == model.selection)
-                            .id(result.id)
+            List(selection: $model.selection) {
+                ForEach(Array(results.enumerated()), id: \.element.id) { index, result in
+                    if let title = result.section {
+                        header(title)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .listRowInsets(Self.rowInsets)
+                            .listRowSeparator(.hidden)
+                            .selectionDisabled()
                     }
+                    row(result, index: index, selected: result.id == model.selection)
+                        .tag(result.id)
+                        .id(result.id)
+                        .listRowInsets(Self.rowInsets)
+                        .listRowSeparator(.hidden)
                 }
-                .padding(8)
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.vertical, 8, for: .scrollContent)
             .onChange(of: model.selection) { _, id in
                 if let id, !model.selectedByHover { proxy.scrollTo(id) }
             }
@@ -256,6 +269,21 @@ struct QuickOpenView: View {
         return LibraryItem.colorAccessibilityName(for: node) ?? ""
     }
 
+    /// A row's VoiceOver label: its title, then its subtitle.
+    private func rowLabel(for result: QuickOpenResult) -> String {
+        [result.displayTitle, result.subtitle].filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
+    /// A row's VoiceOver value: its note, its color tag, and its Command-number shortcut where it has one.
+    private func rowValue(for result: QuickOpenResult, index: Int) -> String {
+        var parts: [String] = []
+        if let note = result.noteLine, !note.isEmpty { parts.append(note) }
+        let tag = tagName(for: result)
+        if !tag.isEmpty { parts.append(tag) }
+        if index < 9 { parts.append("Command \(index + 1)") }
+        return parts.joined(separator: ", ")
+    }
+
     /// The action's title, with its symbol when it has one. Actions without a symbol keep plain text.
     @ViewBuilder
     private func actionLabel(_ action: QuickOpenAction) -> some View {
@@ -301,14 +329,14 @@ struct QuickOpenView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+        // The List draws the selection highlight. The row only sets the text color for it.
         .foregroundStyle(selected ? selectedText : Color.primary)
-        .background(selected ? Color(nsColor: .selectedContentBackgroundColor) : .clear,
-                    in: RoundedRectangle(cornerRadius: 12))
         .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(rowLabel(for: result))
+        .accessibilityValue(rowValue(for: result, index: index))
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .accessibilityValue(tagName(for: result))
         .draggable(model.dragPayload(for: result))
         .onDragSessionUpdated { _ in MainActor.assumeIsolated { model.isDragging = true } }
         .onContinuousHover { phase in
