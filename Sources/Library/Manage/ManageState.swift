@@ -1,5 +1,25 @@
 import SwiftUI
 
+/// Get Info for an item chosen in a menu. The Library window may not be open yet, so the request waits here until
+/// the window takes it when it appears, or is told by the notification when it is already open.
+@MainActor
+enum EditRequest {
+    static let notification = Notification.Name("LibraryEditRequested")
+    private static var pending: UUID?
+
+    static func post(_ id: UUID) {
+        pending = id
+        NotificationCenter.default.post(name: notification, object: nil)
+    }
+
+    /// The waiting request, if any. It is taken once.
+    static func take() -> UUID? {
+        let id = pending
+        pending = nil
+        return id
+    }
+}
+
 enum IconTab: String, CaseIterable {
     case symbols = "Symbols"
     case emoji = "Emoji"
