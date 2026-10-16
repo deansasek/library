@@ -88,10 +88,15 @@ struct MenuContent: View {
             }
         }
         Button {
-            openWindow(id: "manage")
             NSApp.activate(ignoringOtherApps: true)
+            NSApp.orderFrontStandardAboutPanel(options: [
+                .credits: NSAttributedString(
+                    string: "Your bookmarks, apps, and clipboard history, one shortcut away.",
+                    attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+                                 .foregroundColor: NSColor.secondaryLabelColor]),
+            ])
         } label: {
-            Label { Text("Edit Library…", bundle: L10n.bundle) } icon: { Image(systemName: "books.vertical") }
+            Text("About Library", bundle: L10n.bundle)
         }
         Button {
             NSApp.activate(ignoringOtherApps: true)
@@ -100,6 +105,12 @@ struct MenuContent: View {
             Label { Text("Settings…", bundle: L10n.bundle) } icon: { Image(systemName: "gearshape") }
         }
         .keyboardShortcut(",")
+        Button {
+            openWindow(id: "manage")
+            NSApp.activate(ignoringOtherApps: true)
+        } label: {
+            Label { Text("Edit Library…", bundle: L10n.bundle) } icon: { Image(systemName: "books.vertical") }
+        }
         Divider()
         Toggle(isOn: Binding(
             get: { loginItem.isEnabled },
@@ -128,17 +139,6 @@ struct MenuContent: View {
             Button("Support Library…") { NSWorkspace.shared.open(HelpCommands.support) }
         } label: {
             Text("Help", bundle: L10n.bundle)
-        }
-        Button {
-            NSApp.activate(ignoringOtherApps: true)
-            NSApp.orderFrontStandardAboutPanel(options: [
-                .credits: NSAttributedString(
-                    string: "Your bookmarks, apps, and clipboard history, one shortcut away.",
-                    attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
-                                 .foregroundColor: NSColor.secondaryLabelColor]),
-            ])
-        } label: {
-            Text("About Library", bundle: L10n.bundle)
         }
         Button {
             NSApp.terminate(nil)
