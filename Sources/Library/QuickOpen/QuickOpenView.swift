@@ -28,18 +28,17 @@ struct QuickOpenView: View {
                     .font(.title2.weight(.light))
                     .accessibilityLabel("Search Library")
                     .focused($focused)
-                if !model.showActions, model.selected?.hasActions == true {
-                    Button {
-                        model.toggleActions()
+                if !model.showActions, let selected = model.selected, selected.hasActions {
+                    // Tab runs the same actions from the keyboard. The menu lists the actions of the context menu.
+                    Menu {
+                        actionMenuContent(model.actions(for: selected))
                     } label: {
-                        HStack(spacing: 4) {
-                            Text("Actions")
-                            Text("⇥")
-                                .foregroundStyle(.tertiary)
-                        }
-                        .font(.callout)
+                        Image(systemName: "ellipsis.circle")
+                            .font(.title2)
                     }
-                    .buttonStyle(.plain)
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
                     .foregroundStyle(.secondary)
                     .help("Show actions for the selected item (Tab)")
                     .accessibilityLabel("Actions")
@@ -321,21 +320,28 @@ struct QuickOpenView: View {
         }
         .contextMenu {
             // Right-click shows the same actions as Tab.
-            ForEach(model.actions(for: result)) { action in
-                if action.children.isEmpty {
-                    Button {
-                        close()
-                        action.run()
-                    } label: {
-                        actionLabel(action)
-                    }
-                } else {
-                    Menu(action.title) {
-                        ForEach(action.children) { child in
-                            Button(child.title) {
-                                close()
-                                child.run()
-                            }
+            actionMenuContent(model.actions(for: result))
+        }
+    }
+
+    /// Buttons for each action, with a submenu for an action that has children. Shared by the row's context menu and
+    /// the actions button.
+    @ViewBuilder
+    private func actionMenuContent(_ actions: [QuickOpenAction]) -> some View {
+        ForEach(actions) { action in
+            if action.children.isEmpty {
+                Button {
+                    close()
+                    action.run()
+                } label: {
+                    actionLabel(action)
+                }
+            } else {
+                Menu(action.title) {
+                    ForEach(action.children) { child in
+                        Button(child.title) {
+                            close()
+                            child.run()
                         }
                     }
                 }
