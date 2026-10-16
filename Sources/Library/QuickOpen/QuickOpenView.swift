@@ -173,7 +173,7 @@ struct QuickOpenView: View {
                     Label {
                         Text(url.lastPathComponent)
                     } icon: {
-                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                        Image(nsImage: appIcon(at: url.path))
                     }
                 }
                 // A single file shows its contents. Several files show only their names.

@@ -33,7 +33,7 @@ struct IconPicker: View {
         "graduationcap.fill", "briefcase.fill", "lightbulb.fill", "puzzlepiece.fill",
         "gamecontroller.fill", "sparkles", "paintbrush.fill", "cup.and.saucer.fill", "fork.knife",
         "pawprint.fill",
-    ].filter { NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil }
+    ].filter { symbolImage($0) != nil }
 
     /// Single-scalar emoji from the Unicode tables, faces first, with their Unicode names for search.
     private static let emoji: [(symbol: String, name: String)] = {

@@ -118,7 +118,7 @@ final class ClipboardLock: ObservableObject {
     /// The icon for a row or menu item. A locked item shows a lock instead of its picture or file icon.
     func icon(for item: ClipItem) -> NSImage {
         guard isHidden(item) else { return item.icon }
-        return NSImage(systemSymbolName: "lock.fill", accessibilityDescription: nil) ?? NSImage()
+        return symbolImage("lock.fill") ?? NSImage()
     }
 
     /// Runs `work` now when the item may be shown or copied, or once the user authenticates. When the prompt is
