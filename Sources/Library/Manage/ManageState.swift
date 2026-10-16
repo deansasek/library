@@ -25,6 +25,8 @@ final class ManageState: ObservableObject {
     @Published var renamingID: UUID?
     /// The row a drag is over, for the drop highlight.
     @Published var dropTarget: UUID?
+    /// True while a link or app is dragged over the list, for the list's drop outline.
+    @Published var isListDropTargeted = false
     @Published var sheet: Sheet?
     /// Items the user chose to delete for good. Set only after the confirmation is asked.
     @Published var pendingPurge: Set<UUID>?

@@ -259,7 +259,19 @@ struct ManageView: View {
         }
         .dropDestination(for: URL.self) { urls, _ in
             addDropped(urls)
+            state.isListDropTargeted = false
             return true
+        } isTargeted: { targeted in
+            state.isListDropTargeted = targeted
+        }
+        .overlay {
+            // Outlines the list while a link or app is dragged over it, the same as a row that would take the drop.
+            if state.isListDropTargeted {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+                    .padding(4)
+                    .allowsHitTesting(false)
+            }
         }
         // The id saves each item's place and whether it is shown, so the user can customize the toolbar from View > Customize Toolbar.
         .toolbar(id: "manage") {
