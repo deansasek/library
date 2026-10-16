@@ -259,14 +259,6 @@ struct ManageView: View {
         }
         // The id saves each item's place and whether it is shown, so the user can customize the toolbar from View > Customize Toolbar.
         .toolbar(id: "manage") {
-            ToolbarItem(id: "edit", placement: .primaryAction) {
-                Button("Edit…", systemImage: "pencil") {
-                    state.editSelection(in: store)
-                }
-                // Same action as Get Info, which owns ⌘I. This button has no shortcut of its own.
-                .help("Edit the selected items")
-                .disabled(state.selection.isEmpty)
-            }
             ToolbarItem(id: "add", placement: .primaryAction) {
                 Menu {
                     Button("Bookmark…") { state.present(.bookmark) }
