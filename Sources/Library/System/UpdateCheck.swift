@@ -2,6 +2,19 @@ import AppKit
 
 /// The parts of the update check that do not touch the network or the screen. Tested in Tests/Checks/main.swift.
 enum UpdateRules {
+    /// The most seconds the whole check may take, from the request to the last byte. The request timeout only counts
+    /// idle time, so a response fed slowly would otherwise hold up every later automatic check.
+    static let resourceTimeout: TimeInterval = 20
+
+    /// The configuration for the check's session: ephemeral, so nothing is cached or stored, with the whole request
+    /// capped at `resourceTimeout`.
+    static func sessionConfiguration() -> URLSessionConfiguration {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.timeoutIntervalForRequest = 10
+        configuration.timeoutIntervalForResource = resourceTimeout
+        return configuration
+    }
+
     /// The numbers in a version such as "1.10.0" or "v1.10.0". Returns nil for anything else ("latest", "1.x",
     /// "1..2", "+1.0", "1.0-beta"), so a bad tag never claims an update.
     static func numbers(_ version: String) -> [Int]? {
@@ -184,12 +197,14 @@ enum UpdateCheck {
         let defaults = UserDefaults.standard
         let storedTag = defaults.string(forKey: latestTagKey)
         var request = URLRequest(url: latestURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 10)
+        let session = URLSession(configuration: UpdateRules.sessionConfiguration())
+        defer { session.finishTasksAndInvalidate() }
         request.setValue("Library/\(currentVersion)", forHTTPHeaderField: "User-Agent")
         if let etag = UpdateRules.conditionalETag(storedETag: defaults.string(forKey: etagKey), storedTag: storedTag) {
             request.setValue(etag, forHTTPHeaderField: "If-None-Match")
         }
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else { return .failed }
             let fetch = UpdateRules.fetch(status: http.statusCode, etag: http.value(forHTTPHeaderField: "ETag"),
                                           data: data, storedTag: storedTag)
