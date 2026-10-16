@@ -383,6 +383,9 @@
 /* VoiceOver label for the progress spinner while the app list loads. */
 "Loading applications" = "Loading applications";
 
+/* VoiceOver label for the progress spinner while a file preview loads. */
+"Loading preview" = "Loading preview";
+
 /* VoiceOver label for a shortcut's record button when no action is named. The visible text is the same. */
 "Record Shortcut" = "Record Shortcut";
 
