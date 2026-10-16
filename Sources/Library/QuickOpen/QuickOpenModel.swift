@@ -12,12 +12,8 @@ final class QuickOpenModel: ObservableObject {
     private var resultsTask: Task<Void, Never>?
     /// The library's search index. Nil when the library changed since it was built, and rebuilt on the next search.
     private var index: QuickOpenIndex?
-    /// Counts changes to the library, so cached lists that depend on it are rebuilt.
-    private var nodesVersion = 0
     private var nodesObserver: AnyCancellable?
     private var snippetsObserver: AnyCancellable?
-    /// The most opened items, kept until the open counts or the library change.
-    private var frequentCache: (counts: [String: Int], version: Int, items: [LibraryItem])?
     @Published private(set) var results: [QuickOpenResult] = []
     @Published var selection: String? {
         didSet {
@@ -66,10 +62,9 @@ final class QuickOpenModel: ObservableObject {
         self.store = store
         self.selectedText = selectedText
         self.pastes = pastes
-        // Any change to the library drops the index and the frequent list. Both are rebuilt when next needed.
+        // Any change to the library drops the index. It is rebuilt when next needed.
         nodesObserver = store.$contents.dropFirst().sink { [weak self] _ in
             self?.index = nil
-            self?.nodesVersion += 1
         }
         // Snippets are part of the search index, so a change to them rebuilds it too.
         snippetsObserver = SnippetStore.shared.$snippets.dropFirst().sink { [weak self] _ in
@@ -161,15 +156,6 @@ final class QuickOpenModel: ObservableObject {
         return built
     }
 
-    /// The top of Frequently Used, recomputed only when the open counts or the library change.
-    private func frequentItems() -> [LibraryItem] {
-        let counts = store.openCounts
-        if let cache = frequentCache, cache.version == nodesVersion, cache.counts == counts { return cache.items }
-        let items = store.frequent
-        frequentCache = (counts, nodesVersion, items)
-        return items
-    }
-
     private func computeResults() -> [QuickOpenResult] {
         let text = query.trimmingCharacters(in: .whitespaces)
         let history = ClipboardHistory.shared
@@ -179,7 +165,7 @@ final class QuickOpenModel: ObservableObject {
         guard !text.isEmpty else {
             // The same Frequently Used section the menu has, first. Its ids differ from the library rows' ids,
             // so an item can sit in both without clashing.
-            var frequent = frequentItems().map { QuickOpenResult(kind: .item($0, folder: ""), id: "\($0.id.uuidString)#frequent") }
+            var frequent = store.frequent.map { QuickOpenResult(kind: .item($0, folder: ""), id: "\($0.id.uuidString)#frequent") }
             if !frequent.isEmpty { frequent[0].section = "Frequently Used" }
             return suggestion(section: "Suggested") + frequent + list
                 + clipboardResults(ClipboardHistory.shared.displayOrder.prefix(5))

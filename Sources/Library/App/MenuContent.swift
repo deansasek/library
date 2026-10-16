@@ -146,14 +146,14 @@ struct MenuItems: View {
     var topLevel = false
 
     var body: some View {
-        // Read once per build, since the list is sorted from the whole library each time it is read.
+        // Kept by the store, so a redraw does not read the whole library again.
         let frequent = topLevel ? store.frequent : []
         if !frequent.isEmpty {
             Section("Frequently Used") {
                 rows(frequent)
             }
         }
-        let reading = topLevel ? ReadingList.ordered(nodes.leaves) : []
+        let reading = topLevel ? store.readingList : []
         if !reading.isEmpty {
             Section {
                 rows(reading)

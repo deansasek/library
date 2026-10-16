@@ -26,6 +26,24 @@ enum UsageOrder {
         ordered(items) { opened[$0.id.uuidString]?.timeIntervalSince1970 }
     }
 
+    /// The open counts keyed by item id. They are stored keyed by the id's string, so this converts them once, and
+    /// drops any key that is not an id.
+    static func counts(byID stored: [String: Int]) -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for (key, count) in stored {
+            if let id = UUID(uuidString: key) { counts[id] = count }
+        }
+        return counts
+    }
+
+    /// The items for Frequently Used: opened at least twice, most opened first, at most `limit` of them.
+    static func frequent(_ items: [LibraryItem], counts: [UUID: Int], limit: Int = 5) -> [LibraryItem] {
+        items
+            .filter { (counts[$0.id] ?? 0) >= 2 }
+            .sorted { (counts[$0.id] ?? 0) > (counts[$1.id] ?? 0) }
+            .prefix(limit).map { $0 }
+    }
+
     /// Applies `order` to each run of nodes between dividers. Dividers keep their places, so no node moves across one.
     static func withinSections(_ nodes: [LibraryItem], _ order: ([LibraryItem]) -> [LibraryItem]) -> [LibraryItem] {
         var result: [LibraryItem] = []
