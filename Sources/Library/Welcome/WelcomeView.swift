@@ -353,7 +353,7 @@ struct WelcomeView: View {
                     .accessibilityLabel(String(localized: "Another app uses this shortcut", bundle: L10n.bundle))
             }
             Text(store.extraHotkeys[index]?.description ?? "Not set")
-                .font(.system(.body, design: .rounded).weight(.medium))
+                .font(.body.weight(.medium))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 3)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
