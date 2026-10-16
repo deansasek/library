@@ -240,9 +240,9 @@ func hex(_ color: RGB) -> String {
 }
 
 /// One line of text to measure. `rect` is in points from the top left of the PNG, which is `width` points wide.
-/// `semantic` is the system color the view asks for, resolved over `background` for the design value. `knownFloor` is
-/// set for a contrast the system color itself does not reach, with the reason. The check then only stops it from
-/// getting worse, and it measures the rendered pixels, because the selection color is translucent over the panel.
+/// `semantic` is the system color the view asks for, resolved over `background` for the design value. `lightSemantic`
+/// replaces it in light mode when the view uses a different color there. Text on a selection color is measured from
+/// the rendered pixels, because the selection color is translucent over the panel.
 struct TextSample {
     let screen: String
     let label: String
@@ -250,7 +250,7 @@ struct TextSample {
     let width: CGFloat
     let semantic: NSColor
     let background: NSColor
-    var knownFloor: (ratio: Double, reason: String)? = nil
+    var lightSemantic: NSColor? = nil
     /// Set when this text cannot be read in the off-screen render, with the reason. It is printed, not measured.
     var skip: String? = nil
 }
@@ -304,15 +304,13 @@ func checkContrast() {
     // Quick Open sits on glassEffect. Off screen, that glass draws the primary text black in dark mode and the
     // secondary text black in light mode, so only light-mode primary text there can be read in this render.
     let glassNote = "Quick Open sits on glassEffect, which renders its text in another color off screen, so this cannot be read here"
-    let selectedNote = "white on the translucent system selection color renders at 4.2:1 in light mode; the check only stops a drop below 4.0:1"
-    let secondaryNote = "the system secondary label color is 3.95:1 on white in light mode; a design decision, so the check only stops a drop below 3.9:1"
     let samples: [TextSample] = [
         TextSample(screen: qo, label: "selected row title", rect: CGRect(x: 70, y: 126, width: 110, height: 18), width: 780,
                    semantic: .alternateSelectedControlTextColor, background: .selectedContentBackgroundColor,
-                   knownFloor: (4.0, selectedNote)),
+                   lightSemantic: .labelColor),
         TextSample(screen: qo, label: "selected row detail", rect: CGRect(x: 70, y: 143, width: 100, height: 16), width: 780,
                    semantic: .alternateSelectedControlTextColor, background: .selectedContentBackgroundColor,
-                   knownFloor: (4.0, selectedNote)),
+                   lightSemantic: .labelColor),
         TextSample(screen: qo, label: "row title", rect: CGRect(x: 72, y: 196, width: 330, height: 18), width: 780,
                    semantic: .labelColor, background: .windowBackgroundColor),
         TextSample(screen: qo, label: "row detail", rect: CGRect(x: 72, y: 215, width: 330, height: 14), width: 780,
@@ -324,7 +322,7 @@ func checkContrast() {
         TextSample(screen: "settings-general", label: "Version", rect: CGRect(x: 30, y: 162, width: 55, height: 16), width: 500,
                    semantic: .labelColor, background: .windowBackgroundColor),
         TextSample(screen: "settings-general", label: "footer detail", rect: CGRect(x: 30, y: 66, width: 330, height: 16), width: 500,
-                   semantic: .secondaryLabelColor, background: .windowBackgroundColor, knownFloor: (3.9, secondaryNote)),
+                   semantic: .secondaryLabelColor, background: .windowBackgroundColor, lightSemantic: .labelColor),
     ]
     for dark in [false, true] {
         let mode = dark ? "dark" : "light"
@@ -341,18 +339,16 @@ func checkContrast() {
                 continue
             }
             let bg = resolved(sample.background, over: .clear, appearance: appearance)
-            let design = resolved(sample.semantic, over: sample.background, appearance: appearance)
+            let semantic = (!dark ? sample.lightSemantic : nil) ?? sample.semantic
+            let design = resolved(semantic, over: sample.background, appearance: appearance)
             let designRatio = contrastRatio(design, bg)
             let pixelRatio = contrastRatio(pixels.text, pixels.background)
             let detail = String(format: "design %.2f:1 (%@ on %@), rendered %.2f:1 (%@ on %@)", designRatio,
                                 hex(design), hex(bg), pixelRatio, hex(pixels.text), hex(pixels.background))
             // Selection colors are translucent over the panel, so their rendered pixels are the value that counts.
-            let measured = sample.knownFloor != nil && sample.semantic == .alternateSelectedControlTextColor ? pixelRatio : designRatio
-            let floor = sample.knownFloor?.ratio ?? 4.5
-            if measured < floor {
-                problems.append("contrast below \(floor):1 for \(name): \(detail)")
-            } else if let known = sample.knownFloor, measured < 4.5 {
-                print("contrast \(detail) \(name), known: \(known.reason)")
+            let measured = sample.background == .selectedContentBackgroundColor ? pixelRatio : designRatio
+            if measured < 4.5 {
+                problems.append("contrast below 4.5:1 for \(name): \(detail)")
             } else {
                 print("contrast \(detail) \(name)")
             }
