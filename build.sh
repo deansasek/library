@@ -6,6 +6,8 @@ cd "$(dirname "$0")"
 # claim to be older than the latest release, or the update check would always offer one.
 version="${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)}"
 version="${version:-0.0.0}"
+# The version is written into Info.plist, so only digits separated by dots pass (scripts/check-version.sh).
+scripts/check-version.sh "$version" || { echo "Refusing version \"$version\": use digits separated by dots, such as 1.2.0." >&2; exit 1; }
 
 swift build -c release
 bin="$(swift build -c release --show-bin-path)/Library"
