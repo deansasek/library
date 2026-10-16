@@ -19,6 +19,9 @@
 /* Edit menu item that moves the focus to the search field in the Edit Library window. */
 "Find" = "Find";
 
+/* Option-click alternate of a bookmark, command, or app in the Library menu. Opens its Get Info. */
+"Edit…" = "Edit…";
+
 /* Menu item that locks the pinned clipboard items again, so Touch ID or the password is asked for next time. */
 "Lock Pinned Items" = "Lock Pinned Items";
 

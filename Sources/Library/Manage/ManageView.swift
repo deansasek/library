@@ -108,10 +108,17 @@ struct ManageView: View {
         .onAppear {
             store.refreshSyncState()
             restoreSavedState()
+            openRequestedEdit()
         }
+        .onReceive(NotificationCenter.default.publisher(for: EditRequest.notification)) { _ in openRequestedEdit() }
         .onChange(of: state.sortKey) { _, key in storedSortKey = key?.rawValue ?? "" }
         .onChange(of: state.ascending) { _, value in storedAscending = value }
         .onChange(of: state.query) { _, text in storedQuery = text }
+    }
+
+    /// Opens Get Info for an item chosen in a menu, if one is waiting.
+    private func openRequestedEdit() {
+        if let id = EditRequest.take() { state.edit(id, in: store) }
     }
 
     /// Puts back the sort and search text saved for this window. A saved sort key that no longer exists is ignored.

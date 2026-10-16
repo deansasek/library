@@ -23,28 +23,35 @@ enum PopupMenu {
 
     /// Shows the menu at the mouse pointer, like a context menu.
     static func show(store: LibraryStore, selection: String? = nil) {
+        let (menu, target) = makeMenu(store: store, selection: selection)
+        NSApp.activate(ignoringOtherApps: true)
+        // Menu items hold their target weakly, so the target must live until the menu closes.
+        withExtendedLifetime(target) {
+            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        }
+    }
+
+    /// The bookmarks as a menu. Holding Option on a bookmark, command, or app swaps it for Edit…, which opens its
+    /// Get Info. The target must stay alive while the menu is open.
+    static func makeMenu(store: LibraryStore, selection: String? = nil) -> (menu: NSMenu, target: NSObject) {
         let target = Target(store: store)
         let menu = NSMenu()
         let frequent = store.frequent
         if !frequent.isEmpty {
             menu.addItem(NSMenuItem.sectionHeader(title: "Frequently Used"))
-            frequent.forEach { menu.addItem(item(for: $0, target: target)) }
+            frequent.forEach { addNode($0, to: menu, target: target) }
         }
         let reading = store.readingList
         if !reading.isEmpty {
             menu.addItem(NSMenuItem.sectionHeader(title: String(localized: "Reading List", bundle: L10n.bundle)))
-            reading.forEach { menu.addItem(item(for: $0, target: target)) }
+            reading.forEach { addNode($0, to: menu, target: target) }
         }
         fill(menu, with: store.nodes, target: target)
         if let suggestion = store.suggestion(selection: selection) {
             menu.addItem(.separator())
             menu.addItem(suggestionItem(suggestion, action: #selector(Target.addSuggested(_:)), target: target))
         }
-        NSApp.activate(ignoringOtherApps: true)
-        // Menu items hold their target weakly, so the target must live until the menu closes.
-        withExtendedLifetime(target) {
-            menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-        }
+        return (menu, target)
     }
 
     /// Shows the clipboard history at the mouse pointer. Choosing an item copies it back.
@@ -149,6 +156,26 @@ enum PopupMenu {
         return item
     }
 
+    /// The Edit… alternate of a leaf item: a bookmark, command, or app. Folders and dividers get none.
+    private static func editAlternate(for primary: NSMenuItem, id: UUID, target: Target) -> NSMenuItem {
+        let item = NSMenuItem(title: String(localized: "Edit…", bundle: L10n.bundle), action: #selector(Target.edit(_:)),
+                              keyEquivalent: primary.keyEquivalent)
+        item.target = target
+        item.representedObject = id
+        item.isAlternate = true
+        item.keyEquivalentModifierMask = [.option]
+        return item
+    }
+
+    /// Adds a node, followed by its Edit… alternate when it is a leaf. The alternate must come right after its item.
+    private static func addNode(_ node: LibraryItem, to menu: NSMenu, target: Target) {
+        let primary = item(for: node, target: target)
+        menu.addItem(primary)
+        if node.children == nil {
+            menu.addItem(editAlternate(for: primary, id: node.id, target: target))
+        }
+    }
+
     private static func fill(_ menu: NSMenu, with nodes: [LibraryItem], target: Target) {
         for section in nodes.sections {
             if let title = section.title {
@@ -158,7 +185,7 @@ enum PopupMenu {
                 menu.addItem(NSMenuItem.sectionHeader(title: title))
             }
             for node in section.nodes {
-                menu.addItem(item(for: node, target: target))
+                addNode(node, to: menu, target: target)
             }
         }
     }
@@ -265,6 +292,13 @@ enum PopupMenu {
             // Holding Option flips the item's new-window or new-instance setting.
             let flip = NSEvent.modifierFlags.contains(.option)
             open(node, forceNew: flip ? node.openNew != true : nil)
+        }
+
+        @objc func edit(_ sender: NSMenuItem) {
+            guard let id = sender.representedObject as? UUID, store.nodes.node(withID: id) != nil else { return }
+            EditRequest.post(id)
+            NSApp.activate(ignoringOtherApps: true)
+            SceneOpener.open("manage")
         }
 
         @objc func openFolder(_ sender: NSMenuItem) {

@@ -2657,5 +2657,34 @@ MainActor.assumeIsolated {
     check(LoginItem.presentation(for: .notRegistered) == .off && LoginItem.presentation(for: .notFound) == .off, "a login item that is not registered shows off")
 }
 
+// ---- Option-click Edit… alternates in the cursor menu: bookmarks, commands, and apps get one, folders do not ----
+MainActor.assumeIsolated {
+    step { undoStore.nodes = tree() }
+    let (editMenu, editTarget) = PopupMenu.makeMenu(store: undoStore)
+    func editCount(_ menu: NSMenu) -> Int {
+        menu.items.reduce(0) { $0 + ($1.title == "Edit…" ? 1 : 0) + ($1.submenu.map(editCount) ?? 0) }
+    }
+    // Safari, Jira, and Docs are leaves, so each has an alternate. Work and Deep are folders and have none.
+    check(editCount(editMenu) == 3, "one Edit… alternate per leaf item, none for folders")
+    if let safari = editMenu.items.first(where: { $0.title == "Safari" }),
+       let index = editMenu.items.firstIndex(of: safari) {
+        let alternate = editMenu.items[index + 1]
+        check(alternate.title == "Edit…" && alternate.isAlternate && alternate.keyEquivalentModifierMask == [.option],
+              "a bookmark's Edit… is an Option alternate right after it")
+        check(alternate.keyEquivalent == safari.keyEquivalent, "the alternate has the same key equivalent as its item")
+        check(alternate.target === editTarget, "the alternate is handled by the menu's target")
+    } else { check(false, "Safari is in the cursor menu") }
+    if let work = editMenu.items.first(where: { $0.title == "Work" }), let index = editMenu.items.firstIndex(of: work) {
+        check(index + 1 >= editMenu.items.count || editMenu.items[index + 1].title != "Edit…", "a folder gets no Edit… alternate")
+        if let jira = work.submenu?.items.first(where: { $0.title == "Jira" }), let inner = work.submenu?.items.firstIndex(of: jira) {
+            let submenuItems = work.submenu?.items ?? []
+            check(inner + 1 < submenuItems.count && submenuItems[inner + 1].title == "Edit…" && submenuItems[inner + 1].isAlternate,
+                  "a bookmark inside a folder gets its Edit… alternate")
+        } else { check(false, "Jira is in the Work submenu") }
+    } else { check(false, "Work is in the cursor menu") }
+    check(editMenu.items.allSatisfy { !($0.isAlternate) || $0.title == "Edit…" }, "only Edit… items are alternates in the menu")
+    _ = editTarget
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
