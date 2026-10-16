@@ -34,6 +34,7 @@ struct FilePreviewView: View {
                 ProgressView()
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, minHeight: 60)
+                    .accessibilityLabel(String(localized: "Loading preview", bundle: L10n.bundle))
             case .quickLook(let file):
                 QuickLookPreview(url: file)
                     .frame(height: Self.height)
