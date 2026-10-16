@@ -248,9 +248,10 @@ struct ManageView: View {
             return .handled
         }
         .onKeyPress(.return) {
-            guard state.selection.count == 1, let id = state.selection.first, store.nodes.node(withID: id) != nil else {
-                return .ignored
-            }
+            // One selected item that still exists can be renamed. Anything else passes the key on.
+            guard state.selection.count == 1 else { return .ignored }
+            guard let id = state.selection.first else { return .ignored }
+            guard store.nodes.node(withID: id) != nil else { return .ignored }
             state.renamingID = id
             return .handled
         }
