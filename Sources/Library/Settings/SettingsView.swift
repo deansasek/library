@@ -64,7 +64,7 @@ struct SettingsView: View {
             } header: {
                 Text("Storage")
             } footer: {
-                Text("Library keeps bookmarks.json in iCloud Drive, so your library follows you to your other Macs. Clipboard history stays on this Mac.").foregroundStyle(footerStyle)
+                Text("Your library is kept in iCloud Drive, so it follows you to your other Macs. Clipboard history stays on this Mac.", bundle: L10n.bundle).foregroundStyle(footerStyle)
             }
             Section {
                 Toggle(isOn: $checksForUpdates) {
