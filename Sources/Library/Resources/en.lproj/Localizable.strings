@@ -10,6 +10,9 @@
 /* Menu item that opens the window for editing the library. */
 "Edit Library…" = "Edit Library…";
 
+/* Edit menu item that moves the focus to the search field in the Edit Library window. */
+"Find" = "Find";
+
 /* Menu item that locks the pinned clipboard items again, so Touch ID or the password is asked for next time. */
 "Lock Pinned Items" = "Lock Pinned Items";
 

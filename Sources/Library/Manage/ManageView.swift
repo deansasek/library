@@ -3,6 +3,7 @@ import SwiftUI
 struct ManageView: View {
     @ObservedObject var store: LibraryStore
     @StateObject private var state = ManageState()
+    @FocusState private var searchFocused: Bool
     @Environment(\.undoManager) private var undoManager
     // The sort, direction, and search text are kept per window, so they come back on the next launch.
     @SceneStorage("manage.sortKey") private var storedSortKey: String = ""
@@ -183,6 +184,7 @@ struct ManageView: View {
         .listStyle(.inset(alternatesRowBackgrounds: true))
         .navigationSubtitle("\(shown) \(shown == 1 ? "item" : "items")")
         .searchable(text: $state.query, placement: .toolbar, prompt: "Name, URL, command, or keyword")
+        .searchFocused($searchFocused)
         .searchScopes($state.scope) {
             ForEach(SearchScope.allCases, id: \.self) { scope in
                 Text(scope.title).tag(scope)
@@ -216,6 +218,8 @@ struct ManageView: View {
                 open(node)
             }
         }
+        // Find (⌘F) in the Edit menu asks for the search field, so the request is counted rather than stored as a flag.
+        .onChange(of: state.searchFocusRequest) { _, _ in searchFocused = true }
         .onChange(of: state.query) { _, _ in state.selection.formIntersection(visible) }
         .onChange(of: state.scope) { _, _ in state.selection.formIntersection(visible) }
         // An undo, a removal, or a sync can take a selected item out of both the library and Recently Deleted. Delete and
