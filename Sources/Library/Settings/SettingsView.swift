@@ -15,6 +15,7 @@ struct SettingsView: View {
     @ObservedObject private var tracking = TrackingPreferences.shared
     @ObservedObject private var clipLock = ClipboardLock.shared
     @StateObject private var recording = RecordingState()
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage(UpdateCheck.automaticKey) private var checksForUpdates = true
     @AppStorage(LinkChecker.enabledKey) private var checksLinks = false
     @AppStorage(SmartTitle.key) private var namesFromPages = false
@@ -43,14 +44,14 @@ struct SettingsView: View {
                     set: { loginItem.set($0) }
                 ))
             } footer: {
-                Text("Library lives in the menu bar and opens its items from there.")
+                Text("Library lives in the menu bar and opens its items from there.").foregroundStyle(footerStyle)
             }
             Section {
                 Toggle(isOn: $namesFromPages) {
                     Text("Name new bookmarks from their pages", bundle: L10n.bundle)
                 }
             } footer: {
-                Text("Library requests each new bookmark’s page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.", bundle: L10n.bundle)
+                Text("Library requests each new bookmark’s page once to read its title. Until the title arrives, or when the page has none, the bookmark is named after its host.", bundle: L10n.bundle).foregroundStyle(footerStyle)
             }
             Section {
                 Toggle("Keep Library in iCloud Drive", isOn: Binding(
@@ -60,7 +61,7 @@ struct SettingsView: View {
             } header: {
                 Text("Storage")
             } footer: {
-                Text("Library keeps bookmarks.json in iCloud Drive, so your library follows you to your other Macs. Clipboard history stays on this Mac.")
+                Text("Library keeps bookmarks.json in iCloud Drive, so your library follows you to your other Macs. Clipboard history stays on this Mac.").foregroundStyle(footerStyle)
             }
             Section {
                 Toggle(isOn: $checksForUpdates) {
@@ -68,7 +69,7 @@ struct SettingsView: View {
                 }
                 .onChange(of: checksForUpdates) { _, _ in UpdateCheck.startAutomaticChecks() }
             } footer: {
-                Text("Library checks GitHub for a newer version every hour while it runs. When one is available, it appears at the top of the Library menu. Check for Updates… in the menu checks now.")
+                Text("Library checks GitHub for a newer version every hour while it runs. When one is available, it appears at the top of the Library menu. Check for Updates… in the menu checks now.").foregroundStyle(footerStyle)
             }
             Section {
                 Toggle(isOn: $checksLinks) {
@@ -76,7 +77,7 @@ struct SettingsView: View {
                 }
                 .onChange(of: checksLinks) { _, _ in LinkChecker.startSchedule(store: store) }
             } footer: {
-                Text("Once a day while Library is open, Library quickly checks that each bookmark’s page is still there. It doesn’t download the page. If a site doesn’t answer that quick check, Library loads the page and reads only its first 64 KB. Each bookmark is checked at most once a day. Bookmarks whose page is missing or can’t be reached show a warning in Edit Library. Off by default. Choose Check Links in the File menu to check now.", bundle: L10n.bundle)
+                Text("Once a day while Library is open, Library quickly checks that each bookmark’s page is still there. It doesn’t download the page. If a site doesn’t answer that quick check, Library loads the page and reads only its first 64 KB. Each bookmark is checked at most once a day. Bookmarks whose page is missing or can’t be reached show a warning in Edit Library. Off by default. Choose Check Links in the File menu to check now.", bundle: L10n.bundle).foregroundStyle(footerStyle)
             }
             Section {
                 LabeledContent("Library") {
@@ -88,14 +89,14 @@ struct SettingsView: View {
             } header: {
                 Text("Backup")
             } footer: {
-                Text("Export saves your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at login settings to a file. Restore replaces your library with a backup and can be undone. Clipboard items are not included, because pinned clipboard items are encrypted with a key that stays on this Mac.")
+                Text("Export saves your bookmarks, folders, shortcuts, icons, keywords, colors, templates, and Open at login settings to a file. Restore replaces your library with a backup and can be undone. Clipboard items are not included, because pinned clipboard items are encrypted with a key that stays on this Mac.").foregroundStyle(footerStyle)
             }
             Section {
                 Toggle(isOn: $confirmTerminalCommands) {
                     Text("Confirm terminal commands", bundle: L10n.bundle)
                 }
             } footer: {
-                Text("Asks before a terminal command runs, whether it starts from a shortcut, Spotlight, a menu, or Open at Login. The confirmation shows the command, and Cancel is the default.", bundle: L10n.bundle)
+                Text("Asks before a terminal command runs, whether it starts from a shortcut, Spotlight, a menu, or Open at Login. The confirmation shows the command, and Cancel is the default.", bundle: L10n.bundle).foregroundStyle(footerStyle)
             }
             Section {
                 LabeledContent("Welcome Screen") {
@@ -103,11 +104,17 @@ struct SettingsView: View {
                 }
                 LabeledContent("Version", value: version)
             } footer: {
-                Text("The welcome screen explains Library, lists your shortcuts, and asks for access. The build number changes with every build, so you can tell which one is running after an update.")
+                Text("The welcome screen explains Library, lists your shortcuts, and asks for access. The build number changes with every build, so you can tell which one is running after an update.").foregroundStyle(footerStyle)
             }
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Footer text. In light mode the system secondary label color is 3.95:1 on white, below the 4.5:1 floor, so light
+    /// mode uses the primary label color (about 15:1). Dark mode keeps the system secondary color, which passes.
+    private var footerStyle: AnyShapeStyle {
+        colorScheme == .light ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary)
     }
 
     private var version: String {
@@ -134,7 +141,7 @@ struct SettingsView: View {
                     field(2, String(localized: "Open Copied Link", bundle: L10n.bundle), $store.extraHotkeys[2])
                 }
             } footer: {
-                Text("These work in every app. Quick Open searches your library and your clipboard history. Open Copied Link opens the web link you last copied. A beep means the clipboard has no link.")
+                Text("These work in every app. Quick Open searches your library and your clipboard history. Open Copied Link opens the web link you last copied. A beep means the clipboard has no link.").foregroundStyle(footerStyle)
             }
             Section {
                 Picker("Library menu opens", selection: $store.menuMode) {
@@ -148,13 +155,13 @@ struct SettingsView: View {
                         Button("Allow…") { HotKeys.requestClickAccess() }
                     }
                 } footer: {
-                    Text("Clicks, scrolls, pinches, and swipes need Accessibility access. So does suggesting a link you selected.")
+                    Text("Clicks, scrolls, pinches, and swipes need Accessibility access. So does suggesting a link you selected.").foregroundStyle(footerStyle)
                 }
             }
             Section {
                 Button("Restore Defaults") { store.restoreDefaultHotkeys() }
             } footer: {
-                Text("The defaults are Control and right click for the Library menu, Control-Space for Quick Open, and Control-Command-V for the clipboard menu. macOS may use Control-Space to switch input sources.")
+                Text("The defaults are Control and right click for the Library menu, Control-Space for Quick Open, and Control-Command-V for the clipboard menu. macOS may use Control-Space to switch input sources.").foregroundStyle(footerStyle)
             }
         }
         .formStyle(.grouped)
@@ -169,7 +176,7 @@ struct SettingsView: View {
                     set: { clipLock.setRequired($0) }
                 ))
             } footer: {
-                Text("Pinned items show as Pinned Item until you authenticate with Touch ID or your Mac password. They stay unlocked until you choose Lock Pinned Items in the Library menu, the Mac sleeps, or Library quits.")
+                Text("Pinned items show as Pinned Item until you authenticate with Touch ID or your Mac password. They stay unlocked until you choose Lock Pinned Items in the Library menu, the Mac sleeps, or Library quits.").foregroundStyle(footerStyle)
             }
             Section {
                 Toggle("Keep clipboard history", isOn: $history.isEnabled)
@@ -183,14 +190,14 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("History stays in memory and is gone when Library quits, unless Keep clipboard history across restarts is on. With Paste into text fields on, choosing an item while a text field has the keyboard pastes it, and otherwise copies it. That needs Accessibility access. Browsers copy a still picture of a GIF. Turn on Play Copied GIFs to download the original GIF from the page so it can play. It is off by default. Pinned items are the exception: they are saved on this Mac in clipboard.json, so text you keep survives a restart. Copies that password managers mark as private are skipped, and so are copies made in password manager apps. Add screenshots and recordings adds each new screenshot to history as an image, and each recording as a link to its file. Remove tracking parameters removes tracking codes such as utm_source, fbclid, and gclid from a link you copy back from the history. The rest of the link stays the same, and the saved link is not changed. It only adds captures made after you turn it on. Library finds them with Spotlight and does not watch a folder.")
                     Text("Screenshots and recordings skip the privacy filters that copies pass through, so a screenshot of a password manager can be kept. It is off by default. Turn it on only if you accept that.", bundle: L10n.bundle)
-                }
+                }.foregroundStyle(footerStyle)
             }
             Section {
                 Toggle(isOn: $history.keepsAcrossRestarts) {
                     Text("Keep clipboard history across restarts", bundle: L10n.bundle)
                 }
             } footer: {
-                Text("Saves your unpinned clipboard history, encrypted with a key kept in your Keychain, so it is there after you restart. Pinned items are saved either way. Copies from password managers and copies marked private are never saved. Images over 5 MB are never saved, to keep the file small. Turning this off deletes the saved history.", bundle: L10n.bundle)
+                Text("Saves your unpinned clipboard history, encrypted with a key kept in your Keychain, so it is there after you restart. Pinned items are saved either way. Copies from password managers and copies marked private are never saved. Images over 5 MB are never saved, to keep the file small. Turning this off deletes the saved history.", bundle: L10n.bundle).foregroundStyle(footerStyle)
             }
             Section {
                 Toggle(isOn: $history.restoresLatestAtLaunch) {
@@ -198,7 +205,7 @@ struct SettingsView: View {
                 }
                 .disabled(!history.keepsAcrossRestarts)
             } footer: {
-                Text("The newest saved item is copied to the clipboard when Library opens, so you can paste it right away. A password copied before a restart could be pasted by someone else at this Mac.", bundle: L10n.bundle)
+                Text("The newest saved item is copied to the clipboard when Library opens, so you can paste it right away. A password copied before a restart could be pasted by someone else at this Mac.", bundle: L10n.bundle).foregroundStyle(footerStyle)
             }
         }
         .formStyle(.grouped)
