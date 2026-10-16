@@ -1919,11 +1919,22 @@ check(LibraryItem.cleanNote(" \n\t ") == nil && LibraryItem.cleanNote(nil) == ni
 var noted = LibraryItem(name: "Docs", url: "https://docs.example.com")
 noted.note = "  Read section 3\nthen the FAQ "
 check(noted.noteText == "Read section 3\nthen the FAQ", "noteText trims the note")
-check(noted.spotlightDescription == "https://docs.example.com\nRead section 3\nthen the FAQ", "Spotlight shows the note after the target")
-noted.note = "   "
-check(noted.noteText == nil && noted.spotlightDescription == "https://docs.example.com", "a blank note is left out of Spotlight")
-check(LibraryItem(name: "Ask", command: "make").spotlightDescription == "make", "a command's Spotlight description is its command")
-check(LibraryItem(name: "Folder", children: []).spotlightDescription == nil, "no target and no note gives no Spotlight description")
+check(noted.spotlightDescription == "docs.example.com", "Spotlight shows the host only, and never the note")
+// ---- Spotlight indexes only the name and the host: never a command, a path, a query, or a note ----
+do {
+    let docs = LibraryItem(name: "Docs", url: "https://docs.example.com/guide?token=secret#part")
+    check(docs.spotlightDescription == "docs.example.com", "Spotlight shows the host of a bookmark, not its path or token")
+    let login = LibraryItem(name: "Jira", url: "https://user:pw@jira.example.com:8443/browse/X?token=abc")
+    check(login.spotlightDescription == "jira.example.com", "user info and the port are left out")
+    check(LibraryItem(name: "Ticket", url: "tickets.example.com/browse/{}").spotlightDescription == "tickets.example.com", "a bare address and a template keep the host")
+    check(LibraryItem(name: "Ask", command: "rm -rf ~/x").spotlightDescription == nil, "a command has no Spotlight description")
+    check(LibraryItem(name: "Safari", appPath: "/Applications/Safari.app").spotlightDescription == nil, "an app has no host to show")
+    check(LibraryItem(name: "Folder", children: []).spotlightDescription == nil, "a folder has no Spotlight description")
+    let commandItem = LibraryItem(name: "Ask", command: "make")
+    let appItem = LibraryItem(name: "Safari", appPath: "/Applications/Safari.app")
+    check(Spotlight.indexable([docs, commandItem, appItem, LibraryItem(name: "Folder", children: [])]).map(\.name) == ["Docs", "Safari"], "commands and folders are never indexed")
+    check(Spotlight.host(of: "localhost") == nil && Spotlight.host(of: "{x}") == nil && Spotlight.host(of: "  ") == nil, "text with no host gives no host")
+}
 var notedTrip = LibraryItem(name: "Docs", url: "https://docs.example.com", note: "a\nb")
 if let data = try? JSONEncoder().encode(notedTrip), let back = try? JSONDecoder().decode(LibraryItem.self, from: data) {
     check(back.note == "a\nb" && back == notedTrip, "a note round-trips through the file")
