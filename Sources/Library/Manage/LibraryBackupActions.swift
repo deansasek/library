@@ -69,12 +69,11 @@ enum LibraryBackupActions {
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Replace your library?", bundle: L10n.bundle)
         alert.informativeText = String(format: String(localized: "Your library has %@. It will be replaced by the %@ in “%@”. Undo restores the current library.", bundle: L10n.bundle), count(current), count(incoming), url.lastPathComponent)
-        alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
-        let replace = alert.addButton(withTitle: String(localized: "Replace Library", bundle: L10n.bundle))
+        let replace = alert.addActionWithCancelOnLeft(String(localized: "Replace Library", bundle: L10n.bundle), cancel: String(localized: "Cancel", bundle: L10n.bundle))
         replace.hasDestructiveAction = true
         // Cancel is the default button, so pressing Return keeps the library.
         AttachedSheets.alert(alert) { response in
-            guard response == .alertSecondButtonReturn else { return }
+            guard response == .alertFirstButtonReturn else { return }
             // The library may have changed while the sheet was up, so the restored items are made against it now.
             let items = LibraryBackup.restorable(decoded, avoiding: store.deleted)
             store.perform("Restore Library") { $0 = items }

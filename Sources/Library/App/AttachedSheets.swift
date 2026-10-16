@@ -34,3 +34,16 @@ enum AttachedSheets {
         alert.beginSheetModal(for: window, completionHandler: completion)
     }
 }
+
+extension NSAlert {
+    /// Adds the action and Cancel in the macOS order: Cancel on the left, the action on the right. The action is the
+    /// first button, so it returns `.alertFirstButtonReturn`. Cancel stays the default button, so Return still cancels.
+    @discardableResult
+    func addActionWithCancelOnLeft(_ action: String, cancel: String) -> NSButton {
+        let button = addButton(withTitle: action)
+        let cancelButton = addButton(withTitle: cancel)
+        button.keyEquivalent = ""
+        cancelButton.keyEquivalent = "\r"
+        return button
+    }
+}
