@@ -30,6 +30,8 @@ final class ManageState: ObservableObject {
     @Published var pendingPurge: Set<UUID>?
     /// The text in the window's search field. Separate from `search`, which filters the app picker.
     @Published var query = ""
+    /// Counts each Find (⌘F) request, so the window moves focus to its search field.
+    @Published var searchFocusRequest = 0
     /// The search field's scope bar. It narrows the results of `query`.
     @Published var scope = SearchScope.all
     /// The rows for the current query, scope, and sort, kept between redraws.
@@ -135,6 +137,10 @@ final class ManageState: ObservableObject {
             sortKey = nil
             ascending = true
         }
+    }
+
+    func focusSearch() {
+        searchFocusRequest += 1
     }
 
     func present(_ sheet: Sheet) {

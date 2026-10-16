@@ -17,6 +17,12 @@ struct ManageCommands: Commands {
     @FocusedValue(\.manageState) private var state
 
     var body: some Commands {
+        // Find goes in the Edit menu. It is disabled without the Library window, like the commands below.
+        CommandGroup(after: .textEditing) {
+            Button(String(localized: "Find", bundle: L10n.bundle)) { state?.focusSearch() }
+                .keyboardShortcut("f")
+                .disabled(state == nil)
+        }
         CommandGroup(replacing: .newItem) {
             // These sheets belong to the Library window. With that window not in front, they are disabled, rather than
             // doing nothing when chosen.
