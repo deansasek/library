@@ -1759,6 +1759,23 @@ do {
     check(LibrarySync.differences(local: local, other: local).isEmpty, "identical versions have no differences")
     check(LibrarySync.resolve(local: local, other: remote, preferring: .thisMac, choices: [:]) == local, "keeping this Mac's version keeps it exactly")
     check(LibrarySync.resolve(local: local, other: remote, preferring: .other, choices: [:]) == remote, "keeping the other version keeps it exactly")
+    // Three diverged copies: every other version is folded in, so an item from each one survives the merge.
+    // The same item keeps its id on every Mac, so the three copies share the item A.
+    let itemA = LibraryItem(name: "A", url: "https://a.example.com")
+    let itemB = LibraryItem(name: "B", url: "https://b.example.com")
+    let itemC = LibraryItem(name: "C", url: "https://c.example.com")
+    let threeLocal = LibrarySync.Contents(live: [itemA])
+    let threeFirst = LibrarySync.Contents(live: [itemA, itemB])
+    let threeSecond = LibrarySync.Contents(live: [itemA, itemC])
+    let folded = LibrarySync.mergeAll(threeLocal, [threeFirst, threeSecond]) { merged, other in
+        let mine = Set((merged.live + merged.deleted).allIDs)
+        let picks = Dictionary(uniqueKeysWithValues: LibrarySync.differences(local: merged, other: other).map {
+            ($0.id, mine.contains($0.id) ? LibrarySync.Side.thisMac : .other)
+        })
+        return LibrarySync.resolve(local: merged, other: other, preferring: .thisMac, choices: picks)
+    }
+    check(folded.live.map(\.name).sorted() == ["A", "B", "C"], "every other version is merged, so none of the three loses an item")
+    check(LibrarySync.mergeAll(threeLocal, [], merge: { local, _ in local }) == threeLocal, "with no other version, the library is unchanged")
     let picked = LibrarySync.resolve(local: local, other: remote, preferring: .thisMac, choices: [id: .other])
     check(picked.live.map(\.name) == ["A2", "B"], "a per-item choice takes the other version of that item only")
     let withTrash = LibrarySync.Contents(live: [syncItem("a", id: id)], deleted: [])

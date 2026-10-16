@@ -337,29 +337,41 @@ final class LibraryStore: ObservableObject {
         return true
     }
 
-    /// Asks what to keep, and keeps it. Each choice is written before the conflict versions are marked resolved.
+    /// Merges every other version into this Mac's library, one at a time, so each difference is chosen. With two or
+    /// more other versions, each one goes straight to Review. Each choice is written before any version is marked
+    /// resolved, and a version is marked resolved only after it has been reviewed.
     private func resolveConflicts(_ others: [(contents: LibrarySync.Contents, date: Date)]) {
         guard !presentingConflict else { return }
         presentingConflict = true
         defer { presentingConflict = false }
         let versions = LibrarySync.unresolvedConflicts(at: Self.dataFile)
-        let other = others[0].contents
+        let merged = LibrarySync.mergeAll(contents, others.map(\.contents)) { local, other in
+            merge(other, into: local, reviewFirst: others.count > 1)
+        }
+        finishConflict(merged, reviewed: versions)
+    }
+
+    /// Asks how to combine one other version with `local`, and returns the result. Cancelling Review asks again.
+    private func merge(_ other: LibrarySync.Contents, into local: LibrarySync.Contents, reviewFirst: Bool) -> LibrarySync.Contents {
+        var choice: VersionChoice? = reviewFirst ? .review : nil
         while true {
-            switch askWhichVersionToKeep() {
+            switch choice ?? askWhichVersionToKeep() {
             case .thisMac:
-                return finishConflict(LibrarySync.resolve(local: contents, other: other, preferring: .thisMac, choices: [:]), versions)
+                return LibrarySync.resolve(local: local, other: other, preferring: .thisMac, choices: [:])
             case .other:
-                return finishConflict(LibrarySync.resolve(local: contents, other: other, preferring: .other, choices: [:]), versions)
+                return LibrarySync.resolve(local: local, other: other, preferring: .other, choices: [:])
             case .review:
-                let differences = LibrarySync.differences(local: contents, other: other)
-                if let picks = ConflictReview.run(differences) {
-                    return finishConflict(LibrarySync.resolve(local: contents, other: other, preferring: .thisMac, choices: picks), versions)
+                if let picks = ConflictReview.run(LibrarySync.differences(local: local, other: other)) {
+                    return LibrarySync.resolve(local: local, other: other, preferring: .thisMac, choices: picks)
                 }
             }
+            choice = nil
         }
     }
 
-    private func finishConflict(_ resolved: LibrarySync.Contents, _ versions: [NSFileVersion]) {
+    /// Writes the merged library, then clears the versions that were reviewed. A version that appeared while Review was
+    /// open was not reviewed, so it is left in place and checked again.
+    private func finishConflict(_ resolved: LibrarySync.Contents, reviewed versions: [NSFileVersion]) {
         undoSuppressed = true
         loadingFromDisk = true
         contents = resolved
@@ -377,8 +389,16 @@ final class LibraryStore: ObservableObject {
             reportSaveFailure("Library couldn’t keep a copy of the other iCloud versions, so they were left in place. \(error.localizedDescription)")
             return
         }
+        let reviewedKeys = Set(versions.map(LibrarySync.versionKey))
+        let unreviewed = LibrarySync.unresolvedConflicts(at: Self.dataFile).filter { !reviewedKeys.contains(LibrarySync.versionKey($0)) }
         do {
-            try LibrarySync.resolveConflicts(versions, at: Self.dataFile)
+            if unreviewed.isEmpty {
+                try LibrarySync.resolveConflicts(versions, at: Self.dataFile)
+            } else {
+                // Only the reviewed versions are marked. The others stay unresolved for the next check.
+                for version in versions { version.isResolved = true }
+                scheduleConflictCheck()
+            }
         } catch {
             reportSaveFailure("The other version of bookmarks.json in iCloud Drive couldn’t be cleared. Library will ask again. \(error.localizedDescription)")
         }
