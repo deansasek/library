@@ -68,7 +68,6 @@ struct QuickOpenView: View {
             }
         }
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
-        .shadow(color: .black.opacity(0.2), radius: 20, y: 8)
         // A short fade and grow, like Spotlight. Reduce Motion turns the movement off.
         .opacity(model.appeared ? 1 : 0)
         .scaleEffect(model.appeared || reduceMotion ? 1 : 0.95)

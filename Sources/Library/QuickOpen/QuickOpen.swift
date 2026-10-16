@@ -119,7 +119,8 @@ private final class QuickOpenPanel: NSPanel {
         level = .floating
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = false
+        // The system shadow follows the card's rounded, translucent shape, because the panel is clear outside it.
+        hasShadow = true
         isReleasedWhenClosed = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
     }
