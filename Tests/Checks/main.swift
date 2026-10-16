@@ -574,6 +574,21 @@ check(DamagedCopy.preserve(keptDir.appendingPathComponent("missing.json"), stem:
 let keptMoved = DamagedCopy.preserve(keptSource, stem: "bookmarks-damaged", ext: "json", moving: true, at: keptStamp)
 check(keptMoved != nil && keptMoved != keptFirst && keptMoved != keptSecond && !FileManager.default.fileExists(atPath: keptSource.path),
       "a damaged file can be moved aside under a new name")
+
+// ---- a save replaces the file only if it still holds the bytes this Mac last saw ----
+let guardDir = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-guard-\(UUID().uuidString)")
+try? FileManager.default.createDirectory(at: guardDir, withIntermediateDirectories: true)
+let guardFile = guardDir.appendingPathComponent("bookmarks.json")
+let seenBytes = Data("seen".utf8), mineBytes = Data("mine".utf8), otherBytes = Data("other mac".utf8)
+check((try? LibrarySync.writeUnlessChanged(seenBytes, to: guardFile, expected: nil)) == .written, "a missing file is written when none is expected")
+check((try? LibrarySync.writeUnlessChanged(mineBytes, to: guardFile, expected: seenBytes)) == .written
+      && (try? Data(contentsOf: guardFile)) == mineBytes, "a file that still holds the expected bytes is replaced")
+try? otherBytes.write(to: guardFile)
+check((try? LibrarySync.writeUnlessChanged(Data("overwrite".utf8), to: guardFile, expected: mineBytes)) == .changed(current: otherBytes)
+      && (try? Data(contentsOf: guardFile)) == otherBytes, "a newer write from another Mac is not overwritten")
+try? FileManager.default.removeItem(at: guardFile)
+check((try? LibrarySync.writeUnlessChanged(mineBytes, to: guardFile, expected: otherBytes)) == .written, "a file removed since the last read is written again")
+try? FileManager.default.removeItem(at: guardDir)
 try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: bookmarks.path)
 try? FileManager.default.removeItem(at: folder)
 

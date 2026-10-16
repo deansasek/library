@@ -381,6 +381,30 @@ enum LibrarySync {
         try coordinated(url, .write(.forReplacing), presenter: presenter) { try data.write(to: $0, options: .atomic) }
     }
 
+    /// The outcome of `writeUnlessChanged`.
+    enum GuardedWrite: Equatable {
+        /// The file held the expected bytes, so it was replaced.
+        case written
+        /// The file holds other bytes, a write from another Mac that this Mac has not seen. Nothing was written. `current`
+        /// is what the file holds now.
+        case changed(current: Data)
+    }
+
+    /// Replaces `url` unless it holds bytes this Mac has not seen. `expected` is what this Mac last read or wrote, nil
+    /// when it has none. A file that is missing is written; a file with other bytes is left alone. The comparison and
+    /// the write run inside one coordinated write, so another Mac's write cannot land between the check and the
+    /// replacement and be lost.
+    static func writeUnlessChanged(_ data: Data, to url: URL, expected: Data?, presenter: LibraryFilePresenter? = nil) throws -> GuardedWrite {
+        try coordinated(url, .write(.forReplacing), presenter: presenter) { accessed in
+            if FileManager.default.fileExists(atPath: accessed.path) {
+                let current = try Data(contentsOf: accessed)
+                if current != expected { return .changed(current: current) }
+            }
+            try data.write(to: accessed, options: .atomic)
+            return .written
+        }
+    }
+
     private enum Access {
         case read
         case write(NSFileCoordinator.WritingOptions)
