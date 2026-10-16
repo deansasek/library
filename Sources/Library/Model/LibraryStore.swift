@@ -793,9 +793,31 @@ final class LibraryStore: ObservableObject {
             return false
         }
         do {
-            try LibrarySync.write(encoded, to: Self.dataFile, presenter: presenter)
-            // An atomic write creates the file with the default mode (0644). Only you can read it.
-            try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.dataFile.path)
+            // In iCloud Drive, the file is replaced only if it still holds what this Mac last read or wrote. Otherwise
+            // another Mac wrote in between, and that write is not overwritten. A local file is watched and read back
+            // when it changes, so it is replaced as before.
+            let outcome: LibrarySync.GuardedWrite
+            if LibrarySync.isLinked(Self.file) {
+                outcome = try LibrarySync.writeUnlessChanged(encoded, to: Self.dataFile, expected: lastSavedData, presenter: presenter)
+            } else {
+                try LibrarySync.write(encoded, to: Self.dataFile, presenter: presenter)
+                outcome = .written
+            }
+            switch outcome {
+            case .written:
+                // An atomic write creates the file with the default mode (0644). Only you can read it.
+                try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.dataFile.path)
+            case .changed(let current):
+                // A copy that already holds this library needs no conflict. Anything else goes through the conflict flow.
+                if LibrarySync.decode(current) == contents {
+                    lastSavedData = current
+                    lastFileStamp = fileStamp()
+                    refreshSyncState()
+                    return true
+                }
+                scheduleConflictCheck()
+                return false
+            }
         } catch {
             reportSaveFailure(error.localizedDescription)
             return false
