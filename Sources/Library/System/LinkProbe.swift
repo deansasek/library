@@ -1,7 +1,7 @@
 import Foundation
 
 /// Asks one address whether its page loads. The first request is a HEAD, which reads no page content. A server that
-/// refuses HEAD (403, 405, or 501) gets one GET instead, and its status is the answer. Each request follows up to
+/// refuses HEAD (405 or 501) gets one GET instead, and its status is the answer. Each request follows up to
 /// `LinkCheck.maxRedirects` redirects to web addresses. The session keeps no cookies and no cache, and gives up after
 /// `LinkCheck.timeout`. Foundation only, so a harness outside the app can run it.
 enum LinkProbe {

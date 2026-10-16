@@ -1975,8 +1975,13 @@ check(LinkCheck.kind(forHTTPCode: 100) == .unreachable && LinkCheck.kind(forHTTP
 check(LinkCheck.outcome(statusCode: nil, redirectRefused: false) == .unreachable, "no response is unreachable, not broken")
 check(LinkCheck.outcome(statusCode: 302, redirectRefused: true) == .unreachable, "a refused redirect is unreachable, not ok")
 check(LinkCheck.outcome(statusCode: 200, redirectRefused: false) == .ok && LinkCheck.outcome(statusCode: 404, redirectRefused: false) == .broken, "a finished response uses its code")
-check(LinkCheck.retriesWithGET(afterHEAD: 403) && LinkCheck.retriesWithGET(afterHEAD: 405) && LinkCheck.retriesWithGET(afterHEAD: 501), "a HEAD refused with 403, 405, or 501 is asked again with GET")
-check(!LinkCheck.retriesWithGET(afterHEAD: 200) && !LinkCheck.retriesWithGET(afterHEAD: 302) && !LinkCheck.retriesWithGET(afterHEAD: 404) && !LinkCheck.retriesWithGET(afterHEAD: 500) && !LinkCheck.retriesWithGET(afterHEAD: nil), "other HEAD answers, and no answer, are final")
+check(LinkCheck.retriesWithGET(afterHEAD: 405) && LinkCheck.retriesWithGET(afterHEAD: 501), "a HEAD refused with 405 or 501 is asked again with GET")
+check(!LinkCheck.retriesWithGET(afterHEAD: 403) && !LinkCheck.retriesWithGET(afterHEAD: 200) && !LinkCheck.retriesWithGET(afterHEAD: 302) && !LinkCheck.retriesWithGET(afterHEAD: 404) && !LinkCheck.retriesWithGET(afterHEAD: 500) && !LinkCheck.retriesWithGET(afterHEAD: nil), "other HEAD answers, including 403, and no answer, are final")
+for address in ["https://shop.example.com/logout", "https://example.com/Unsubscribe?list=1", "https://example.com/account?action=delete",
+                "https://example.com/settings/toggle-dark", "https://example.com/email/confirm/abc", "https://example.com/sign-out"] {
+    check(LinkCheck.looksLikeAction(URL(string: address)!), "action address \(address) is not checked")
+}
+check(!LinkCheck.looksLikeAction(URL(string: "https://example.com/docs/intro?page=2")!) && !LinkCheck.looksLikeAction(URL(string: "https://example.com/")!), "ordinary addresses are checked")
 check(LinkCheck.retriesWithGET(afterHEAD: 405) && LinkCheck.outcome(statusCode: 200, redirectRefused: false) == .ok && LinkCheck.outcome(statusCode: 404, redirectRefused: false) == .broken, "a HEAD refused with 405 takes the status of the GET that follows")
 check(LinkCheck.followsRedirect(after: 0, to: URL(string: "https://example.com/next")) && LinkCheck.followsRedirect(after: 4, to: URL(string: "http://example.com/")), "redirects up to five are followed")
 check(!LinkCheck.followsRedirect(after: 5, to: URL(string: "https://example.com/next")), "the sixth redirect is refused")
