@@ -138,6 +138,10 @@ struct WelcomeView: View {
                         Text("Start Library when you log in, so the shortcuts are always ready.")
                             .font(.callout)
                             .foregroundStyle(.secondary)
+                        if loginItem.needsApproval {
+                            LoginItemApprovalNote()
+                                .padding(.top, 4)
+                        }
                     }
                     Spacer()
                     Toggle("Open at login", isOn: Binding(get: { loginItem.isEnabled }, set: { loginItem.set($0) }))
