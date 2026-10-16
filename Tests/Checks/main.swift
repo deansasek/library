@@ -41,6 +41,13 @@ check(WebFetch.isLocalTarget(URL(string: "http://localhost:8080/x")!) && WebFetc
 check(WebFetch.isLocalTarget(URL(string: "http://127.1/")!) && WebFetch.isLocalTarget(URL(string: "http://[::1]/")!), "short and bracketed loopback are local")
 check(WebFetch.isLocalTarget(URL(string: "http://10.0.0.7/admin")!) && WebFetch.isLocalTarget(URL(string: "http://192.168.0.1/")!), "LAN addresses are local")
 
+// ---- the update check has a total deadline ----
+do {
+    let configuration = UpdateRules.sessionConfiguration()
+    check(configuration.timeoutIntervalForResource == 20 && UpdateRules.resourceTimeout == 20, "the update check is capped at 20 s in total")
+    check(configuration.timeoutIntervalForRequest <= configuration.timeoutIntervalForResource, "the idle timeout is inside the total cap")
+}
+
 // ---- model ----
 check(splitArguments("--profile \"My Work\" -n 'a b'") == ["--profile", "My Work", "-n", "a b"], "quoted arguments")
 let jira = LibraryItem(name: "Jira", url: "x.example.com/browse/{}")
