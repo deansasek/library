@@ -425,3 +425,12 @@
 
 /* Shown when a clipboard item cannot be pinned because the pinned items would pass 200 MB together. */
 "Pinned clips can’t total more than 200 MB. Unpin a clip to make room." = "Pinned clips can’t total more than 200 MB. Unpin a clip to make room.";
+
+/* Confirmation before an app that a Shortcut or another app added through an intent opens. */
+"Open “%@”?" = "Open “%@”?";
+
+/* Confirmation text for an app added through an intent. */
+"A Shortcut or another app added this application to Library. Open it only if you expect it." = "A Shortcut or another app added this application to Library. Open it only if you expect it.";
+
+/* Confirmation before an app outside the Applications folders is added through a Shortcut. */
+"Add “%@” to Library? It is outside the Applications folders." = "Add “%@” to Library? It is outside the Applications folders.";

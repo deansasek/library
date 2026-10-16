@@ -42,4 +42,24 @@ enum IntentLogic {
         guard URL(fileURLWithPath: path).pathExtension.lowercased() == "app" else { return nil }
         return LibraryItem(name: appName(at: path), appPath: path)
     }
+
+    /// True for an app directly inside /Applications or ~/Applications. An intent adds these without asking. A symbolic
+    /// link does not count, since it can point anywhere. The folder is resolved, so the folder itself is compared as a real path.
+    static func isStandardApplication(atPath path: String, home: String = NSHomeDirectory()) -> Bool {
+        let url = URL(fileURLWithPath: path)
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: url.path)) != nil { return false }
+        let parent = url.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
+        let folders = ["/Applications", home + "/Applications"].map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().standardizedFileURL.path }
+        return folders.contains(parent)
+    }
+
+    /// The question shown before an app outside the Applications folders is added through an intent.
+    static func addConfirmation(for node: LibraryItem) -> String {
+        String(format: String(localized: "Add “%@” to Library? It is outside the Applications folders.", bundle: L10n.bundle), node.name)
+    }
+
+    /// Launching an app that an intent added asks first, every time.
+    static func needsLaunchConfirmation(_ node: LibraryItem) -> Bool {
+        node.appPath != nil && node.addedByIntent == true
+    }
 }

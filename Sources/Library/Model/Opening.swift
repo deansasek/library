@@ -243,6 +243,19 @@ func confirmLinkOpen(_ node: LibraryItem, value: String?) -> Bool {
     return alert.runModal() == .alertSecondButtonReturn
 }
 
+/// Asks before an app that a Shortcut or another app added through an intent opens. Cancel is the default button.
+@MainActor
+private func confirmIntentApp(_ node: LibraryItem) -> Bool {
+    guard IntentLogic.needsLaunchConfirmation(node) else { return true }
+    NSApp.activate(ignoringOtherApps: true)
+    let alert = NSAlert()
+    alert.messageText = String(format: String(localized: "Open “%@”?", bundle: L10n.bundle), node.name)
+    alert.informativeText = String(localized: "A Shortcut or another app added this application to Library. Open it only if you expect it.", bundle: L10n.bundle)
+    alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
+    alert.addButton(withTitle: String(localized: "Open", bundle: L10n.bundle))
+    return alert.runModal() == .alertSecondButtonReturn
+}
+
 /// Opens a bookmark in the browser, or runs a terminal command. Opens an app,
 /// or brings it to the front when it already runs. `forceNew` overrides the item's own setting.
 /// `value` fills a URL template with a single field without asking. Templates with several fields always ask.
@@ -254,6 +267,7 @@ func open(_ node: LibraryItem, forceNew: Bool? = nil, value: String? = nil) {
         LibraryStore.shared.recordOpen(node.id)
         runInTerminal(command)
     } else if let path = node.appPath {
+        guard confirmIntentApp(node) else { return }
         LibraryStore.shared.recordOpen(node.id)
         let configuration = NSWorkspace.OpenConfiguration()
         let arguments = splitArguments(node.arguments ?? "")

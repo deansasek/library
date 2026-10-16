@@ -41,6 +41,8 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     var note: String?
     /// Whether a bookmark is in the Reading List, and read or unread there. Nil when it is not in the list.
     var readLater: ReadLaterState?
+    /// Set on an app that a Shortcut or another app added through an intent. Launching it asks first. Nil otherwise.
+    var addedByIntent: Bool?
     /// What the last link check found, and when. Nil until a check runs, so files written before the check decode unchanged.
     var linkStatus: LinkStatus?
     /// Whether a folder's menus show its Open All item. Nil means shown, so files written before this setting decode unchanged.

@@ -84,9 +84,15 @@ struct AddAppIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        guard let path = app.fileURL?.path, let node = IntentLogic.app(atPath: path) else {
+        guard let path = app.fileURL?.path, var node = IntentLogic.app(atPath: path) else {
             throw LibraryIntentError("Choose an application (.app) file.")
         }
+        // An app outside /Applications and ~/Applications is added only after the person confirms. A declined dialog throws.
+        if !IntentLogic.isStandardApplication(atPath: path) {
+            try await requestConfirmation(dialog: IntentDialog(stringLiteral: IntentLogic.addConfirmation(for: node)))
+        }
+        // Launching it asks again, so a Shortcut cannot start an app that it added without the person seeing it.
+        node.addedByIntent = true
         LibraryStore.shared.perform("Add Application") { $0.append(node, to: nil) }
         return .result(dialog: "Added \(node.name) to Library.")
     }
