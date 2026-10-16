@@ -5,15 +5,9 @@ struct QuickOpenView: View {
 
     @ObservedObject var model: QuickOpenModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.colorScheme) private var colorScheme
     let close: () -> Void
     @FocusState private var focused: Bool
 
-    /// The text color of a selected row. The light-mode selection is too light for white text (4.19:1), so light mode
-    /// uses the primary label color (5.0:1 rendered). Dark mode keeps the selected text color, which passes at 4.8:1.
-    private var selectedText: Color {
-        colorScheme == .light ? Color.primary : Color(nsColor: .alternateSelectedControlTextColor)
-    }
 
     var body: some View {
         let results = model.results
@@ -238,7 +232,7 @@ struct QuickOpenView: View {
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .foregroundStyle(index == model.actionSelection ? selectedText : Color.primary)
+                        .foregroundStyle(index == model.actionSelection ? Color(nsColor: .alternateSelectedControlTextColor) : Color.primary)
                         .background(index == model.actionSelection ? Color(nsColor: .selectedContentBackgroundColor) : .clear,
                                     in: RoundedRectangle(cornerRadius: 12))
                         .contentShape(Rectangle())
@@ -307,14 +301,14 @@ struct QuickOpenView: View {
                 if let note = result.noteLine {
                     Text(note)
                         .font(.caption)
-                        .foregroundStyle(selected ? AnyShapeStyle(selectedText) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.tail)
                 }
                 Text(result.subtitle)
                     .font(.caption)
                     // System secondary colors adapt to light, dark, and Increase Contrast; selected rows keep the selected text color.
-                    .foregroundStyle(selected ? AnyShapeStyle(selectedText) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
             }
@@ -322,13 +316,12 @@ struct QuickOpenView: View {
             if index < 9 {
                 Text("⌘\(index + 1)")
                     .font(.callout)
-                    .foregroundStyle(selected ? AnyShapeStyle(selectedText) : AnyShapeStyle(.tertiary))
+                    .foregroundStyle(.tertiary)
             }
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        // The List draws the selection highlight. The row only sets the text color for it.
-        .foregroundStyle(selected ? selectedText : Color.primary)
+        // The List draws the selection highlight and colors the text for it. The row sets no color of its own.
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(rowLabel(for: result))
