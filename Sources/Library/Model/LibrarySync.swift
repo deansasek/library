@@ -224,6 +224,18 @@ enum LibrarySync {
         NSFileVersion.unresolvedConflictVersionsOfItem(at: url) ?? []
     }
 
+    /// Tells one conflict version from another, so a version that appears during a review can be told apart from the
+    /// ones that were reviewed.
+    static func versionKey(_ version: NSFileVersion) -> String {
+        "\(version.url.absoluteString)|\(version.modificationDate?.timeIntervalSince1970 ?? 0)"
+    }
+
+    /// Folds every other version into `local`, in order. `merge` combines the result so far with one other version, so
+    /// no other version is left out.
+    static func mergeAll(_ local: Contents, _ others: [Contents], merge: (Contents, Contents) -> Contents) -> Contents {
+        others.reduce(local) { merged, other in merge(merged, other) }
+    }
+
     /// Marks the conflict versions resolved and removes the rest, after the user has chosen and the choice is saved.
     /// Copies every conflict version to `folder` before any of them is removed. Two or more diverged copies can hold
     /// edits the chosen version does not include, so none is deleted without a copy kept on this Mac.
