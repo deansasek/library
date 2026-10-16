@@ -155,9 +155,8 @@ func openAll(_ nodes: [LibraryItem]) {
         let alert = NSAlert()
         alert.messageText = String(format: String(localized: "Open %lld items?", bundle: L10n.bundle), items.count)
         alert.informativeText = String(localized: "Library opens them one after another.", bundle: L10n.bundle)
-        alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
-        alert.addButton(withTitle: String(localized: "Open", bundle: L10n.bundle))
-        guard alert.runModal() == .alertSecondButtonReturn else { return }
+        alert.addActionWithCancelOnLeft(String(localized: "Open", bundle: L10n.bundle), cancel: String(localized: "Cancel", bundle: L10n.bundle))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
     }
     Task { @MainActor in
         for (index, node) in items.enumerated() {
@@ -214,9 +213,8 @@ private func confirmCommand(_ node: LibraryItem, _ command: String) -> Bool {
     let alert = NSAlert()
     alert.messageText = String(format: String(localized: "Run “%@” in Terminal?", bundle: L10n.bundle), node.name)
     alert.informativeText = command
-    alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
-    alert.addButton(withTitle: String(localized: "Run", bundle: L10n.bundle))
-    return alert.runModal() == .alertSecondButtonReturn
+    alert.addActionWithCancelOnLeft(String(localized: "Run", bundle: L10n.bundle), cancel: String(localized: "Cancel", bundle: L10n.bundle))
+    return alert.runModal() == .alertFirstButtonReturn
 }
 
 /// Whether a `library://open` link must ask before it opens the item. An app with arguments asks, and so does a
@@ -238,9 +236,8 @@ func confirmLinkOpen(_ node: LibraryItem, value: String?) -> Bool {
     } else {
         alert.informativeText = String(format: String(localized: "The link fills this address with: %@", bundle: L10n.bundle), value ?? "")
     }
-    alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
-    alert.addButton(withTitle: String(localized: "Open", bundle: L10n.bundle))
-    return alert.runModal() == .alertSecondButtonReturn
+    alert.addActionWithCancelOnLeft(String(localized: "Open", bundle: L10n.bundle), cancel: String(localized: "Cancel", bundle: L10n.bundle))
+    return alert.runModal() == .alertFirstButtonReturn
 }
 
 /// Asks before an app that a Shortcut or another app added through an intent opens. Cancel is the default button.
@@ -251,9 +248,8 @@ private func confirmIntentApp(_ node: LibraryItem) -> Bool {
     let alert = NSAlert()
     alert.messageText = String(format: String(localized: "Open “%@”?", bundle: L10n.bundle), node.name)
     alert.informativeText = String(localized: "A Shortcut or another app added this application to Library. Open it only if you expect it.", bundle: L10n.bundle)
-    alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
-    alert.addButton(withTitle: String(localized: "Open", bundle: L10n.bundle))
-    return alert.runModal() == .alertSecondButtonReturn
+    alert.addActionWithCancelOnLeft(String(localized: "Open", bundle: L10n.bundle), cancel: String(localized: "Cancel", bundle: L10n.bundle))
+    return alert.runModal() == .alertFirstButtonReturn
 }
 
 /// Opens a bookmark in the browser, or runs a terminal command. Opens an app,
