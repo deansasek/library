@@ -1936,6 +1936,15 @@ let readD = LibraryItem(name: "D", url: "https://d.example.com", readLater: .rea
 let readE = LibraryItem(name: "E", url: "https://e.example.com", readLater: .unread)
 check(ReadingList.ordered([readA, readB, readC, readD, readE]).map(\.name) == ["C", "E", "A", "D"], "Reading List: unread first, then read, each in tree order")
 check(ReadingList.ordered([readB]).isEmpty && ReadingList.ordered([]).isEmpty, "Reading List: items not in the list are left out")
+// ---- Frequently Used: counts keyed by item id ----
+let frequentA = LibraryItem(name: "A"), frequentB = LibraryItem(name: "B"), frequentC = LibraryItem(name: "C")
+let idCounts = UsageOrder.counts(byID: [frequentA.id.uuidString: 3, frequentB.id.uuidString: 2, "not-an-id": 9, frequentC.id.uuidString: 1])
+check(idCounts == [frequentA.id: 3, frequentB.id: 2, frequentC.id: 1], "open counts are keyed by id, and keys that are not ids are dropped")
+check(UsageOrder.frequent([frequentC, frequentB, frequentA], counts: idCounts).map(\.name) == ["A", "B"],
+      "Frequently Used: two or more opens, most opened first")
+let manyOpened = (0..<7).map { _ in LibraryItem(name: "M") }
+check(UsageOrder.frequent(manyOpened, counts: Dictionary(uniqueKeysWithValues: manyOpened.map { ($0.id, 2) })).count == 5,
+      "Frequently Used lists at most five items")
 check(ReadingList.state(after: .add, from: nil) == .unread && ReadingList.state(after: .add, from: .read) == .read, "adding gives unread, and keeps a state already there")
 check(ReadingList.state(after: .markRead, from: .unread) == .read && ReadingList.state(after: .markUnread, from: .read) == .unread, "marking read and unread changes an item in the list")
 check(ReadingList.state(after: .markRead, from: nil) == nil && ReadingList.state(after: .markUnread, from: nil) == nil, "marking never adds an item to the list")

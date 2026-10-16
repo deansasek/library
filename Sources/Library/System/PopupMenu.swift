@@ -30,7 +30,7 @@ enum PopupMenu {
             menu.addItem(NSMenuItem.sectionHeader(title: "Frequently Used"))
             frequent.forEach { menu.addItem(item(for: $0, target: target)) }
         }
-        let reading = ReadingList.ordered(store.nodes.leaves)
+        let reading = store.readingList
         if !reading.isEmpty {
             menu.addItem(NSMenuItem.sectionHeader(title: String(localized: "Reading List", bundle: L10n.bundle)))
             reading.forEach { menu.addItem(item(for: $0, target: target)) }

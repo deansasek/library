@@ -472,11 +472,24 @@ final class LibraryStore: ObservableObject {
     }
 
     /// The most opened items, for the Frequently Used section. Needs two or more opens.
-    var frequent: [LibraryItem] {
-        nodes.leaves
-            .filter { (openCounts[$0.id.uuidString] ?? 0) >= 2 }
-            .sorted { (openCounts[$0.id.uuidString] ?? 0) > (openCounts[$1.id.uuidString] ?? 0) }
-            .prefix(5).map { $0 }
+    var frequent: [LibraryItem] { menuLists.frequent }
+
+    /// The Reading List rows, unread first, for the menus.
+    var readingList: [LibraryItem] { menuLists.reading }
+
+    /// The rows the menus show from the library and the open counts. Rebuilt only when the library or the counts change,
+    /// since a menu is redrawn often and each rebuild reads the whole library.
+    private var menuListsCache: (revision: Int, usage: Int, frequent: [LibraryItem], reading: [LibraryItem])?
+
+    private var menuLists: (frequent: [LibraryItem], reading: [LibraryItem]) {
+        if let cache = menuListsCache, cache.revision == revision, cache.usage == usageRevision {
+            return (cache.frequent, cache.reading)
+        }
+        let leaves = nodes.leaves
+        let frequent = UsageOrder.frequent(leaves, counts: UsageOrder.counts(byID: openCounts))
+        let reading = ReadingList.ordered(leaves)
+        menuListsCache = (revision, usageRevision, frequent, reading)
+        return (frequent, reading)
     }
 
     func recordOpen(_ id: UUID) {
