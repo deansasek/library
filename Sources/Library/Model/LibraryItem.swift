@@ -37,7 +37,7 @@ struct LibraryItem: Codable, Identifiable, Equatable {
     /// The named fields a URL template declares in Get Info, each "name" or "name:Label". Only declared names are
     /// placeholders, so `{name}` is plain text in a URL without them. Nil for templates that use only `{}`.
     var templateFields: [String]?
-    /// A note about the item, in plain text, which may span lines. Quick Open and Spotlight show it. Nil when empty.
+    /// A note about the item, in plain text, which may span lines. Quick Open shows it. Spotlight does not index it. Nil when empty.
     var note: String?
     /// Whether a bookmark is in the Reading List, and read or unread there. Nil when it is not in the list.
     var readLater: ReadLaterState?
@@ -136,11 +136,10 @@ struct LibraryItem: Codable, Identifiable, Equatable {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    /// What Spotlight shows as the description: the target, then the note on the next line.
+    /// What Spotlight shows under the name: only the host of a bookmark, such as "jira.example.com". The path, the query
+    /// (which can hold a token), the note, and any command are never indexed. Nil for an app or a folder.
     var spotlightDescription: String? {
-        let target = url ?? command ?? appPath
-        let parts = [target, noteText].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: "\n")
+        url.flatMap(Spotlight.host(of:))
     }
 
     /// Only bookmarks with a fixed link can be in the Reading List. A template would ask for a value each time.
