@@ -34,6 +34,8 @@ jobs:
           else
             version="${GITHUB_REF_NAME#v}"
           fi
+          # The version reaches GITHUB_ENV and Info.plist, so only digits separated by dots pass.
+          scripts/check-version.sh "$version" || { echo "Refusing the release: use digits separated by dots, such as 1.2.0." >&2; exit 1; }
           echo "VERSION=$version" >> "$GITHUB_ENV"
       # Reuses SwiftPM's .build between runs. The key changes with the manifest, the lockfile, or any source file. A
       # partial match falls back to the same manifest, and swift build then compiles only what changed.
@@ -80,6 +82,14 @@ jobs:
           else
             version="${GITHUB_REF_NAME#v}"
           fi
+          # This job checks out no code, so it repeats the rule of scripts/check-version.sh.
+          case "$version" in
+            [0-9]*) ;;
+            *) echo "Refusing the release: use digits separated by dots, such as 1.2.0." >&2; exit 1 ;;
+          esac
+          case "$version" in
+            *[!0-9.]* | *. | *..*) echo "Refusing the release: use digits separated by dots, such as 1.2.0." >&2; exit 1 ;;
+          esac
           echo "VERSION=$version" >> "$GITHUB_ENV"
       - name: Download the source and its checksum
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4

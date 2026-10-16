@@ -9,6 +9,18 @@ cd "$(dirname "$0")"
 # The theming rules: colors, fonts, opacity on text, and icon-only buttons (Tests/lint-theming.sh).
 Tests/lint-theming.sh
 
+# The version check that build.sh and the release workflow use: valid versions pass, and text that could reach
+# GITHUB_ENV or Info.plist fails.
+for version in 1 1.2 1.2.0 10.20.30; do
+  scripts/check-version.sh "$version"
+done
+for version in "" 1. .1 1..2 "1.2 3" $'1.2.0\nFOO=bar' v1.2 '1.2</string>' 1.2-beta; do
+  if scripts/check-version.sh "$version"; then
+    echo "FAIL: the version check accepted [$version]" >&2
+    exit 1
+  fi
+done
+
 # The names build.sh writes into Info.plist that the code depends on must exist in the code, so a rename on one side
 # fails here: the Services messages (NSMessage), the library URL scheme, and the exported drag type.
 # Each name is read from build.sh's heredoc and searched for in the code that uses it.
