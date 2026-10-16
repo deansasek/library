@@ -51,9 +51,14 @@ jobs:
         run: ./build.sh
       - name: Run the checks
         run: ./test.sh
-      # .gitattributes leaves out everything the app does not need to build: tests, workflows, docs, and scripts.
+      # .gitattributes leaves out everything the app does not need to build: tests, workflows, and docs.
+      # The zip has no git history, so it carries its version in a VERSION file that build.sh reads.
       - name: Zip the source
-        run: git archive --format=zip --prefix="Library-$VERSION/" -o "Library-$VERSION.zip" HEAD
+        run: |
+          git archive --format=tar --prefix="Library-$VERSION/" HEAD | tar -x
+          printf '%s\n' "$VERSION" > "Library-$VERSION/VERSION"
+          zip -qr "Library-$VERSION.zip" "Library-$VERSION"
+          rm -rf "Library-$VERSION"
       # The checksum is published next to the zip, so the update in the app and the install command can check the
       # download before running any of it. The file is in the form `shasum -a 256 -c` reads.
       - name: Checksum the source
