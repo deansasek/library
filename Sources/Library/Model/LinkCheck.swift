@@ -59,10 +59,21 @@ enum LinkCheck {
         followed < maxRedirects && target.map(WebFetch.isWeb) == true && !WebFetch.isDowngrade(from: source, to: target)
     }
 
-    /// Whether a HEAD answer means the server does not accept HEAD, so the check asks again with GET: 403, 405, or 501.
-    /// Any other answer, or none, is final.
+    /// Whether a HEAD answer means the server does not accept HEAD, so the check asks again with GET: 405 or 501 only.
+    /// A 403 is final, since it is often a real answer and a GET to it could act on the page. Any other answer, or
+    /// none, is final.
     static func retriesWithGET(afterHEAD statusCode: Int?) -> Bool {
-        statusCode.map { [403, 405, 501].contains($0) } ?? false
+        statusCode.map { [405, 501].contains($0) } ?? false
+    }
+
+    /// Words that mark a page as one that acts when it is requested, such as signing out or unsubscribing. Their
+    /// addresses are never requested by the background check.
+    static let actionWords = ["logout", "log-out", "log_out", "signout", "sign-out", "unsubscribe", "confirm", "toggle", "delete"]
+
+    /// True when the path or query of `url` contains an action word. Matching is case-insensitive.
+    static func looksLikeAction(_ url: URL) -> Bool {
+        let text = ((url.path(percentEncoded: false)) + "?" + (url.query(percentEncoded: false) ?? "")).lowercased()
+        return actionWords.contains { text.contains($0) }
     }
 
     /// True when `checked` is within the last 24 hours. A date in the future (the clock was set back) is not recent,
@@ -92,7 +103,7 @@ enum LinkCheck {
     static func isCheckable(_ item: LibraryItem) -> Bool {
         guard item.isDivider != true, !item.isFolder, item.command == nil, item.appPath == nil,
               !item.isTemplate, let link = item.link else { return false }
-        return WebFetch.isWeb(link)
+        return WebFetch.isWeb(link) && !looksLikeAction(link)
     }
 
     /// The address a bookmark is checked at, as the key that groups bookmarks sharing one request.
