@@ -56,7 +56,7 @@ struct ShortcutField: View {
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .fixedSize()
-            .help("Hot corner and clear")
+            .help(String(localized: "Choose a hot corner or clear it.", bundle: L10n.bundle))
         }
         .background {
             if isRecording {

@@ -389,6 +389,9 @@
 /* VoiceOver label for a shortcut's record button when no action is named. The visible text is the same. */
 "Record Shortcut" = "Record Shortcut";
 
+/* Tooltip of the menu beside a shortcut field. It offers a hot corner choice or clearing the shortcut. */
+"Choose a hot corner or clear it." = "Choose a hot corner or clear it.";
+
 /* VoiceOver label for a shortcut's record button. The name of the action follows, such as "Show Quick Open". */
 "Record Shortcut for %@" = "Record Shortcut for %@";
 
