@@ -1306,6 +1306,7 @@ check(staleCommandFiles(among: commandFiles, now: commandNow) == [oldCommand], "
 // Names the code builds at runtime (no string literal in the argument) are listed below with the reason they are safe.
 let runtimeSymbolUses: [(file: String, expression: String, reason: String)] = [
     ("Model/Icons.swift", "text", "a custom icon the user typed; customIcon returns nil for an unknown name"),
+    ("Model/Icons.swift", "name", "the cache's lookup of the name symbolImage passes in; symbolImage's literal callers are read by the scan"),
     ("Model/LibraryStore.swift", "name", "private symbol(_:) helper; its literal callers are read by the symbol(\"...\") rule"),
     ("QuickOpen/QuickOpenModel.swift", "name", "private symbol(_:) helper; its literal callers are read by the symbol(\"...\") rule"),
     ("Manage/ManageState.swift", "$0", "the saved icon of an item, only tested to choose the picker tab"),
@@ -1322,7 +1323,7 @@ check(swiftFiles.count > 20, "finds the app's Swift files (run from the reposito
 
 func symbolRegex(_ pattern: String) -> NSRegularExpression { try! NSRegularExpression(pattern: pattern) }
 let symbolLiteral = symbolRegex(#""([^"\\\n]*)""#)
-let symbolLabelled = symbolRegex(#"(?:systemName|systemImage|systemSymbolName|systemImageName):\s*([^,)\n]+)"#)
+let symbolLabelled = symbolRegex(#"(?:(?:systemName|systemImage|systemSymbolName|systemImageName):\s*|(?<!func )\bsymbolImage\()([^,)\n]+)"#)
 let symbolHelperCall = symbolRegex(#"\bsymbol\(\s*("[^"\n]*")\s*\)"#)
 let symbolIconField = symbolRegex(#"icon:\s*("[^"\n]*")"#)
 let symbolReturn = symbolRegex(#"return\s+("[^"\n]*")"#)
@@ -1466,6 +1467,9 @@ if let written = ClipPreviewSource.write(Data("secret".utf8), extension: "txt", 
 let boundedIcons = IconCache(capacity: 10)
 for index in 0..<25 { _ = boundedIcons.icon(at: "/copied/\(index)", modified: nil) { NSImage() } }
 check(boundedIcons.count <= 10, "the icon cache is bounded")
+check(symbolImage("star.fill") === symbolImage("star.fill") && symbolImage("star.fill") != nil,
+      "an SF Symbol is kept after its first lookup")
+check(symbolImage("not.a.real.symbol.name") == nil, "a name that is not a symbol has no image")
 let boundedDates = ModificationDateCache(capacity: 10)
 for index in 0..<25 { _ = boundedDates.modified(at: "/copied/\(index)", now: 0) { nil } }
 check(boundedDates.count <= 10, "the modification date cache is bounded")

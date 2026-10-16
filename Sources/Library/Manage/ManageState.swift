@@ -98,7 +98,7 @@ final class ManageState: ObservableObject {
         draft = node
         draftBase = node
         fieldsText = (node.templateFields ?? []).joined(separator: ", ")
-        let isSymbol = node.icon.map { NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil } ?? true
+        let isSymbol = node.icon.map { symbolImage($0) != nil } ?? true
         iconTab = isSymbol ? .symbols : .emoji
     }
 

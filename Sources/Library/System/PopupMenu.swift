@@ -120,7 +120,7 @@ enum PopupMenu {
             }
             let next = NSMenuItem(title: String(localized: "Paste Next", bundle: L10n.bundle), action: #selector(ClipTarget.pasteNext(_:)), keyEquivalent: "")
             next.target = target
-            next.image = NSImage(systemSymbolName: "arrow.right.doc.on.clipboard", accessibilityDescription: nil)
+            next.image = symbolImage("arrow.right.doc.on.clipboard")
             menu.addItem(next)
             let clearQueue = NSMenuItem(title: String(localized: "Clear Queue", bundle: L10n.bundle), action: #selector(ClipTarget.clearPasteQueue(_:)), keyEquivalent: "")
             clearQueue.target = target
@@ -134,7 +134,7 @@ enum PopupMenu {
         let item = NSMenuItem(title: suggestion.title, action: action, keyEquivalent: "")
         item.target = target
         item.representedObject = suggestion
-        item.image = NSImage(systemSymbolName: "plus.circle", accessibilityDescription: nil)
+        item.image = symbolImage("plus.circle")
         item.toolTip = suggestion.subtitle
         return item
     }

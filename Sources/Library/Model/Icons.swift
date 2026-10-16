@@ -87,10 +87,36 @@ func retainedIcons(_ icons: [String: NSImage], live: Set<String>) -> [String: NS
     icons.filter { live.contains($0.key) }
 }
 
+/// SF Symbol images by name. Asking the system for a symbol renders it, and rows and menus ask on every redraw, so
+/// each name is kept after its first lookup. A name that is not a symbol is not kept, so it is looked up again.
+private final class SymbolCache: @unchecked Sendable {
+    static let defaultCapacity = 300
+    private let lock = NSLock()
+    private var images: [String: NSImage] = [:]
+
+    func image(named name: String) -> NSImage? {
+        if let cached = lock.withLock({ images[name] }) { return cached }
+        guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil) else { return nil }
+        lock.withLock {
+            // Starts over when full, as IconCache does, so names that were typed long ago do not stay forever.
+            if images.count >= Self.defaultCapacity { images.removeAll() }
+            images[name] = image
+        }
+        return image
+    }
+}
+
+private let symbolImages = SymbolCache()
+
+/// The SF Symbol with this name, kept for the next lookup. Nil when there is no such symbol.
+func symbolImage(_ name: String) -> NSImage? {
+    symbolImages.image(named: name)
+}
+
 /// The 16 pt image for a custom icon: an SF Symbol name or a single emoji. Nil when `text` is neither.
 func customIcon(_ text: String) -> NSImage? {
     let text = text.trimmingCharacters(in: .whitespaces)
-    if let symbol = NSImage(systemSymbolName: text, accessibilityDescription: nil) {
+    if let symbol = symbolImage(text) {
         return symbol
     }
     // Scalars above U+238C skip ASCII digits and symbols, which also count as emoji.

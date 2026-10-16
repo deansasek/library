@@ -94,7 +94,7 @@ final class LibraryStore: ObservableObject {
     static var dataFile: URL { LibrarySync.linkDestination(of: file) ?? file }
 
     private static func symbol(_ name: String) -> NSImage {
-        NSImage(systemSymbolName: name, accessibilityDescription: nil) ?? NSImage()
+        symbolImage(name) ?? NSImage()
     }
     private static let fallbackIcon = symbol("link")
     private static let terminalIcon = symbol("terminal")

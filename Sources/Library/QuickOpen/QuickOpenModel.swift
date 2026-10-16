@@ -236,7 +236,7 @@ final class QuickOpenModel: ObservableObject {
     }
 
     private func symbol(_ name: String) -> NSImage {
-        NSImage(systemSymbolName: name, accessibilityDescription: nil) ?? NSImage()
+        symbolImage(name) ?? NSImage()
     }
 
     /// Selects the row under the pointer, but only after the pointer actually moved. A list that scrolls under a

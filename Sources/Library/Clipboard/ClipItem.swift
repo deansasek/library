@@ -33,7 +33,7 @@ struct ClipItem: Identifiable {
     var icon: NSImage {
         if let thumbnail { return thumbnail }
         if kind == .file, let path = fileURLs.first?.path { return appIcon(at: path) }
-        return NSImage(systemSymbolName: pinned ? "pin.fill" : symbol, accessibilityDescription: nil) ?? NSImage()
+        return symbolImage(pinned ? "pin.fill" : symbol) ?? NSImage()
     }
 
     var symbol: String {
