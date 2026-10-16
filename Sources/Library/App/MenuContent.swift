@@ -48,7 +48,11 @@ struct MenuContent: View {
                     }
                 }
                 Divider()
-                Button { history.clear() } label: { Text("Clear History", bundle: L10n.bundle) }
+                Button {
+                    if Self.confirmClearHistory() { history.clear() }
+                } label: {
+                    Text("Clear History", bundle: L10n.bundle)
+                }
             }
             if !history.pasteQueue.isEmpty {
                 Divider()
@@ -142,6 +146,19 @@ struct MenuContent: View {
             Text("Quit Library", bundle: L10n.bundle)
         }
         .keyboardShortcut("q")
+    }
+
+    /// Asks before the clipboard history is cleared. Cancel is the first button, so it is the default one.
+    private static func confirmClearHistory() -> Bool {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = String(localized: "Clear clipboard history?", bundle: L10n.bundle)
+        alert.informativeText = String(localized: "Unpinned items are removed. Pinned items are kept.", bundle: L10n.bundle)
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
+        let clear = alert.addButton(withTitle: String(localized: "Clear History", bundle: L10n.bundle))
+        clear.hasDestructiveAction = true
+        return alert.runModal() == .alertSecondButtonReturn
     }
 }
 

@@ -4,6 +4,12 @@
 /* Clipboard menu item that empties the clipboard history. */
 "Clear History" = "Clear History";
 
+/* Title of the alert that confirms clearing the clipboard history. */
+"Clear clipboard history?" = "Clear clipboard history?";
+
+/* Explains what clearing the clipboard history removes and keeps. */
+"Unpinned items are removed. Pinned items are kept." = "Unpinned items are removed. Pinned items are kept.";
+
 /* Clipboard submenu title and the Clipboard settings tab. */
 "Clipboard" = "Clipboard";
 
