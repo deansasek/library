@@ -79,6 +79,8 @@ final class ClipboardHistory: ObservableObject {
     private let historyFile: URL?
     /// Supplies the key that encrypts pinned items and the history. Tests pass their own, so they never touch the Keychain.
     private let loadKey: @Sendable () throws -> SymmetricKey
+    /// Deletes the Keychain key for Reset Clipboard Key. Tests pass their own, so they never touch the Keychain.
+    private let resetKey: @Sendable () -> Void
     /// True when clipboard.json exists but could not be opened because the key was unavailable.
     private var leavesPinnedFile = false
     /// True when the history file exists but could not be opened because the key was unavailable. Nothing is written then.
@@ -114,11 +116,13 @@ final class ClipboardHistory: ObservableObject {
     /// `file` is where pinned items are saved. Nil saves nothing. `key` encrypts that file.
     /// `historyFile` is where unpinned history is saved when it is kept across restarts. Nil saves nothing.
     init(pasteboard: NSPasteboard = .general, file: URL? = ClipboardHistory.defaultFile, historyFile: URL? = nil,
-         key: @escaping @Sendable () throws -> SymmetricKey = ClipboardKey.key) {
+         key: @escaping @Sendable () throws -> SymmetricKey = ClipboardKey.key,
+         resetKey: @escaping @Sendable () -> Void = ClipboardKey.reset) {
         self.pasteboard = pasteboard
         self.file = file
         self.historyFile = historyFile
         self.loadKey = key
+        self.resetKey = resetKey
         lastChange = pasteboard.changeCount
         launchChangeCount = pasteboard.changeCount
         isEnabled = UserDefaults.standard.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
@@ -428,6 +432,30 @@ final class ClipboardHistory: ObservableObject {
             guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return }
             if rename(temporary.path, file.path) != 0 { try? FileManager.default.removeItem(at: temporary) }
         }
+    }
+
+    /// Reset Clipboard Key. Deletes the Keychain key and the saved pinned items, and the saved history, which the old key
+    /// sealed. Pinned items are removed from memory and the paste queue. Unpinned items stay, and are saved again under
+    /// the new key when history is kept across restarts. Does nothing until the pinned items have loaded.
+    func resetClipboardKey() {
+        guard pinnedLoaded else { return }
+        let pinned = items.filter(\.pinned)
+        items.removeAll { $0.pinned }
+        forget(pinned)
+        historySave?.cancel()
+        historySave = nil
+        let pinnedFile = file
+        let historyFileURL = historyFile
+        let resetKey = self.resetKey
+        // Queued on writeQueue, so any save already waiting finishes first and none runs with the new key.
+        Self.writeQueue.sync {
+            if let pinnedFile { try? FileManager.default.removeItem(at: pinnedFile) }
+            if let historyFileURL { try? FileManager.default.removeItem(at: historyFileURL) }
+            resetKey()
+        }
+        leavesPinnedFile = false
+        leavesHistoryFile = false
+        scheduleHistorySave()
     }
 
     /// Pinned items first, then the rest, newest first in each group.

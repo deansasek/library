@@ -179,6 +179,15 @@ struct SettingsView: View {
                 Text("Pinned items show as Pinned Item until you authenticate with Touch ID or your Mac password. They stay unlocked until you choose Lock Pinned Items in the Library menu, the Mac sleeps, or Library quits.").foregroundStyle(footerStyle)
             }
             Section {
+                Button {
+                    confirmResetClipboardKey()
+                } label: {
+                    Text("Reset Clipboard Key", bundle: L10n.bundle)
+                }
+            } footer: {
+                Text("Use this only if pinned items can no longer be shown. It deletes the key that protects them, and the pinned items are removed from this Mac. They cannot be recovered.", bundle: L10n.bundle)
+            }
+            Section {
                 Toggle("Keep clipboard history", isOn: $history.isEnabled)
                 Toggle("Paste into text fields", isOn: $history.pastesIntoFields)
                 Toggle("Play copied GIFs", isOn: $history.playsGIFs)
@@ -210,6 +219,20 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Asks before the key is reset, because the pinned items cannot be recovered once it is gone.
+    private func confirmResetClipboardKey() {
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = String(localized: "Reset the clipboard key?", bundle: L10n.bundle)
+        alert.informativeText = String(localized: "Pinned items will be removed from this Mac. The key and the saved pinned items are deleted, and they cannot be recovered.", bundle: L10n.bundle)
+        let reset = alert.addButton(withTitle: String(localized: "Reset Clipboard Key", bundle: L10n.bundle))
+        reset.hasDestructiveAction = true
+        alert.addButton(withTitle: String(localized: "Cancel", bundle: L10n.bundle))
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        history.resetClipboardKey()
     }
 
     private func field(_ index: Int, _ name: String, _ shortcut: Binding<Shortcut?>) -> some View {

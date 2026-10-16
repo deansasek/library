@@ -434,3 +434,16 @@
 
 /* Confirmation before an app outside the Applications folders is added through a Shortcut. */
 "Add “%@” to Library? It is outside the Applications folders." = "Add “%@” to Library? It is outside the Applications folders.";
+
+/* Clipboard settings button that deletes the key protecting pinned items, so a damaged key can be replaced. */
+"Reset Clipboard Key" = "Reset Clipboard Key";
+
+/* Clipboard settings footer explaining when Reset Clipboard Key is needed and what it removes. */
+"Use this only if pinned items can no longer be shown. It deletes the key that protects them, and the pinned items are removed from this Mac. They cannot be recovered." = "Use this only if pinned items can no longer be shown. It deletes the key that protects them, and the pinned items are removed from this Mac. They cannot be recovered.";
+
+/* Title of the confirmation before the clipboard key is reset. */
+"Reset the clipboard key?" = "Reset the clipboard key?";
+
+/* Text of the confirmation before the clipboard key is reset, which says pinned items are removed. */
+"Pinned items will be removed from this Mac. The key and the saved pinned items are deleted, and they cannot be recovered." = "Pinned items will be removed from this Mac. The key and the saved pinned items are deleted, and they cannot be recovered.";
+>
