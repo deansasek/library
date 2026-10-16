@@ -43,6 +43,9 @@ struct SettingsView: View {
                     get: { loginItem.isEnabled },
                     set: { loginItem.set($0) }
                 ))
+                if loginItem.needsApproval {
+                    LoginItemApprovalNote()
+                }
             } footer: {
                 Text("Library lives in the menu bar and opens its items from there.").foregroundStyle(footerStyle)
             }

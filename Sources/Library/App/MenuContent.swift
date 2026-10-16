@@ -103,6 +103,13 @@ struct MenuContent: View {
         )) {
             Text("Open at Login", bundle: L10n.bundle)
         }
+        if loginItem.needsApproval {
+            Button {
+                LoginItem.openSettings()
+            } label: {
+                Text("Open Login Items…", bundle: L10n.bundle)
+            }
+        }
         Button {
             UpdateCheck.checkNow()
         } label: {

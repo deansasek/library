@@ -447,3 +447,14 @@
 /* Text of the confirmation before the clipboard key is reset, which says pinned items are removed. */
 "Pinned items will be removed from this Mac. The key and the saved pinned items are deleted, and they cannot be recovered." = "Pinned items will be removed from this Mac. The key and the saved pinned items are deleted, and they cannot be recovered.";
 >
+/* Confirmation text: Open at Login needs Library allowed in System Settings. */
+"Allow Library in System Settings under Login Items to open it at login." = "Allow Library in System Settings under Login Items to open it at login.";
+
+/* Button that opens System Settings at Login Items. */
+"Open Login Items…" = "Open Login Items…";
+
+/* Alert title when Library cannot register to open at login. */
+"Library Can’t Open at Login" = "Library Can’t Open at Login";
+
+/* Alert title when Library cannot unregister from opening at login. */
+"Library Can’t Stop Opening at Login" = "Library Can’t Stop Opening at Login";

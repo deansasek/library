@@ -2613,5 +2613,12 @@ check(ClipboardHistory.historySaveDelay(lastWrite: saveNow, now: saveNow) == 10,
 check(ClipboardHistory.historySaveDelay(lastWrite: saveNow.addingTimeInterval(-4), now: saveNow) == 6, "the wait counts from the last write")
 check(ClipboardHistory.historySaveDelay(lastWrite: saveNow.addingTimeInterval(-30), now: saveNow) == 1, "a save after a long pause waits a second")
 
+// ---- Open at Login shows the system's status, and asks the person to allow Library when the system needs it ----
+MainActor.assumeIsolated {
+    check(LoginItem.presentation(for: .enabled) == .on, "an enabled login item shows on")
+    check(LoginItem.presentation(for: .requiresApproval) == .needsApproval, "a login item waiting for approval asks for it, not off")
+    check(LoginItem.presentation(for: .notRegistered) == .off && LoginItem.presentation(for: .notFound) == .off, "a login item that is not registered shows off")
+}
+
 print(failures == 0 ? "ALL CHECKS PASS" : "\(failures) FAILED")
 exit(failures == 0 ? 0 : 1)
