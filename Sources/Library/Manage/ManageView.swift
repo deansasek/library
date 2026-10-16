@@ -264,19 +264,10 @@ struct ManageView: View {
         } message: {
             Text("The items are removed from Recently Deleted. Undo right after this brings them back.")
         }
-        .dropDestination(for: RowDrag.self) { drags, _ in
-            // Rows dropped on empty space, not on a row, go to the top level.
-            let moved = Set(drags.flatMap(\.ids))
-            store.apply(rowDrop(moving: moved, onto: nil, in: store.nodes, listSorted: false), moving: moved)
-            return true
-        }
-        .dropDestination(for: URL.self) { urls, _ in
-            addDropped(urls)
-            state.isListDropTargeted = false
-            return true
-        } isTargeted: { targeted in
+        .dropDestination(for: RowDrag.self) { drags, _ in dropRowsOnList(drags) }
+        .dropDestination(for: URL.self, action: { urls, _ in dropLinksOnList(urls) }, isTargeted: { targeted in
             state.isListDropTargeted = targeted
-        }
+        })
         .overlay {
             // Outlines the list while a link or app is dragged over it, the same as a row that would take the drop.
             if state.isListDropTargeted {
@@ -519,6 +510,20 @@ struct ManageView: View {
     }
 
     /// Live items go to Recently Deleted. Items already there are removed for good, after the user confirms.
+    /// Rows dropped on empty space, not on a row, go to the top level.
+    private func dropRowsOnList(_ drags: [RowDrag]) -> Bool {
+        let moved = Set(drags.flatMap(\.ids))
+        store.apply(rowDrop(moving: moved, onto: nil, in: store.nodes, listSorted: false), moving: moved)
+        return true
+    }
+
+    /// A link or app dropped on the list is added to the library, and the highlight is cleared.
+    private func dropLinksOnList(_ urls: [URL]) -> Bool {
+        addDropped(urls)
+        state.isListDropTargeted = false
+        return true
+    }
+
     private func delete(_ ids: Set<UUID>) {
         let live = ids.filter { store.nodes.node(withID: $0) != nil }
         if !live.isEmpty { store.delete(live) }
