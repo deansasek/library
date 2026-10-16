@@ -260,7 +260,15 @@ private final class QuickOpenPanel: NSPanel {
                 if onSpace?() == true { return }
             default: break
             }
+            returnTypingToSearchField()
         }
         super.sendEvent(event)
+    }
+
+    /// A click or right-click on a List row can make the list the first responder. Its type-to-select would then take
+    /// the letters typed next, so the search field gets the keyboard back before a key is delivered.
+    private func returnTypingToSearchField() {
+        guard let content = contentView, !(firstResponder is NSText) else { return }
+        if let field = textField(in: content) { makeFirstResponder(field) }
     }
 }
