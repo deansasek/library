@@ -26,10 +26,10 @@ Click the Library icon in the menu bar to open your items and recent copies, or 
 
 ## Install
 
-Paste this into Terminal. It installs the Xcode Command Line Tools if they are missing, builds Library, and installs `Library.app` in your Applications folder. It downloads the source to a temporary folder and needs no git or Xcode beforehand:
+Paste this into Terminal. It downloads the latest release, checks its SHA-256 checksum, and builds and installs `Library.app` in your Applications folder. It installs the Command Line Tools for Xcode first if they are missing, and it needs nothing else installed beforehand:
 
 ```bash
-cd "$(mktemp -d)" && curl -fsSL https://github.com/deansasek/library/archive/refs/heads/main.zip -o library.zip && unzip -q library.zip && ./library-main/install.sh
+cd "$(mktemp -d)" && tag="$(curl -fsSIL -o /dev/null -w '%{url_effective}' https://github.com/deansasek/library/releases/latest | sed 's#.*/tag/##')" && ver="${tag#v}" && curl -fsSL -O "https://github.com/deansasek/library/releases/download/$tag/Library-$ver.zip" -O "https://github.com/deansasek/library/releases/download/$tag/Library-$ver.zip.sha256" && shasum -a 256 -c "Library-$ver.zip.sha256" && unzip -q "Library-$ver.zip" && "./Library-$ver/install.sh"
 ```
 
 Library checks for updates itself. **Check for Updates…** offers to install a newer version in Terminal. Your library and pinned clipboard items are kept. An install made from a clone can be updated with `update.sh` in that folder.
