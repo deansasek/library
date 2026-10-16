@@ -86,7 +86,12 @@ struct ManageView: View {
                 if let status = store.syncState {
                     // The iCloud state, as Finder shows it for an iCloud Drive file. It is not a dialog.
                     Divider()
-                    HStack {
+                    HStack(spacing: 6) {
+                        // Spins while the iCloud copy is still being sent or fetched.
+                        if status != .upToDate {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
                         Text(status.label)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
