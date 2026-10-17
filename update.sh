@@ -17,14 +17,10 @@ change() {
     fi
 }
 
-# The version of the checked-out code: its latest tag (the nearest one reachable from HEAD), or the default
-# CFBundleShortVersionString in build.sh when there is no tag.
+# The version of the checked-out code, from the one place build.sh stamps it (scripts/version.sh), so the two cannot
+# drift. It is empty when nothing resolves, which the lines below print as "unknown".
 version() {
-    if tag="$(git describe --tags --abbrev=0 2>/dev/null)"; then
-        print -r -- "$tag"
-    else
-        sed -n 's/.*CFBundleShortVersionString<\/key><string>\${VERSION:-\([^}]*\)}<.*/\1/p' build.sh
-    fi
+    scripts/version.sh 2>/dev/null || true
 }
 
 branch="$(git rev-parse --abbrev-ref HEAD)"

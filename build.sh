@@ -2,11 +2,10 @@
 # Builds Library.app in ./build. Set VERSION to stamp a version, as the release workflow does.
 set -euo pipefail
 cd "$(dirname "$0")"
-# The version comes from VERSION, else the VERSION file in a release zip, else the latest git tag, else 0.0.0. A
-# plain build from source must not claim to be older than the latest release, or the update check would always
-# offer one.
-version="${VERSION:-$(cat VERSION 2>/dev/null || git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)}"
-version="${version:-0.0.0}"
+# The version comes from one place, scripts/version.sh: VERSION, else the VERSION file in a release zip, else the
+# nearest tag reachable from HEAD. It fails when nothing resolves, so a source build with no tags is refused rather
+# than stamped 0.0.0, which the update check would always offer a release for.
+version="$(scripts/version.sh)" || exit 1
 # The version is written into Info.plist, so only digits separated by dots pass (scripts/check-version.sh).
 scripts/check-version.sh "$version" || { echo "Refusing version \"$version\": use digits separated by dots, such as 1.2.0." >&2; exit 1; }
 

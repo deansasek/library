@@ -1,5 +1,5 @@
 # Left out of release zips and GitHub's source archives, because none of it is needed to build the app.
-# scripts/ is not left out: build.sh runs scripts/check-version.sh.
+# scripts/ is not left out: build.sh runs scripts/version.sh and scripts/check-version.sh.
 /.github export-ignore
 /.gitattributes export-ignore
 /.gitignore export-ignore
