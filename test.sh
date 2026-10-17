@@ -5,6 +5,7 @@
 # They use private pasteboards and temporary files, so they never touch your clipboard or your library.
 set -euo pipefail
 cd "$(dirname "$0")"
+repo="$PWD"
 
 # The theming rules: colors, fonts, opacity on text, and icon-only buttons (Tests/lint-theming.sh).
 Tests/lint-theming.sh
@@ -40,6 +41,43 @@ printf '1.2.3\n' > "$version_repo/VERSION"
 from_file="$(cd "$version_repo" && env -u VERSION "$version_script")"
 [[ "$from_file" == "1.2.3" ]] || { echo "FAIL: the version lookup printed [$from_file] for a VERSION file of 1.2.3" >&2; exit 1; }
 echo "Version lookup: no tag fails, tag v9.9.9 reads 9.9.9, a VERSION file reads 1.2.3"
+
+# The release branch check that the release workflow runs before it builds or publishes: a manual run is allowed on
+# main, and a tag is allowed only on a commit main reaches. Tested against a throwaway repository with a feature
+# branch that is ahead of main, the case the check exists to refuse.
+branch_check="$(mktemp -d)"
+git init -q --bare "$branch_check/origin.git"
+git init -q "$branch_check/work"
+git -C "$branch_check/work" config user.email test@example.com
+git -C "$branch_check/work" config user.name test
+git -C "$branch_check/work" remote add origin "$branch_check/origin.git"
+git -C "$branch_check/work" commit -q --allow-empty -m one
+git -C "$branch_check/work" branch -M main
+git -C "$branch_check/work" checkout -qb feature
+git -C "$branch_check/work" commit -q --allow-empty -m two
+git -C "$branch_check/work" push -q origin main feature
+git -C "$branch_check/work" fetch -q origin
+git -C "$branch_check/work" checkout -q main
+main_sha="$(git -C "$branch_check/work" rev-parse main)"
+feature_sha="$(git -C "$branch_check/work" rev-parse feature)"
+release_branch() { ( cd "$branch_check/work" && "$repo/scripts/check-release-branch.sh" "$@" ); }
+release_branch workflow_dispatch refs/heads/main "$main_sha" \
+  || { echo "FAIL: the release branch check refused a manual run from main" >&2; exit 1; }
+if release_branch workflow_dispatch refs/heads/feature "$feature_sha" 2>/dev/null; then
+  echo "FAIL: the release branch check allowed a manual run from a feature branch" >&2; exit 1
+fi
+release_branch push refs/tags/v1.2.0 "$main_sha" \
+  || { echo "FAIL: the release branch check refused a tag on main" >&2; exit 1; }
+if release_branch push refs/tags/v9.9.9 "$feature_sha" 2>/dev/null; then
+  echo "FAIL: the release branch check allowed a tag on a feature branch" >&2; exit 1
+fi
+rm -rf "$branch_check"
+# The workflow must actually run the check and keep the build behind it, or the check above proves nothing.
+grep -q 'scripts/check-release-branch.sh' .github/workflows/release.yml \
+  || { echo "FAIL: the release workflow does not run scripts/check-release-branch.sh" >&2; exit 1; }
+grep -q '^    needs: guard$' .github/workflows/release.yml \
+  || { echo "FAIL: the release workflow's build does not wait for the guard job" >&2; exit 1; }
+echo "The release branch check passes: main may release, another branch may not"
 
 # The names build.sh writes into Info.plist that the code depends on must exist in the code, so a rename on one side
 # fails here: the Services messages (NSMessage), the library URL scheme, and the exported drag type.

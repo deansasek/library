@@ -2,6 +2,8 @@ name: Release
 
 # Pushing a tag such as v1.2.0 publishes a release. Running the workflow by hand with a version does the same and
 # creates the tag. The release holds a source zip, not a built app: people build it themselves with ./install.sh.
+# Only a commit on main can publish: the guard job below refuses a manual run from another branch, or a tag that main
+# does not reach, before anything is built or published.
 on:
   push:
     tags: ["v*"]
@@ -17,9 +19,27 @@ permissions:
   contents: read
 
 jobs:
+  # Refuses a run that is not on main, before anything is built or published. It checks out the ref only to read git
+  # history: it runs no build, and the read-only token keeps .git/config free of credentials.
+  guard:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          # All history and branches, so main is present to test whether it reaches the tag's commit.
+          fetch-depth: 0
+      - name: Require a commit on main
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          SHA: ${{ github.sha }}
+        run: scripts/check-release-branch.sh "$EVENT_NAME" "$REF" "$SHA"
+
   # Builds and tests the code with a read-only token. The checkout keeps no credentials in .git/config, so the code
   # that build.sh and test.sh run cannot reach the token either.
   build:
+    needs: guard
     runs-on: macos-26
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
