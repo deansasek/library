@@ -79,6 +79,14 @@ if ! ./build.sh; then
     fail "the build failed. The messages above show where."
 fi
 
+# Only replace a copy that is Library. An unrelated app that happens to be named Library.app is left alone, the same
+# way the in-app Installer refuses to replace it. The check runs before anything is quit, copied, or moved, so a
+# refusal leaves Applications exactly as it was.
+if [[ -e /Applications/Library.app ]]; then
+    existing_id="$(defaults read /Applications/Library.app/Contents/Info CFBundleIdentifier 2>/dev/null || true)"
+    [[ "$existing_id" == "com.deansasek.library" ]] || fail "Applications already has a different app named Library.app. Move it out of the way yourself, then try again. Nothing was changed."
+fi
+
 # Quit the running app through its own quit command, so it saves pending changes on the way out. A signal such as
 # SIGTERM skips those saves. Wait a bounded time for it to exit, so a stuck app cannot stall the install forever.
 quit_library() {
@@ -95,7 +103,7 @@ if pgrep -x Library >/dev/null; then
 fi
 
 # Copy the new app beside the old one in /Applications (same volume, so the moves are renames), check the copy, and only
-# then swap it in. The old copy is removed last, so a failed copy leaves the installed app as it was.
+# then swap it in. The old copy goes to the Trash last, so a failed copy leaves the installed app as it was.
 staging="/Applications/.Library.new.$$.app"
 previous="/Applications/.Library.old.$$.app"
 trap 'rm -rf "$staging"' EXIT
@@ -118,7 +126,20 @@ if ! mv "$staging" /Applications/Library.app; then
     fi
     fail "the new copy could not be put in place."
 fi
-rm -rf "$previous" || print -u2 "Installed, but the old copy could not be removed: $previous"
+# The old copy goes to the Trash so it can be recovered, rather than being deleted. Its version in the name keeps it
+# easy to recognise in the Trash, and a unique name is used if a copy is already there so nothing is overwritten.
+if (( had_previous )); then
+    old_version="$(defaults read "$previous/Contents/Info" CFBundleShortVersionString 2>/dev/null || true)"
+    trashed="$HOME/.Trash/Library${old_version:+ $old_version}.app"
+    if [[ -e "$trashed" ]]; then
+        trashed="$HOME/.Trash/Library.old.$$.app"
+    fi
+    if [[ -d "$HOME/.Trash" ]] && mv "$previous" "$trashed" 2>/dev/null; then
+        print "The previous copy is in the Trash: $(basename "$trashed")"
+    else
+        print -u2 "Installed, but the old copy could not be moved to the Trash: $previous"
+    fi
+fi
 installed="$(defaults read /Applications/Library.app/Contents/Info CFBundleShortVersionString)"
 
 # Opening the app is a convenience. A failure here does not undo a good install.
