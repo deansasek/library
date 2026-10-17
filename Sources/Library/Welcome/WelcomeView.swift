@@ -35,6 +35,7 @@ struct WelcomeView: View {
     @ObservedObject var model: WelcomeModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var loginItem = LoginItem.shared
+    @ObservedObject private var history = ClipboardHistory.shared
     let close: () -> Void
 
     var body: some View {
@@ -152,12 +153,21 @@ struct WelcomeView: View {
             }
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
-            Text("Clipboard history stays in memory and is gone when Library quits. Pinned items are saved on this Mac, and copies from password managers are skipped.")
+            Text(historyNote)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
             Spacer(minLength: 0)
         }
+    }
+
+    /// What happens to clipboard history at quit, matching the Settings > Clipboard footer. The history is only in
+    /// memory unless Keep clipboard history across restarts is on, so the sentence names that setting when it is.
+    private var historyNote: String {
+        if history.keepsAcrossRestarts {
+            return "Clipboard history stays in memory and is gone when Library quits, unless Keep clipboard history across restarts is on. Pinned items are saved on this Mac, and copies from password managers are skipped."
+        }
+        return "Clipboard history stays in memory and is gone when Library quits. Pinned items are saved on this Mac, and copies from password managers are skipped."
     }
 
     /// Whether the app is in the Applications folder, with a button to move it there if it is not.
