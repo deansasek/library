@@ -2428,6 +2428,38 @@ do {
 let storeHome = FileManager.default.temporaryDirectory.appendingPathComponent("library-store-checks-\(UUID().uuidString)", isDirectory: true)
 setenv("LIBRARY_HOME", storeHome.path, 1)
 let undoStore = LibraryStore()
+
+// Restore Defaults changes the shortcuts without asking for Accessibility access. The Accessibility row asks.
+do {
+    let savedHotkeys = UserDefaults.standard.data(forKey: "extraHotkeys")
+    let originalHotkeys = undoStore.extraHotkeys
+    let customHotkeys = [
+        Shortcut(modifiers: UInt32(controlKey | optionKey), gesture: "scrollDown"),
+        Shortcut(keyCode: 19, modifiers: UInt32(cmdKey | optionKey), key: "2"),
+        Shortcut(keyCode: 20, modifiers: UInt32(cmdKey | optionKey), key: "3"),
+        Shortcut(keyCode: 21, modifiers: UInt32(cmdKey | optionKey), key: "0"),
+    ]
+    HotKeys.hasClickAccessOverride = false
+    undoStore.extraHotkeys = customHotkeys
+    check(undoStore.clickAccessMissing, "a click shortcut waits for access")
+    let requests = HotKeys.accessRequestCount
+    undoStore.restoreDefaultHotkeys()
+    check(HotKeys.accessRequestCount == requests, "Restore Defaults does not ask for Accessibility access")
+    check(undoStore.extraHotkeys[0] == LibraryStore.defaultHotkeys[0]
+          && undoStore.extraHotkeys[1] == LibraryStore.defaultHotkeys[1]
+          && undoStore.extraHotkeys[2] == customHotkeys[2]
+          && undoStore.extraHotkeys[3] == LibraryStore.defaultHotkeys[3],
+          "Restore Defaults restores the defaults with access missing, and Open Copied Link stays")
+    check(undoStore.clickAccessMissing, "Restore Defaults leaves the Accessibility row showing Allow…")
+    HotKeys.hasClickAccessOverride = nil
+    undoStore.extraHotkeys = originalHotkeys
+    if let savedHotkeys {
+        UserDefaults.standard.set(savedHotkeys, forKey: "extraHotkeys")
+    } else {
+        UserDefaults.standard.removeObject(forKey: "extraHotkeys")
+    }
+}
+
 let undoLog = UndoManager()
 // Every change is grouped by hand, so a whole check runs in one run loop turn and still has one step per action.
 undoLog.groupsByEvent = false
