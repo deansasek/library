@@ -1021,6 +1021,27 @@ func clip(_ kind: ClipItem.Kind, text: String? = nil, files: [URL] = [], reps: [
     ClipItem(representations: reps, digest: UUID().uuidString, kind: kind, title: "clip", plainText: text, link: link,
              thumbnail: nil, gifURL: nil, fileURLs: files, byteCount: 0, animatedData: animated)
 }
+// Copy as Plain Text is for formatting, so a copy holding several plain-text flavors is not offered one.
+do {
+    func textTypes(_ names: [String]) -> [NSPasteboard.PasteboardType: Data] {
+        Dictionary(uniqueKeysWithValues: names.map { (NSPasteboard.PasteboardType($0), Data("x".utf8)) })
+    }
+    check(!clip(.text, text: "a", reps: [textTypes([NSPasteboard.PasteboardType.string.rawValue])]).hasRichFormats,
+          "a copy holding only plain text drops nothing")
+    check(!clip(.text, text: "a", reps: [textTypes(["public.utf8-plain-text", "public.utf16-plain-text",
+                                                    "public.utf16-plain-text-le", "NSStringPboardType"])]).hasRichFormats,
+          "a copy holding several plain-text flavors drops nothing")
+    check(clip(.text, text: "a", reps: [textTypes(["public.utf8-plain-text", "public.rtf"])]).hasRichFormats,
+          "a copy holding RTF with its text drops the RTF")
+    check(clip(.text, text: "a", reps: [textTypes(["public.utf8-plain-text", "public.html"])]).hasRichFormats,
+          "a copy holding HTML with its text drops the HTML")
+    check(clip(.text, text: "a", reps: [textTypes(["public.utf8-plain-text", "com.adobe.pdf"])]).hasRichFormats,
+          "a copy holding PDF with its text drops the PDF")
+    check(!clip(.text, text: "a").hasRichFormats && !clip(.image).hasRichFormats, "no representations is not rich text")
+    check(!clip(.text, text: "a", reps: [textTypes(["public.utf8-plain-text"]), textTypes(["public.rtf"])]).hasRichFormats,
+          "only the first pasteboard item decides, as the property always has")
+}
+
 let previewDir = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-preview-\(UUID().uuidString)")
 let pixels = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: 2, pixelsHigh: 2, bitsPerSample: 8, samplesPerPixel: 4,
                               hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
