@@ -884,6 +884,41 @@ MainActor.assumeIsolated {
                 source: nil, fromLibrary: false, generation: -1, epoch: now)
     check(history.items.map(\.title) == ["copied after the clear"], "a copy made after the clear is still recorded")
 
+    // Copying a pinned clip again moves it to the top with a new date and source app, and the pinned file has to
+    // carry them, or the older values come back at the next launch.
+    let repinBoard = NSPasteboard(name: NSPasteboard.Name("library-checks-repin-\(UUID().uuidString)"))
+    let repinFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-repin-\(UUID().uuidString).json")
+    let repinning = ClipboardHistory(pasteboard: repinBoard, file: repinFile, key: { testKey })
+    waitForLoad(repinning)
+    @MainActor func paste(_ text: String, on board: NSPasteboard) {
+        board.clearContents()
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        board.writeObjects([item])
+        repinning.poll()
+        while repinning.pendingCaptures > 0 { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+    paste("pinned and copied again", on: repinBoard)
+    repinning.togglePin(repinning.items[0])
+    ClipboardHistory.waitForSaves()
+    guard case .clips(let beforeRecopy, _) = PinnedFile.read((try? Data(contentsOf: repinFile)) ?? Data(), key: testKey) else {
+        check(false, "the pin is saved before the copy is made again")
+        fatalError("unreachable")
+    }
+    Thread.sleep(forTimeInterval: 0.02)
+    paste("pinned and copied again", on: repinBoard)
+    ClipboardHistory.waitForSaves()
+    guard case .clips(let afterRecopy, _) = PinnedFile.read((try? Data(contentsOf: repinFile)) ?? Data(), key: testKey) else {
+        check(false, "copying a pinned clip again writes the pinned file")
+        fatalError("unreachable")
+    }
+    check(afterRecopy.count == 1, "copying a pinned clip again leaves one entry in the pinned file")
+    check(afterRecopy[0].date > beforeRecopy[0].date, "the pinned file carries the new copy date")
+    check(afterRecopy[0].date == repinning.items[0].date && afterRecopy[0].source == repinning.items[0].sourceApp,
+          "the pinned file carries the date and source the pinned item has now")
+    check(repinning.items[0].pinned, "copying a pinned clip again keeps it pinned")
+    try? FileManager.default.removeItem(at: repinFile)
+
     // Quitting waits for the pinned writes even when no history file is kept, which is the default, so the last pin
     // reaches disk. There is no waitForSaves between the pin and the flush, so only the flush itself can finish it.
     let quitFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-quit-\(UUID().uuidString).json")
