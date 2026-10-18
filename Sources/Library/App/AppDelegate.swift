@@ -123,11 +123,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Why a link could not be used, or nil when it can. Pure, so the checks can cover each case, and separate from
+    /// `linkAction` so a link that parses still reports that its name matches nothing. A link for another app is
+    /// left alone, since it was never meant for Library.
+    static func linkProblem(_ url: URL, in nodes: [LibraryItem]) -> String? {
+        guard url.scheme?.lowercased() == "library" else { return nil }
+        guard let action = linkAction(url) else {
+            return String(format: String(localized: "Library does not know the action “%@”.", bundle: L10n.bundle),
+                          shortened(url.host ?? ""))
+        }
+        guard case .open(let name, _) = action else { return nil }
+        guard let name, !name.isEmpty else {
+            return String(localized: "A library://open link needs a name, as in library://open?name=Jira.", bundle: L10n.bundle)
+        }
+        guard Self.item(named: name, in: nodes) == nil else { return nil }
+        return String(format: String(localized: "No item named “%@” is in your library.", bundle: L10n.bundle), shortened(name))
+    }
+
+    /// A name cut short, so a long one from a link cannot make the message unwieldy.
+    static func shortened(_ text: String) -> String {
+        text.count > 40 ? String(text.prefix(40)) + "…" : text
+    }
+
+    /// Tells the user a link could not be used, without a window: a beep and a spoken announcement, and the same
+    /// text in the log. A Shortcut or a script author then sees why nothing happened.
+    private static func reportLinkProblem(_ message: String) {
+        NSSound.beep()
+        AccessibilityNotification.Announcement(message).post()
+        NSLog("Library: a library:// link could not be used: \(message)")
+    }
+
     /// `library://open?name=Jira&value=ABC-123` opens an item and fills its template.
     /// `library://menu` shows the menu. `library://search` shows Quick Open.
     func application(_ application: NSApplication, open urls: [URL]) {
         let store = LibraryStore.shared
         for url in urls {
+            if let problem = Self.linkProblem(url, in: store.nodes) {
+                Self.reportLinkProblem(problem)
+                continue
+            }
             switch Self.linkAction(url) {
             case .menu:
                 store.showMenu()
