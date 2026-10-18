@@ -1,10 +1,16 @@
 # Development and releasing
 
+## Requirements
+
+- macOS 26 or later, as `Package.swift` asks for.
+- Swift 6, from the Xcode Command Line Tools. The checks and the release build need no other install, and no full Xcode.
+
 ## Development
 
 - `./build.sh` builds the app.
 - `./test.sh` runs the checks in `Tests/`. They use private pasteboards and temporary files, so they never touch your clipboard or your library.
-- On GitHub Actions, a pull request that changes code runs `./test.sh`. A push to `main` also builds the app and renders the screens. Changes to Markdown and `docs/` skip the run.
+- `Tests/render.sh` draws every screen in light and dark appearance to PNGs, so the views can be checked by eye. It needs no window server or screen-recording permission, and without a folder it writes to a temporary one it prints.
+- On GitHub Actions, a pull request that changes code runs `./test.sh` and then `swift build -c release`, since `test.sh` leaves out the app entry point and resource processing. A push to `main` also builds the app and renders the screens with `Tests/render.sh`. The render check runs on `main` and on demand only, not on a pull request, since it is the slowest step. Changes to Markdown and `docs/` skip the run.
 
 ## Releasing
 
