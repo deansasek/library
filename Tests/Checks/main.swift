@@ -2950,6 +2950,29 @@ do {
           "a writable folder takes the file")
 }
 
+// A library:// link is routed without regard to case: a URL's scheme and host are case-insensitive, and macOS
+// hands the app whatever was typed.
+do {
+    func link(_ text: String) -> URL? { URL(string: text) }
+    check(AppDelegate.linkAction(link("library://menu")!) == .menu
+          && AppDelegate.linkAction(link("library://search")!) == .search, "the menu and search actions")
+    check(AppDelegate.linkAction(link("library://open?name=Jira&value=ABC-123")!) == .open(name: "Jira", value: "ABC-123"),
+          "an open link keeps its name and value")
+    for text in ["LIBRARY://MENU", "Library://Menu", "lIbRaRy://mEnU"] {
+        check(AppDelegate.linkAction(link(text)!) == .menu, "mixed-case link '\(text)' is routed")
+    }
+    check(AppDelegate.linkAction(link("LIBRARY://Search")!) == .search
+          && AppDelegate.linkAction(link("Library://OPEN?name=Two")!) == .open(name: "Two", value: nil),
+          "mixed-case search and open links are routed")
+    check(AppDelegate.linkAction(link("https://example.com")!) == nil, "another app's link is left alone")
+    check(AppDelegate.linkAction(link("library://opne?name=Jira")!) == nil, "an action Library does not have is not one")
+    check(AppDelegate.linkAction(link("library://open")!) == .open(name: nil, value: nil), "an open link with no name is still an open")
+    check(AppDelegate.linkAction(link("library://open?value=x")!) == .open(name: nil, value: "x"), "a value with no name is still an open")
+    check(AppDelegate.linkAction(link("library://open?name=A&name=B")!) == .open(name: "A", value: nil), "the first name wins")
+    check(AppDelegate.linkAction(link("library://OPEN?name=Caf%C3%A9&value=a%2Bb")!) == .open(name: "Café", value: "a+b"),
+          "a percent-encoded name and value are decoded")
+}
+
 // The Settings toggle and the code that asks before running a command must name the same defaults key, or the
 // confirmation is silently off. Both now read it from one constant, and no literal is left behind.
 do {

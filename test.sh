@@ -144,7 +144,8 @@ drag_type="$(grep -oE 'UTTypeIdentifier</key><string>[^<]+' "$plist" | sed 's/.*
 for message in $messages; do
     grep -qF "@objc func $message(" "$app_code" || { echo "Services message $message is not an @objc func in $app_code" >&2; exit 1; }
 done
-grep -qF "url.scheme == \"$scheme\"" "$app_code" || { echo "URL scheme $scheme is not handled in $app_code" >&2; exit 1; }
+# The scheme may be compared as typed or lowercased first, since a URL's scheme is case-insensitive.
+grep -qE "url\.scheme(\?\.[a-z]+\(\))? == \"$scheme\"" "$app_code" || { echo "URL scheme $scheme is not handled in $app_code" >&2; exit 1; }
 grep -qF "UTType(exportedAs: \"$drag_type\")" "$drag_code" || { echo "Drag type $drag_type is not declared in $drag_code" >&2; exit 1; }
 echo "Info.plist names match the code: ${#messages[@]} Services messages, scheme $scheme, drag type $drag_type"
 
