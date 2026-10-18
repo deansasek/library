@@ -344,6 +344,10 @@ final class ClipboardHistory: ObservableObject {
     func flushHistory() {
         historySave?.cancel()
         historySave = nil
+        // Whatever is already queued has to finish before this returns, since the app may exit right after. A pin
+        // made moments before the quit is queued on writeQueue, and with history off there is nothing else here that
+        // would wait for it, so it is drained here rather than after the guard below.
+        Self.writeQueue.sync {}
         guard let historyFile, let clips = historyClips() else { return }
         lastHistoryWrite = Date()
         let loadKey = self.loadKey
