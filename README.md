@@ -26,7 +26,7 @@ Click the Library icon in the menu bar to open your items and recent copies, or 
 
 ## Install
 
-Paste this into Terminal. It downloads the latest release, checks its SHA-256 checksum, and builds and installs `Library.app` in your Applications folder. It installs the Command Line Tools for Xcode first if they are missing, and it needs nothing else installed beforehand:
+Paste this into Terminal. It downloads the latest release, checks its SHA-256 checksum, and builds and installs `Library.app` in your Applications folder. It installs the Command Line Tools for Xcode first if they are missing, and it needs nothing else installed beforehand. The checksum confirms the download matches the release it came from, so it catches a truncated or corrupt download; it does not show the release is genuine, since the zip and its checksum are fetched from the same place:
 
 ```bash
 cd "$(mktemp -d)" && tag="$(curl -fsSIL -o /dev/null -w '%{url_effective}' https://github.com/deansasek/library/releases/latest | sed 's#.*/tag/##')" && ver="${tag#v}" && curl -fsSL -O "https://github.com/deansasek/library/releases/download/$tag/Library-$ver.zip" -O "https://github.com/deansasek/library/releases/download/$tag/Library-$ver.zip.sha256" && shasum -a 256 -c "Library-$ver.zip.sha256" && unzip -q "Library-$ver.zip" && "./Library-$ver/install.sh"
