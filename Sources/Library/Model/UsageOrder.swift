@@ -36,12 +36,16 @@ enum UsageOrder {
         return counts
     }
 
-    /// The items for Frequently Used: opened at least twice, most opened first, at most `limit` of them.
+    /// The items for Frequently Used: opened at least twice, most opened first, at most `limit` of them. Items opened
+    /// equally often keep their tree order, as `ordered` does, so the list does not shuffle between runs.
     static func frequent(_ items: [LibraryItem], counts: [UUID: Int], limit: Int = 5) -> [LibraryItem] {
-        items
-            .filter { (counts[$0.id] ?? 0) >= 2 }
-            .sorted { (counts[$0.id] ?? 0) > (counts[$1.id] ?? 0) }
-            .prefix(limit).map { $0 }
+        items.enumerated()
+            .filter { (counts[$0.element.id] ?? 0) >= 2 }
+            .sorted { a, b in
+                let left = counts[a.element.id] ?? 0, right = counts[b.element.id] ?? 0
+                return left != right ? left > right : a.offset < b.offset
+            }
+            .prefix(limit).map(\.element)
     }
 
     /// Applies `order` to each run of nodes between dividers. Dividers keep their places, so no node moves across one.
