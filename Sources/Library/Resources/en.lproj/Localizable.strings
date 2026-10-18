@@ -482,3 +482,6 @@
 
 /* Placeholder in the Quick Open search field, which searches everything in the library. */
 "Search Library" = "Search Library";
+
+/* Announcement when a clip's file was deleted, so the clip is not copied and nothing is pasted. */
+"That file is no longer there." = "That file is no longer there.";

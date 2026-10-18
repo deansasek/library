@@ -499,12 +499,15 @@ final class ClipboardHistory: ObservableObject {
     // MARK: Actions
 
     /// Puts the item back on the clipboard in every format it had. A link has its tracking parameters removed
-    /// when the setting is on; the history keeps the link as it was copied.
-    func copy(_ item: ClipItem) {
+    /// when the setting is on; the history keeps the link as it was copied. True when it wrote to the pasteboard,
+    /// false when it refused, so a caller does not paste the previous contents in the item's place.
+    @discardableResult
+    func copy(_ item: ClipItem) -> Bool {
         // A file that was moved or deleted is not copied, so no dead file reference reaches the pasteboard.
         guard !Self.refersToMissingFile(item) else {
             NSSound.beep()
-            return
+            AccessibilityNotification.Announcement(String(localized: "That file is no longer there.", bundle: L10n.bundle)).post()
+            return false
         }
         let cleans = item.kind == .link && TrackingPreferences.shared.removesOnCopy
         pasteboard.clearContents()
@@ -515,6 +518,7 @@ final class ClipboardHistory: ObservableObject {
             }
             return pasteboardItem
         })
+        return true
     }
 
     /// True when the item names a file that is no longer on disk.

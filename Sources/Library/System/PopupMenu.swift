@@ -238,8 +238,8 @@ enum PopupMenu {
         @objc func copy(_ sender: NSMenuItem) {
             if let item = clip(sender) {
                 ClipboardLock.shared.perform(item, for: .copy) { [pastes, previous] in
-                    ClipboardHistory.shared.copy(item)
-                    if pastes { FrontApp.pasteSoon(returningTo: previous) }
+                    // A copy that refused, because the file is gone, must not paste what is already on the clipboard.
+                    if ClipboardHistory.shared.copy(item), pastes { FrontApp.pasteSoon(returningTo: previous) }
                 }
             }
         }

@@ -2427,7 +2427,9 @@ MainActor.assumeIsolated {
     try? FileManager.default.removeItem(at: folder)
 }
 
-// A recording that was deleted is neither copied nor left as a dead reference.
+// A recording that was deleted is neither copied nor left as a dead reference, and the copy reports that it wrote
+// nothing, so no caller pastes the previous clipboard contents in its place. A clip whose file is still there
+// copies, and the copy reports that it wrote.
 do {
     let gone = ClipItem(representations: [], digest: "gone", kind: .file, title: "gone.mov", plainText: nil, link: nil, thumbnail: nil,
                         gifURL: nil, fileURLs: [URL(fileURLWithPath: "/nonexistent/library-check-\(UUID().uuidString).mov")], byteCount: 0, date: Date())
@@ -2438,8 +2440,20 @@ do {
     board.clearContents()
     board.setString("before", forType: .string)
     let changeBefore = board.changeCount
-    history.copy(gone)
+    check(history.copy(gone) == false, "copying a missing file says it wrote nothing")
     check(board.changeCount == changeBefore && board.string(forType: .string) == "before", "copying a missing file leaves the pasteboard alone")
+
+    // The file is still on disk: the copy writes, and says so, so a paste may follow it.
+    let present = FileManager.default.temporaryDirectory.appendingPathComponent("library-check-\(UUID().uuidString).mov")
+    try? Data("a recording".utf8).write(to: present)
+    let here = ClipItem(representations: [[.string: Data("a recording".utf8)]], digest: "here", kind: .file, title: "here.mov",
+                        plainText: "a recording", link: nil, thumbnail: nil, gifURL: nil, fileURLs: [present], byteCount: 11, date: Date())
+    check(!ClipboardHistory.refersToMissingFile(here), "a file item whose file is present is not refused")
+    let changeHere = board.changeCount
+    check(history.copy(here) == true, "copying a clip whose file is present says it wrote")
+    check(board.changeCount != changeHere && board.string(forType: .string) == "a recording", "copying a clip whose file is present writes to the pasteboard")
+    try? FileManager.default.removeItem(at: present)
+
     history.removeFile(at: gone.fileURLs[0])
 }
 

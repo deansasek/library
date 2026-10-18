@@ -130,7 +130,11 @@ struct PasteLatestClipIntent: AppIntent {
         guard let item = ClipboardHistory.shared.items.first(where: { !ClipboardLock.shared.isHidden($0) }) else {
             throw LibraryIntentError("The clipboard history is empty.")
         }
-        ClipboardHistory.shared.copy(item)
+        // A file that was moved or deleted is not copied, so the clip is not on the clipboard and the shortcut must
+        // not say it was.
+        guard ClipboardHistory.shared.copy(item) else {
+            throw LibraryIntentError("The latest clip’s file is no longer there.")
+        }
         return .result(dialog: "Copied the latest clip.")
     }
 }

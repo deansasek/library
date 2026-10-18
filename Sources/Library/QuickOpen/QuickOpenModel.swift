@@ -392,8 +392,8 @@ final class QuickOpenModel: ObservableObject {
         let verb = pastes ? "Paste" : "Copy"
         var list = [QuickOpenAction(id: "copy", title: verb) { [pastes] in
             lock.perform(item, for: .copy) {
-                history.copy(item)
-                if pastes { FrontApp.pasteSoon() }
+                // A copy that refused, because the file is gone, must not paste what is already on the clipboard.
+                if history.copy(item), pastes { FrontApp.pasteSoon() }
             }
         }]
         if pastes {
@@ -496,8 +496,8 @@ final class QuickOpenModel: ObservableObject {
             store.add(suggestion)
         case .clip(let item):
             ClipboardLock.shared.perform(item, for: .copy) { [pastes] in
-                ClipboardHistory.shared.copy(item)
-                if pastes { FrontApp.pasteSoon() }
+                // A copy that refused, because the file is gone, must not paste what is already on the clipboard.
+                if ClipboardHistory.shared.copy(item), pastes { FrontApp.pasteSoon() }
             }
         case .item(let node, _):
             open(node, forceNew: flip ? node.openNew != true : nil)
