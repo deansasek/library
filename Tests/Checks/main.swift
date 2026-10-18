@@ -645,6 +645,18 @@ do {
     if case .unreadable = PinnedFile.read(Data(), key: key) {} else { check(false, "an empty file is rejected") }
 }
 
+// ---- the ignored-app filter is judged at copy time, not poll time ----
+check(ClipboardHistory.isIgnoredCopy(frontmost: ["com.apple.keychainaccess", "com.apple.TextEdit"], types: []),
+      "an ignored app in front during the window is enough")
+check(!ClipboardHistory.isIgnoredCopy(frontmost: ["com.apple.TextEdit"], types: []), "a normal app is not ignored")
+check(ClipboardHistory.isIgnoredCopy(frontmost: ["com.apple.TextEdit"], types: ["org.nspasteboard.ConcealedType"]),
+      "a private marker is still enough")
+check(ClipboardHistory.copySourceApp(frontmost: ["com.apple.Safari"]) == "com.apple.Safari",
+      "a copy with no app switch is credited to the app in front")
+check(ClipboardHistory.copySourceApp(frontmost: ["com.apple.Safari", "com.apple.TextEdit"]) == "com.apple.Safari",
+      "a copy made just before a switch is credited to the app that made it")
+check(ClipboardHistory.copySourceApp(frontmost: []) == nil, "no app in front is no source")
+
 // ---- clipboard history and menu, on a private pasteboard ----
 MainActor.assumeIsolated {
     let testKey = SymmetricKey(size: .bits256)
