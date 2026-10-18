@@ -259,8 +259,9 @@ enum UpdateCheck {
     /// Downloads one release into a temporary folder, runs its install script, and removes the folder whether or not
     /// the install succeeded.
     static func installCommand(tag: String) -> String {
-        // The tag is already checked to be numeric. The zip and its SHA-256 come from the release, and the install
-        // script runs only if the checksum matches.
+        // The tag is already checked to be numeric. The zip and its SHA-256 are fetched from the same release, so the
+        // checksum shows the download matches that release rather than that the release is genuine: it catches a
+        // truncated or corrupt download, and anyone who can replace the release assets can replace both files.
         let version = String(tag.drop(while: { $0 == "v" }))
         let base = "https://github.com/deansasek/library/releases/download/\(tag)/Library-\(version)"
         return "T=\"$(mktemp -d)\" && cd \"$T\" && curl -fsSL -O \(shellQuoted(base + ".zip")) -O \(shellQuoted(base + ".zip.sha256")) "

@@ -15,7 +15,7 @@ git tag v1.2.0
 git push origin v1.2.0
 ```
 
-Or run the **Release** workflow by hand with a version. Either way, GitHub Actions builds and checks the app, then publishes `Library-1.2.0.zip`. Only a commit on `main` can release: a manual run must start on `main`, and a tag must point at a commit `main` reaches. The zip is the source, with only what's needed to build. The tests, workflows, docs, scripts, `test.sh`, and `update.sh` are left out, as set in `.gitattributes`.
+Or run the **Release** workflow by hand with a version. Either way, GitHub Actions builds and checks the app, then publishes `Library-1.2.0.zip`. Only a commit on `main` can release: a manual run must start on `main`, and a tag must point at a commit `main` reaches. The zip is the source, with only what's needed to build. The tests, workflows, docs, scripts, `test.sh`, and `update.sh` are left out, as set in `.gitattributes`. The zip and its SHA-256 checksum are published to the same release, so the check the install command and the update check run confirms the download matches that release, and does not show the release is genuine: anyone who can replace the release assets can replace the checksum too.
 
 If publishing fails with a server error, the workflow makes up to four attempts. Re-running it is safe, because it skips creating a release that already exists.
 ## Languages
