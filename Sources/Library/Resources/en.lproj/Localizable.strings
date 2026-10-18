@@ -494,3 +494,12 @@
 
 /* Added to the Check Links summary when bookmarks on action addresses were left alone. */
 "%d were skipped because the address looks like it signs out, unsubscribes, or deletes something." = "%d were skipped because the address looks like it signs out, unsubscribes, or deletes something.";
+
+/* Help menu item, which opens this guide. */
+"Help" = "Help";
+
+/* Shown in Edit Library for a bookmark whose link has never been checked. */
+"Not checked" = "Not checked";
+
+/* Said once when a save of the pinned items or the history did not reach disk. */
+"Library could not save your clipboard items. Check that its folder can be written to, then try again." = "Library could not save your clipboard items. Check that its folder can be written to, then try again.";

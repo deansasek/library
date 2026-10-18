@@ -3053,6 +3053,81 @@ do {
     check(FileManager.default.fileExists(atPath: strings.path), "the English strings file is in the Resources folder the bundle is made from")
 }
 
+// Every string the code looks up in L10n.bundle must be in the table, and every key in the table must be used. A key
+// the table lacks falls back to itself, so a translation would never pick it up, and a key nothing uses is a line
+// nobody reads.
+do {
+    /// The text of a localized string with every Swift interpolation and every format specifier reduced to one
+    /// marker, so `%lld results` in the table and `\(count) results` in the code compare as the same string.
+    func localizedShape(_ text: String) -> String {
+        let scalars = Array(text.unicodeScalars)
+        var out = "", i = 0
+        func letters(_ c: UnicodeScalar) -> Bool {
+            ("a"..."z").contains(c) || ("A"..."Z").contains(c) || c == "@"
+        }
+        while i < scalars.count {
+            // \( ... ), matched to its closing parenthesis by depth, so a call inside it does not end it early.
+            if scalars[i] == "\\", i + 1 < scalars.count, scalars[i + 1] == "(" {
+                var depth = 1, j = i + 2
+                while j < scalars.count, depth > 0 {
+                    if scalars[j] == "(" { depth += 1 } else if scalars[j] == ")" { depth -= 1 }
+                    j += 1
+                }
+                out += "%@"
+                i = j
+                continue
+            }
+            // A format specifier: optional width, then a run of letters or @.
+            if scalars[i] == "%" {
+                var j = i + 1, saw = false
+                while j < scalars.count, scalars[j] >= "0", scalars[j] <= "9" { j += 1; saw = true }
+                if j < scalars.count, scalars[j] == "$" { j += 1; saw = true }
+                let specStart = j
+                while j < scalars.count, letters(scalars[j]) { j += 1 }
+                if j > specStart {
+                    out += "%@"
+                    i = j
+                    continue
+                }
+                _ = saw
+            }
+            out.unicodeScalars.append(scalars[i])
+            i += 1
+        }
+        return out
+    }
+
+    let stringsURL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Sources/Library/Resources/en.lproj/Localizable.strings")
+    let table = (try? String(contentsOf: stringsURL, encoding: .utf8)) ?? ""
+    let tableKeys = captures(symbolRegex(#"(?m)^\s*"((?:[^"\\\n]|\\.)*)"\s*="#), in: table).map { $0.text }
+    check(tableKeys.count > 100, "the strings file is parsed into keys")
+
+    // The two forms that name the bundle, and therefore have to find their key there.
+    let localizedLiterals = [#"String\(localized:\s*"((?:[^"\\\n]|\\.)*)""#, #"Text\(\s*"((?:[^"\\\n]|\\.)*)"\s*,\s*bundle:\s*L10n\.bundle"#]
+    var used: [String] = []
+    var sources = ""
+    for path in swiftFiles {
+        let text = (try? String(contentsOfFile: swiftRoot + path, encoding: .utf8)) ?? ""
+        sources += text
+        for pattern in localizedLiterals { used += captures(symbolRegex(pattern), in: text).map(\.text) }
+    }
+    check(used.count > 100, "the localized string literals are found in the sources")
+    let shapes = Set(tableKeys.map(localizedShape))
+    let usedShapes = Set(used.map(localizedShape))
+    for key in Set(used) where !shapes.contains(localizedShape(key)) {
+        check(false, "no key in Localizable.strings for the string the code looks up: \(key)")
+    }
+    check(used.contains("Help") && used.contains("Not checked"), "Help and Not checked are looked up by the code")
+
+    // A key counts as used when the code passes it another way too, such as LabeledContent("Last checked") or a
+    // literal handed to another function, so this only reports a key that appears in no source at all.
+    for key in tableKeys where !usedShapes.contains(localizedShape(key)) && !sources.contains(key) {
+        check(false, "no code uses this key in Localizable.strings: \(key)")
+    }
+}
+
 // A saved link is the same as a copied one when only the scheme, a trailing slash, or the case of the host differs.
 check(AddSuggestion.matchKey(LibraryItem(name: "A", url: "example.com")) == AddSuggestion.matchKey(LibraryItem(name: "B", url: "https://Example.com/")),
       "a bare host matches the saved https address with a trailing slash")
