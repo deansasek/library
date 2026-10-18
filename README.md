@@ -32,7 +32,7 @@ Paste this into Terminal. It downloads the latest release, checks its SHA-256 ch
 cd "$(mktemp -d)" && tag="$(curl -fsSIL -o /dev/null -w '%{url_effective}' https://github.com/deansasek/library/releases/latest | sed 's#.*/tag/##')" && ver="${tag#v}" && curl -fsSL -O "https://github.com/deansasek/library/releases/download/$tag/Library-$ver.zip" -O "https://github.com/deansasek/library/releases/download/$tag/Library-$ver.zip.sha256" && shasum -a 256 -c "Library-$ver.zip.sha256" && unzip -q "Library-$ver.zip" && "./Library-$ver/install.sh"
 ```
 
-Library checks for updates itself. **Check for Updates…** offers to install a newer version in Terminal. Your library and pinned clipboard items are kept. An install made from a clone can be updated with `update.sh` in that folder.
+Library checks for updates itself. **Check for Updates…** offers to install a newer version in Terminal. Your library and pinned clipboard items are kept. An install made from a clone can be updated with `update.sh` in that folder. The command above runs in a temporary folder that you can delete once Library is installed; a clone build leaves only a `.build` compile cache behind, which `update.sh` reuses.
 
 **Requirements:** macOS 26 or later, and the Xcode Command Line Tools.
 
