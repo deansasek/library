@@ -68,12 +68,33 @@ enum LinkCheck {
 
     /// Words that mark a page as one that acts when it is requested, such as signing out or unsubscribing. Their
     /// addresses are never requested by the background check.
+    /// Words that mark a page as one that acts when it is requested, such as signing out or unsubscribing. Their
+    /// addresses are never requested by the background check.
     static let actionWords = ["logout", "log-out", "log_out", "signout", "sign-out", "unsubscribe", "confirm", "toggle", "delete"]
 
-    /// True when the path or query of `url` contains an action word. Matching is case-insensitive.
-    static func looksLikeAction(_ url: URL) -> Bool {
+    /// One word reduced to its letters and digits, so `sign-out`, `sign_out` and `SignOut` are all the same word.
+    private static func word(_ text: String) -> String {
+        String(text.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map { Character($0) })
+    }
+
+    /// The action words in the same form, so both sides of the comparison are built the same way.
+    static let normalizedActionWords: Set<String> = Set(actionWords.map(word))
+
+    /// The address's words in order: its path and query, split at the separators that end a word. Each word is reduced
+    /// to letters and digits, so `log-out` and `logout` are the same word.
+    static func addressWords(_ url: URL) -> [String] {
         let text = ((url.path(percentEncoded: false)) + "?" + (url.query(percentEncoded: false) ?? "")).lowercased()
-        return actionWords.contains { text.contains($0) }
+        let separators = CharacterSet(charactersIn: "/-_&?=+.%:,;#[]@!$'\"()*|~ ")
+        return text.unicodeScalars.split(whereSeparator: { separators.contains($0) }).map { word(String($0)) }
+    }
+
+    /// True when a word of the path or query spells an action word. Matching is whole-word and case-insensitive, so
+    /// `/docs/deleted-items` and `?confirmed=1` are checked while `/account/logout` and `?action=delete` are not. A
+    /// hyphenated action word is two words once the address is split, so neighbouring words are tried joined as well.
+    static func looksLikeAction(_ url: URL) -> Bool {
+        let words = addressWords(url)
+        if words.contains(where: normalizedActionWords.contains) { return true }
+        return zip(words, words.dropFirst()).contains { normalizedActionWords.contains($0 + $1) }
     }
 
     /// True when `checked` is within the last 24 hours. A date in the future (the clock was set back) is not recent,

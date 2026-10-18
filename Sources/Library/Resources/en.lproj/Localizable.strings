@@ -491,3 +491,6 @@
 
 /* Said when a library://open link names an item that is not in the library. */
 "No item named “%@” is in your library." = "No item named “%@” is in your library.";
+
+/* Added to the Check Links summary when bookmarks on action addresses were left alone. */
+"%d were skipped because the address looks like it signs out, unsubscribes, or deletes something." = "%d were skipped because the address looks like it signs out, unsubscribes, or deletes something.";

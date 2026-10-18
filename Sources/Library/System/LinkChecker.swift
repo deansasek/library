@@ -93,11 +93,17 @@ enum LinkChecker {
         // A run that was cut short before it recorded anything leaves the stamp alone, so the next scheduled pass runs
         // at once rather than the unchecked bookmarks waiting out the rest of the day.
         if LinkCheck.stampsLastRun(cancelled: Task.isCancelled, recorded: updates.count) { stamp(now) }
+        let skipped = items.count - Set(targets.keys).count
         if interactive {
             let broken = kinds.values.filter { $0 == .broken }.count
             let unreachable = kinds.values.filter { $0 == .unreachable }.count
-            show(String(localized: "Checked \(kinds.count) links. \(broken) are broken, and \(unreachable) can’t be reached.",
-                        bundle: L10n.bundle))
+            let message = String(localized: "Checked \(kinds.count) links. \(broken) are broken, and \(unreachable) can’t be reached.",
+                                 bundle: L10n.bundle)
+            // Bookmarks on a page that acts when requested are left alone, so the count says how many were not asked
+            // about rather than leaving them out of the summary with no explanation.
+            show(skipped > 0
+                 ? message + " " + String(format: String(localized: "%d were skipped because the address looks like it signs out, unsubscribes, or deletes something.", bundle: L10n.bundle), skipped)
+                 : message)
         }
     }
 
