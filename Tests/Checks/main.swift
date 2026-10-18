@@ -968,6 +968,29 @@ check(ics.hasPrefix("BEGIN:VCALENDAR\r\n") && ics.hasSuffix("END:VCALENDAR\r\n")
 check(ics.contains("DTSTART:19700101T000000Z\r\n") && ics.contains("DTEND:19700101T010000Z\r\n"), "no length gives a one-hour event")
 check(ics.contains("SUMMARY:Lunch\\; rooms\\, 2\r\n") && !ics.contains("second line"), "summary is the first line, with commas and semicolons escaped")
 check(ics.contains("UID:T1@library\r\n"), "the event has its UID")
+// RFC 5545 caps a content line at 75 octets, and continues it with a CRLF and one space.
+do {
+    func unfold(_ text: String) -> String {
+        text.replacingOccurrences(of: "\r\n ", with: "")
+    }
+    let long = SmartText.calendarEvent(text: String(repeating: "é", count: 120),
+                                      date: icsStart, created: Date(timeIntervalSince1970: 0), uid: "T2")
+    let contentLines = long.split(separator: "\r\n", omittingEmptySubsequences: false).map { String($0) }
+    check(contentLines.allSatisfy { $0.utf8.count <= 75 }, "every line of a folded event is at most 75 octets")
+    let continuations = contentLines.filter { $0.first == " " }
+    check(!continuations.isEmpty, "a 120-character summary has to be folded")
+    check(unfold(long).contains("SUMMARY:" + String(repeating: "é", count: 120) + "\r\n"),
+          "unfolding the event gives back the whole summary")
+    // A four-byte character never straddles a fold, so every continuation still holds complete characters.
+    let wide = SmartText.calendarEvent(text: String(repeating: "🎉", count: 60),
+                                       date: icsStart, created: Date(timeIntervalSince1970: 0), uid: "T3")
+    check(wide.split(separator: "\r\n").allSatisfy { $0.utf8.count <= 75 }
+          && unfold(wide).contains("SUMMARY:" + String(repeating: "🎉", count: 60)), "a wide character is never cut in half")
+    check(SmartText.folded("SHORT:LINE") == "SHORT:LINE" && SmartText.folded("") == "", "a line that fits is not folded")
+    check(ics == SmartText.calendarEvent(text: "  Lunch; rooms, 2\nsecond line", date: icsStart,
+                                        created: Date(timeIntervalSince1970: 0), uid: "T1"),
+          "a short event is the same bytes as before")
+}
 
 // ---- Markdown links ----
 check(MarkdownLink.escapedTitle("a [b] *c* _d_ `e` \\f") == "a \\[b\\] \\*c\\* \\_d\\_ \\`e\\` \\\\f", "Markdown special characters are escaped")
