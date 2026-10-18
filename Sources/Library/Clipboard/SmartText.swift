@@ -55,7 +55,8 @@ enum SmartText {
     }
 
     /// An iCalendar event for the date. The summary is the first non-empty line of the text. An event with no length
-    /// lasts one hour. Dates are written in UTC, so Calendar shows them in the Mac's time zone.
+    /// lasts one hour. Dates are written in UTC, so Calendar shows them in the Mac's time zone. Content lines longer
+    /// than 75 octets are folded, as RFC 5545 requires.
     static func calendarEvent(text: String, date: DetectedDate, created: Date, uid: String) -> String {
         let summary = text.split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
@@ -74,7 +75,25 @@ enum SmartText {
             "END:VEVENT",
             "END:VCALENDAR",
         ]
-        return lines.joined(separator: "\r\n") + "\r\n"
+        return lines.map(folded).joined(separator: "\r\n") + "\r\n"
+    }
+
+    /// Folds one content line to 75 octets, continuing with a CRLF and a single space. The split is on character
+    /// boundaries, so a multi-byte character is never cut in half. A line that already fits is returned unchanged, so
+    /// a short event keeps the bytes it had.
+    static func folded(_ line: String) -> String {
+        let octetLimit = 75
+        guard line.utf8.count > octetLimit else { return line }
+        var folded = ""
+        var used = 0
+        for character in line {
+            let width = String(character).utf8.count
+            // A fresh line starts with the space that marks it a continuation, which counts towards the limit.
+            if used + width > octetLimit { folded += "\r\n "; used = 1 }
+            folded.append(character)
+            used += width
+        }
+        return folded
     }
 
     /// Writes the event to a temporary .ics file and opens it, so Calendar shows its add-event sheet. The file is
