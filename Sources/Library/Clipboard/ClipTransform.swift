@@ -29,7 +29,9 @@ enum ClipTransform: CaseIterable {
             return text.uppercased()
         case .joinedLines:
             // Each line break, including a CRLF pair, becomes one space. Character.isNewline counts CRLF as one break.
-            return text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).joined(separator: " ")
+            // Empty pieces are dropped, so a break at the end adds nothing and a run of breaks (a blank line) adds one
+            // space rather than one per break.
+            return text.split(whereSeparator: \.isNewline).joined(separator: " ")
         case .smartPunctuation:
             return Self.smartPunctuation(text)
         }
