@@ -917,6 +917,8 @@ let transformTable: [(ClipTransform, String, String)] = [
     (.smartPunctuation, "The dogs' bowls", "The dogs’ bowls"),
     (.smartPunctuation, "'quoted' word", "‘quoted’ word"),
     (.smartPunctuation, "'90s music", "’90s music"),
+    (.smartPunctuation, "'42' is the answer", "‘42’ is the answer"),
+    (.smartPunctuation, "'123' digits are not a year", "‘123’ digits are not a year"),
     (.smartPunctuation, "wait -- what", "wait — what"),
     (.smartPunctuation, "one... two", "one… two"),
     (.smartPunctuation, "wait....", "wait…."),
