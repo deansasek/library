@@ -62,13 +62,20 @@ final class QuickOpenModel: ObservableObject {
         self.store = store
         self.selectedText = selectedText
         self.pastes = pastes
-        // Any change to the library drops the index. It is rebuilt when next needed.
+        // Any change to the library drops the index and recomputes the rows, the way a clipboard change does. An open panel
+        // is usually short-lived, but iCloud sync or a link check can write to the library while it is open.
         nodesObserver = store.$contents.dropFirst().sink { [weak self] _ in
-            self?.index = nil
+            guard let self else { return }
+            self.index = nil
+            // @Published sends before the new value is stored, so rebuilding here would read the library as it was.
+            // The next turn of the run loop is after the store holds the change.
+            DispatchQueue.main.async { [weak self] in self?.libraryChanged() }
         }
         // Snippets are part of the search index, so a change to them rebuilds it too.
         snippetsObserver = SnippetStore.shared.$snippets.dropFirst().sink { [weak self] _ in
-            self?.index = nil
+            guard let self else { return }
+            self.index = nil
+            DispatchQueue.main.async { [weak self] in self?.libraryChanged() }
         }
         results = computeResults()
         // A copied GIF finishing its download updates the open panel.
@@ -154,6 +161,30 @@ final class QuickOpenModel: ObservableObject {
         let built = QuickOpenIndex(nodes: store.nodes, snippets: SnippetStore.shared.snippets)
         index = built
         return built
+    }
+
+    /// Puts the rows back after the library changed under an open panel, so a removed item loses its row without a
+    /// keystroke and an edited one shows what it is now.
+    private func libraryChanged() {
+        results = computeResults()
+        if let selection, !results.contains(where: { $0.id == selection }) { resetSelection() }
+    }
+
+    /// The node a row stands for, taken from the library as it is now rather than the copy the row was built from. An
+    /// item that has been removed or edited since the row was made is the library's version or nothing at all.
+    func currentNode(_ result: QuickOpenResult) -> LibraryItem? {
+        guard let id = result.node?.id else { return nil }
+        return store.nodes.node(withID: id)
+    }
+
+    /// What the panel runs for the selected row. A library row is resolved against the library as it is now, so an edited
+    /// item opens its current address, and an item that has been removed runs nothing at all. A row that is not a
+    /// library item is used as it is.
+    func activatableKind(for selection: String?) -> QuickOpenResult.Kind? {
+        guard let selection, let result = results.first(where: { $0.id == selection }) else { return nil }
+        guard case .item(_, let folder) = result.kind else { return result.kind }
+        guard let node = result.node, let current = store.nodes.node(withID: node.id) else { return nil }
+        return .item(current, folder: folder)
     }
 
     private func computeResults() -> [QuickOpenResult] {
@@ -488,8 +519,8 @@ final class QuickOpenModel: ObservableObject {
             if action.children.isEmpty { action.run() } else { openGroup(action) }
             return
         }
-        guard let result = selected else { return }
-        switch result.kind {
+        guard let kind = activatableKind(for: selected?.id) else { return }
+        switch kind {
         case .snippet(let snippet):
             Self.copyText(snippet.text)
         case .addSuggestion(let suggestion):
