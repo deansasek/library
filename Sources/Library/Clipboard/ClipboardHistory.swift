@@ -103,6 +103,8 @@ final class ClipboardHistory: ObservableObject {
     private(set) var pinnedLoaded = false
     /// A pin or unpin that happened before the load finished. It is written once the load is merged.
     private var savesAfterLoad = false
+    /// True while a retry of a file the launch load could not open is under way, so one save starts one read.
+    private var retryingUnreadFiles = false
     /// Every write of clipboard.json runs here, one at a time and in the order they were queued.
     private static let writeQueue = DispatchQueue(label: "com.deansasek.library.clipboard-save")
     /// True once a save has failed and the user has been told. Cleared by the next save that works, so a folder that
@@ -406,18 +408,63 @@ final class ClipboardHistory: ObservableObject {
         pinnedLoaded = true
         if let load {
             leavesPinnedFile = load.leavesFile
-            for pin in load.items {
-                if let index = items.firstIndex(where: { $0.digest == pin.digest }) {
-                    items[index].pinned = true
-                } else {
-                    items.insert(pin, at: items.firstIndex { $0.date < pin.date } ?? items.count)
-                }
-            }
-            trim()
+            merge(pins: load.items)
         }
         if load?.migrated == true || savesAfterLoad {
             savesAfterLoad = false
             savePinned()
+        }
+    }
+
+    /// Puts pins that were just read into the history. A pin whose copy is already there is marked pinned in place
+    /// rather than added twice, and the rest go in by copy time, as a copy does.
+    private func merge(pins: [ClipItem]) {
+        for pin in pins {
+            if let index = items.firstIndex(where: { $0.digest == pin.digest }) {
+                items[index].pinned = true
+            } else {
+                items.insert(pin, at: items.firstIndex { $0.date < pin.date } ?? items.count)
+            }
+        }
+        trim()
+    }
+
+    /// Reads clipboard.json and the history file again when the launch load could not open them, since the Keychain
+    /// may be readable now. A denied prompt or a locked Keychain at launch leaves the flag set for the whole session
+    /// otherwise, and every pin made meanwhile is lost at quit. Only one read is under way at a time. Returns without
+    /// writing, so nothing is put over a file that is still unreadable; the next save or pin change tries again.
+    private func retryUnreadFiles() {
+        guard leavesPinnedFile || leavesHistoryFile, !retryingUnreadFiles else { return }
+        retryingUnreadFiles = true
+        let pinnedFile = file
+        let historyFileURL = historyFile
+        let loadKey = self.loadKey
+        Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            let pinned = pinnedFile.flatMap { ClipboardHistory.readPinned(file: $0, key: loadKey) }
+            let history = historyFileURL.flatMap { ClipboardHistory.readHistory(file: $0, key: loadKey) }
+            await self.finishRetryingFiles(pinned: pinned, history: history)
+        }
+    }
+
+    /// Publishes files that a retry opened, and lets the saves that were waiting on them go out. Back on the main
+    /// actor. A file that is still unreadable keeps its flag, so nothing is written over it.
+    private func finishRetryingFiles(pinned: PinnedLoad?, history: HistoryLoad?) {
+        retryingUnreadFiles = false
+        if leavesPinnedFile, pinned?.leavesFile != true {
+            leavesPinnedFile = false
+            merge(pins: pinned?.items ?? [])
+            savePinned()
+        }
+        if leavesHistoryFile, history?.leavesFile != true {
+            leavesHistoryFile = false
+            if let history { items = HistoryRestart.merge(items, restored: history.items); trim() }
+            scheduleHistorySave()
+        }
+        // Both files are still closed, so say so once rather than losing every pin in silence.
+        if leavesPinnedFile || leavesHistoryFile {
+            NSLog("Library: clipboard items were not saved, because the clipboard key is still unavailable")
+            Self.noteWrite(false)
         }
     }
 
@@ -443,8 +490,10 @@ final class ClipboardHistory: ObservableObject {
             return
         }
         guard let file else { return }
-        guard !leavesPinnedFile else {
-            NSLog("Library: pinned clipboard items were not saved, because clipboard.json was not opened this launch")
+        if leavesPinnedFile || leavesHistoryFile {
+            // A file the launch load could not open is read again, since the Keychain may be readable now. The save
+            // goes out from finishRetryingFiles once the pins it holds are in memory.
+            retryUnreadFiles()
             return
         }
         // Only the copy of the clips is made here. Sealing them can wait for the Keychain, so it runs on the write
