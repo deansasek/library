@@ -1,7 +1,8 @@
 #!/bin/zsh
 # Builds Library and installs it in /Applications, replacing the old copy. Your library lives in ~/.library, apart
-# from the app, so an update never touches it. Nothing is kept from this folder afterward: Check for Updates downloads
-# a fresh copy and removes it.
+# from the app, so an update never touches it. Check for Updates downloads a fresh copy and removes it. A build from
+# a clone leaves one folder here afterwards, the .build compile cache, which a later update.sh reuses; everything else
+# this makes is removed. Delete it when you no longer want to update from this folder.
 #
 # If anything fails before the copy, the installed app is left as it was.
 set -euo pipefail
@@ -144,4 +145,8 @@ installed="$(defaults read /Applications/Library.app/Contents/Info CFBundleShort
 
 # Opening the app is a convenience. A failure here does not undo a good install.
 open /Applications/Library.app 2>/dev/null || print -u2 "Installed, but Library did not open. Open it from Applications."
+# build/Library.app is the only thing this leaves behind that is not needed afterward, since Check for Updates
+# downloads a fresh copy anyway. Removing it keeps the header above true for a build from a clone. The .build cache is
+# kept, so a later update.sh does not have to compile everything again.
+rm -rf build 2>/dev/null || true
 echo "Installed Library $installed in /Applications."
