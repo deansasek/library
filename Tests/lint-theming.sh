@@ -15,10 +15,27 @@ allowlist="Tests/theming-allowlist.txt"
 violations="$(mktemp)"
 trap 'rm -f "$violations"' EXIT
 
+# A missing source tree or allowlist must fail, not pass with nothing checked.
+if [[ ! -d "$root" ]]; then
+    print -ru2 -- "Theming lint failed: $root is missing, so there is nothing to check."
+    exit 1
+fi
+if [[ ! -f "$allowlist" ]]; then
+    print -ru2 -- "Theming lint failed: $allowlist is missing, so no exception can be checked."
+    exit 1
+fi
+
 # Lines are printed as: rule, file, line number, trimmed text.
+# grep exits 1 when nothing matches, which is fine; any other failure means the tree could not be searched.
 grep_rule() {
-    local rule="$1" pattern="$2"
-    { grep -rnE --include='*.swift' -- "$pattern" "$root" || true; } \
+    local rule="$1" pattern="$2" matches grep_status=0
+    matches="$(grep -rnE --include='*.swift' -- "$pattern" "$root")" || grep_status=$?
+    if (( grep_status > 1 )); then
+        print -ru2 -- "Theming lint failed: could not search $root for $rule (grep exit $grep_status)."
+        exit 1
+    fi
+    [[ -n "$matches" ]] || return 0
+    print -r -- "$matches" \
         | awk -F: -v rule="$rule" '{ file=$1; n=$2; sub(/^[^:]*:[^:]*:/, ""); gsub(/^[ \t]+|[ \t]+$/, ""); print rule "\t" file "\t" n "\t" $0 }' \
         >> "$violations"
 }
@@ -30,7 +47,12 @@ grep_rule opacity '(foregroundStyle|foregroundColor)\(.*\.opacity\('
 # An Image(systemName:) that is the label of a Button or Menu. The control is found from the line with the image, the
 # line before it (label: {), or the line that opens a trailing closure. It passes when accessibilityLabel or help is
 # attached within the next few lines, or when the label also has text or a Label.
-for file in $(find "$root" -name '*.swift' | sort); do
+swift_files=("${(@f)$(find "$root" -name '*.swift' | sort)}")
+if [[ -z "${swift_files[*]}" ]]; then
+    print -ru2 -- "Theming lint failed: no Swift files under $root, so nothing was checked."
+    exit 1
+fi
+for file in "${swift_files[@]}"; do
     awk -v file="$file" '
         function trim(s) { sub(/^[ \t]+/, "", s); sub(/[ \t]+$/, "", s); return s }
         { L[FNR] = $0 }
@@ -59,8 +81,10 @@ for file in $(find "$root" -name '*.swift' | sort); do
 done
 
 # Drop the lines the allowlist excepts, and report allowlist entries that no longer match anything.
+# The awk status must fail the script: a read error here would otherwise turn into a false pass.
+awk_status=0
 result="$(awk -F'\t' '
-    FNR == NR {
+    FILENAME == ARGV[1] {
         if ($0 ~ /^#/ || NF < 3) next
         key = $1 "\t" $2; allow[key] = $3; order[++count] = key
         next
@@ -78,10 +102,12 @@ result="$(awk -F'\t' '
             failed = 1
         }
         exit failed
-    }' "$allowlist" "$violations" || true)"
+    }' "$allowlist" "$violations")" || awk_status=$?
 
 if [[ -n "$result" ]]; then
     print -r -- "$result"
+fi
+if (( awk_status != 0 )); then
     print -r -- "Theming lint failed. Fix the line, or add an exception with a reason to $allowlist."
     exit 1
 fi
