@@ -10,6 +10,58 @@ repo="$PWD"
 # The theming rules: colors, fonts, opacity on text, and icon-only buttons (Tests/lint-theming.sh).
 Tests/lint-theming.sh
 
+# The lint must fail, not pass, when it cannot check anything. Each case runs a copy of the script against a
+# throwaway tree so the real checkout stays untouched, and expects both a nonzero exit and a message saying why.
+lint_tree="$(mktemp -d)"
+trap 'rm -rf "$lint_tree"' EXIT
+lint_fails() { # tree, text the message must contain, what the setup did
+    local output code=0
+    output="$("$1/Tests/lint-theming.sh" 2>&1)" || code=$?
+    if (( code == 0 )); then
+        echo "FAIL: the theming lint passed when $3" >&2
+        exit 1
+    fi
+    [[ "$output" == *"$2"* ]] \
+        || { echo "FAIL: the theming lint failed when $3 without saying why: $output" >&2; exit 1; }
+}
+
+lint_seeded="$lint_tree/seeded"
+mkdir -p "$lint_seeded/Tests" "$lint_seeded/Sources/Library"
+cp Tests/lint-theming.sh "$lint_seeded/Tests/"
+: > "$lint_seeded/Tests/theming-allowlist.txt"
+printf 'Text("x").foregroundStyle(.red)\n' > "$lint_seeded/Sources/Library/Seeded.swift"
+lint_fails "$lint_seeded" "FAIL color" "a .foregroundStyle(.red) is seeded"
+
+lint_allowlisted="$lint_tree/allowlisted"
+mkdir -p "$lint_allowlisted/Tests" "$lint_allowlisted/Sources/Library"
+cp Tests/lint-theming.sh "$lint_allowlisted/Tests/"
+printf 'Text("x").foregroundStyle(.red)\n' > "$lint_allowlisted/Sources/Library/Seeded.swift"
+printf 'Sources/Library/Seeded.swift\tText("x").foregroundStyle(.red)\tseeded for the test\n' \
+    > "$lint_allowlisted/Tests/theming-allowlist.txt"
+"$lint_allowlisted/Tests/lint-theming.sh" >/dev/null \
+    || { echo "FAIL: the theming lint rejected an allowlisted line" >&2; exit 1; }
+
+lint_no_allowlist="$lint_tree/no-allowlist"
+mkdir -p "$lint_no_allowlist/Tests" "$lint_no_allowlist/Sources/Library"
+cp Tests/lint-theming.sh "$lint_no_allowlist/Tests/"
+printf 'struct Fine {}\n' > "$lint_no_allowlist/Sources/Library/Fine.swift"
+lint_fails "$lint_no_allowlist" "Tests/theming-allowlist.txt" "its allowlist is missing"
+
+lint_no_sources="$lint_tree/no-sources"
+mkdir -p "$lint_no_sources/Tests"
+cp Tests/lint-theming.sh "$lint_no_sources/Tests/"
+: > "$lint_no_sources/Tests/theming-allowlist.txt"
+lint_fails "$lint_no_sources" "Sources/Library" "its Sources folder is missing"
+
+lint_no_swift="$lint_tree/no-swift"
+mkdir -p "$lint_no_swift/Tests" "$lint_no_swift/Sources/Library"
+cp Tests/lint-theming.sh "$lint_no_swift/Tests/"
+: > "$lint_no_swift/Tests/theming-allowlist.txt"
+lint_fails "$lint_no_swift" "no Swift files" "there are no Swift files to check"
+
+rm -rf "$lint_tree"
+echo "Theming lint fails without its sources, allowlist, or a seeded violation, and passes with an exception"
+
 # The version check that build.sh and the release workflow use: valid versions pass, and text that could reach
 # GITHUB_ENV or Info.plist fails.
 for version in 1 1.2 1.2.0 10.20.30; do
