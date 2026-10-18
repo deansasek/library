@@ -52,6 +52,8 @@ Library skips anything a password manager marks as private, and copies over 25 M
 
 Keep text you type often, such as an address or a standard reply, as a snippet. Add one from **File > New Snippet…** or the **Snippets** button in the Library window. Type a snippet's name or keywords in Quick Open, then press Return to copy it.
 
+In the Snippets sheet, Return opens the selected snippet for editing, and Delete asks before it is removed. Snippets have no Recently Deleted folder, but ⌘Z right after a delete brings the snippet back with its name, keywords, and text.
+
 ### Organize your library
 
 <p align="center">

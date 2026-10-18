@@ -114,6 +114,22 @@ struct SnippetsSheet: View {
     @ObservedObject private var store = SnippetStore.shared
     @StateObject private var model = SnippetListModel()
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.undoManager) private var undoManager
+
+    /// True while the delete confirmation asked by the Delete button or the Delete key is on screen.
+    private var deleteIsPresented: Binding<Bool> {
+        Binding(
+            get: { model.pendingDelete != nil },
+            set: { if !$0 { model.pendingDelete = nil } }
+        )
+    }
+
+    /// Asks before removing the selected snippet. A snippet has no Recently Deleted copy, so both the button and the
+    /// Delete key confirm first; Undo right after the confirmation brings it back.
+    private func requestDelete() {
+        guard let id = model.selection, !store.saveBlocked else { return }
+        model.pendingDelete = id
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -147,6 +163,14 @@ struct SnippetsSheet: View {
                     }
                 }
             }
+            // Return opens the selected snippet for editing, as Return renames in the Edit Library list.
+            .onKeyPress(.return) {
+                guard let id = model.selection, let snippet = store.snippets.first(where: { $0.id == id }) else { return .ignored }
+                model.editing = .edit(snippet)
+                return .handled
+            }
+            // Delete (Backspace) asks first: unlike a bookmark, a snippet has no Recently Deleted copy to restore.
+            .onDeleteCommand { requestDelete() }
             Divider()
             HStack {
                 // The label is the visible text, so Voice Control can click it by the name on screen.
@@ -158,21 +182,30 @@ struct SnippetsSheet: View {
                     }
                 }
                 .disabled(model.selection == nil)
-                Button("Delete", role: .destructive) {
-                    if let id = model.selection {
-                        SnippetStore.shared.remove([id])
-                        model.selection = nil
-                    }
-                }
-                .disabled(model.selection == nil || store.saveBlocked)
+                Button("Delete", role: .destructive) { requestDelete() }
+                    .disabled(model.selection == nil || store.saveBlocked)
                 Spacer()
+                // Done is not the default button: Return in the list opens the selected snippet for editing.
                 Button("Done") { dismiss() }
-                    .keyboardShortcut(.defaultAction)
             }
             .padding(20)
         }
         .frame(width: 480)
+        // The sheet's undo manager, so a Delete registers one step that Undo (⌘Z) takes back from here or the menu.
+        .onAppear { store.undoManager = undoManager }
         .onExitCommand { dismiss() }
+        .confirmationDialog("Delete Snippet?", isPresented: deleteIsPresented, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                if let id = model.pendingDelete {
+                    SnippetStore.shared.remove([id])
+                    model.selection = nil
+                }
+                model.pendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { model.pendingDelete = nil }
+        } message: {
+            Text("The snippet is removed from snippets.json. Undo right after this brings it back.")
+        }
         .sheet(item: $model.editing) { editing in
             SnippetForm(snippet: editing.snippet) { model.editing = nil }
         }
@@ -202,6 +235,8 @@ final class SnippetListModel: ObservableObject {
 
     @Published var selection: UUID?
     @Published var editing: Editing?
+    /// The snippet a Delete button or Delete key asked to remove, while the confirmation is on screen.
+    @Published var pendingDelete: UUID?
 }
 
 /// Opens one snippet form in its own window: File > New Snippet, and Edit in Quick Open. The window is single-instance,

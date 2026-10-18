@@ -502,6 +502,37 @@ check(FileManager.default.fileExists(atPath: blockedSnippetFile.path, isDirector
       "a change while blocked does not replace the unreadable file")
 try? FileManager.default.removeItem(at: snippetDir)
 
+// ---- undo restores a deleted snippet with its name, keywords, and text, at its index ----
+let snippetUndoLog = UndoManager()
+// Each delete is grouped by hand, so the checks run in one run loop turn and still have one undo step per delete.
+snippetUndoLog.groupsByEvent = false
+let undoableSnippets = SnippetStore(file: nil)
+undoableSnippets.undoManager = snippetUndoLog
+@MainActor func snippetStep(_ body: () -> Void) {
+    snippetUndoLog.beginUndoGrouping()
+    body()
+    snippetUndoLog.endUndoGrouping()
+}
+let replySnippet = Snippet(name: "Reply", text: "Thanks,\nDean", keywords: "email")
+let addressSnippet = Snippet(name: "Home address", text: "1 Main St\nSpringfield", keywords: "street mailing")
+snippetStep { undoableSnippets.add(replySnippet) }
+snippetStep { undoableSnippets.add(addressSnippet) }
+snippetUndoLog.removeAllActions()
+// The delete is of the second snippet, so the check covers its place in the list, not just its contents.
+snippetStep { undoableSnippets.remove([addressSnippet.id]) }
+check(undoableSnippets.snippets.map(\.id) == [replySnippet.id], "a delete removes only the selected snippet")
+undoableSnippets.undoManager?.undo()
+check(undoableSnippets.snippets.map(\.id) == [replySnippet.id, addressSnippet.id],
+      "Undo puts the deleted snippet back at its index: \(undoableSnippets.snippets.map(\.name))")
+check(undoableSnippets.snippets.last?.name == "Home address" && undoableSnippets.snippets.last?.text == "1 Main St\nSpringfield"
+      && undoableSnippets.snippets.last?.keywords == "street mailing",
+      "the restored snippet keeps its name, keywords, and text")
+// A remove of an id that is not saved is not a change, so it is not an undo step and leaves Redo alone.
+// It runs outside a group, as a no-op menu action does, so an empty group is not what keeps Redo.
+undoableSnippets.remove([UUID()])
+check(snippetUndoLog.canRedo && undoableSnippets.snippets.count == 2,
+      "removing an id that is not saved is not an undo step")
+
 // ---- a shortcut is equal to the same shortcut ----
 check(Shortcut(modifiers: UInt32(controlKey), button: 1) == Shortcut(modifiers: UInt32(controlKey), button: 1), "shortcut equality")
 check(Shortcut(modifiers: UInt32(controlKey), button: 1) != Shortcut(modifiers: UInt32(cmdKey), button: 1), "shortcut inequality")
