@@ -482,3 +482,12 @@
 
 /* Placeholder in the Quick Open search field, which searches everything in the library. */
 "Search Library" = "Search Library";
+
+/* Said when a library:// link names an action Library does not have. */
+"Library does not know the action “%@”." = "Library does not know the action “%@”.";
+
+/* Said when a library://open link has no name to open. */
+"A library://open link needs a name, as in library://open?name=Jira." = "A library://open link needs a name, as in library://open?name=Jira.";
+
+/* Said when a library://open link names an item that is not in the library. */
+"No item named “%@” is in your library." = "No item named “%@” is in your library.";

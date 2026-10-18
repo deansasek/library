@@ -2979,6 +2979,26 @@ do {
           "a percent-encoded name and value are decoded")
 }
 
+// A link that cannot be used says why, naming the problem, so a Shortcut or a script author is not left guessing.
+do {
+    func link(_ text: String) -> URL { URL(string: text)! }
+    let nodes = [LibraryItem(name: "Jira", url: "https://jira.example.com")]
+    let unknown = AppDelegate.linkProblem(link("library://opne?name=Jira"), in: nodes)
+    check(unknown != nil && unknown!.contains("opne"), "an unknown action names the action")
+    let noName = AppDelegate.linkProblem(link("library://open"), in: nodes)
+    check(noName != nil && noName!.contains("name"), "an open link with no name says it needs one")
+    check(AppDelegate.linkProblem(link("library://open?name="), in: nodes) != nil, "an open link with an empty name says so")
+    let noMatch = AppDelegate.linkProblem(link("library://open?name=NoSuchItem"), in: nodes)
+    check(noMatch != nil && noMatch!.contains("NoSuchItem"), "a name that matches nothing is named back")
+    check(AppDelegate.linkProblem(link("library://OPEN?name=jira"), in: nodes) == nil, "a usable link says nothing")
+    check(AppDelegate.linkProblem(link("library://menu"), in: nodes) == nil
+          && AppDelegate.linkProblem(link("LIBRARY://search"), in: nodes) == nil, "menu and search say nothing")
+    check(AppDelegate.linkProblem(link("https://example.com/opne"), in: nodes) == nil, "another app's link is left alone")
+    let long = "x".prefix(80)
+    let cut = AppDelegate.linkProblem(link("library://\(long)"), in: nodes)
+    check(cut != nil && cut!.count <= 80, "a long name is cut short rather than filling the message")
+}
+
 // The Settings toggle and the code that asks before running a command must name the same defaults key, or the
 // confirmation is silently off. Both now read it from one constant, and no literal is left behind.
 do {
