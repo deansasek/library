@@ -568,10 +568,16 @@ do {
     let argsApp = LibraryItem(name: "Chrome", appPath: "/Applications/Chrome.app", arguments: "--profile Work")
     let blankArgsApp = LibraryItem(name: "Blank", appPath: "/Applications/Blank.app", arguments: "   ")
     let template = LibraryItem(name: "Ticket", url: "tickets.example.com/browse/{}")
+    let twoField = LibraryItem(name: "Two", url: "a.example.com/{a}/{b}", templateFields: ["a", "b"])
     check(!linkOpenNeedsConfirmation(bookmark, value: nil) && !linkOpenNeedsConfirmation(bookmark, value: "x"), "a bookmark opens without a prompt")
     check(!linkOpenNeedsConfirmation(plainApp, value: nil) && !linkOpenNeedsConfirmation(blankArgsApp, value: nil), "a plain app opens without a prompt")
     check(linkOpenNeedsConfirmation(argsApp, value: nil), "an app with arguments asks")
-    check(linkOpenNeedsConfirmation(template, value: "ABC-123") && !linkOpenNeedsConfirmation(template, value: nil), "a template filled from the link asks, and an empty one does not")
+    check(linkOpenNeedsConfirmation(template, value: "ABC-123") && !linkOpenNeedsConfirmation(template, value: nil), "a one-field template filled from the link asks, and an empty one does not")
+    check(twoField.isTemplate && twoField.placeholders.count == 2, "the two-field template has two fields")
+    // open(_:value:) fills a template only when it has one field, so the prompt must not name a value it drops.
+    check(!linkOpenNeedsConfirmation(twoField, value: "hello") && !linkOpenNeedsConfirmation(twoField, value: nil),
+          "a template with several fields never asks, because the link's value cannot fill it")
+    check(linkOpenNeedsConfirmation(argsApp, value: "hello"), "an app with arguments still asks when the link has a value")
 }
 
 // ---- Services: apps and folders dropped from Finder ----
