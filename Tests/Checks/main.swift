@@ -884,6 +884,26 @@ MainActor.assumeIsolated {
                 source: nil, fromLibrary: false, generation: -1, epoch: now)
     check(history.items.map(\.title) == ["copied after the clear"], "a copy made after the clear is still recorded")
 
+    // Quitting waits for the pinned writes even when no history file is kept, which is the default, so the last pin
+    // reaches disk. There is no waitForSaves between the pin and the flush, so only the flush itself can finish it.
+    let quitFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-quit-\(UUID().uuidString).json")
+    let quitBoard = NSPasteboard(name: NSPasteboard.Name("library-checks-quit-\(UUID().uuidString)"))
+    let quitting = ClipboardHistory(pasteboard: quitBoard, file: quitFile, key: { testKey })
+    waitForLoad(quitting)
+    quitBoard.clearContents()
+    let quitItem = NSPasteboardItem()
+    quitItem.setString("pinned just before quitting", forType: .string)
+    quitBoard.writeObjects([quitItem])
+    quitting.poll()
+    while quitting.pendingCaptures > 0 { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    quitting.togglePin(quitting.items[0])
+    quitting.flushHistory()
+    check(FileManager.default.fileExists(atPath: quitFile.path), "the quit flush waits for a pin written with history off")
+    if case .clips(let quitClips, _) = PinnedFile.read((try? Data(contentsOf: quitFile)) ?? Data(), key: testKey) {
+        check(quitClips.count == 1, "the pin made just before the quit is the one on disk")
+    } else { check(false, "the pin made just before the quit is the one on disk") }
+    try? FileManager.default.removeItem(at: quitFile)
+
     // A paste goes back to the app that had the keyboard, and never to Library itself.
     check(FrontApp.canPaste(toProcess: 42, ownProcess: 7), "a paste may go to another app")
     check(!FrontApp.canPaste(toProcess: 7, ownProcess: 7), "a paste never goes to Library")
