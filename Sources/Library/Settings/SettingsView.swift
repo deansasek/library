@@ -19,7 +19,7 @@ struct SettingsView: View {
     @AppStorage(UpdateCheck.automaticKey) private var checksForUpdates = true
     @AppStorage(LinkChecker.enabledKey) private var checksLinks = false
     @AppStorage(SmartTitle.key) private var namesFromPages = false
-    @AppStorage("confirmTerminalCommands") private var confirmTerminalCommands = false
+    @AppStorage(TerminalConfirmation.confirmKey) private var confirmTerminalCommands = false
 
     var body: some View {
         TabView {
