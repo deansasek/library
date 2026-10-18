@@ -210,6 +210,24 @@ let pt = [LibraryItem(name: "Jira", url: "https://x.atlassian.net"),
 check(QuickOpenResult.search("", in: pt, counts: [:]).compactMap(\.node).map(\.name) == ["Jira", "Jenkins", "Terminal"], "empty search order")
 check(QuickOpenResult.search("j", in: pt, counts: [:]).compactMap(\.node).map(\.name) == ["Jira", "Jenkins"], "prefix search")
 check(QuickOpenResult.link(from: "example.com/a")?.absoluteString == "https://example.com/a" && QuickOpenResult.link(from: "hello world") == nil, "link detection")
+// A router or a local server is typed without a scheme, so those are links too.
+do {
+    for text in ["192.168.1.1", "192.168.1.1:8080", "localhost:3000", "http://192.168.1.1/admin", "https://example.com:8443/x"] {
+        check(QuickOpenResult.link(from: text) != nil, "a typed link '\(text)' is offered")
+    }
+    check(QuickOpenResult.link(from: "192.168.1.1")?.absoluteString == "https://192.168.1.1"
+          && QuickOpenResult.link(from: "192.168.1.1:8080")?.absoluteString == "https://192.168.1.1:8080"
+          && QuickOpenResult.link(from: "localhost:3000")?.absoluteString == "https://localhost:3000",
+          "a typed address gets the https default, with its port kept")
+    for text in ["1.2.3", "word", "hello world", "999.1.1.1", "192.168.1", "1.2.3.4.5", "", "a b c"] {
+        check(QuickOpenResult.link(from: text) == nil, "not a typed link: '\(text)'")
+    }
+    check(QuickOpenResult.link(from: " 192.168.1.1 ")?.host == "192.168.1.1", "a typed address is trimmed")
+    check(QuickOpenResult.link(from: "192.168.1.1/x?y=z")?.host == "192.168.1.1", "a path and query on a typed address are kept")
+    check(QuickOpenResult.isWebHost("192.168.1.1") && QuickOpenResult.isWebHost("localhost") && QuickOpenResult.isWebHost("example.com")
+          && !QuickOpenResult.isWebHost("1.2.3") && !QuickOpenResult.isWebHost("word") && !QuickOpenResult.isWebHost("256.1.1.1"),
+          "a host is a typed link when it is a dotted name, a dotted-quad address, or localhost")
+}
 
 /// The Quick Open search as it was before the index: walks and lowercases the whole tree on every call. The index
 /// must return exactly what this returns.
