@@ -2759,6 +2759,45 @@ let storeHome = FileManager.default.temporaryDirectory.appendingPathComponent("l
 setenv("LIBRARY_HOME", storeHome.path, 1)
 let undoStore = LibraryStore()
 
+// An open Quick Open panel follows the library: a removed item loses its row, and a row that is still shown opens the
+// item as the library holds it now.
+do {
+    // The library's publisher reaches the panel on the next turn of the run loop.
+    @MainActor func settle(_ condition: () -> Bool) {
+        let deadline = Date().addingTimeInterval(10)  // a limit only; the wait ends as soon as the condition holds
+        while !condition(), Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+    @MainActor func run() {
+        let page = LibraryItem(name: "Docs", url: "https://docs.example.com/old")
+        undoStore.perform("Add Bookmark") { $0.append(page, to: nil) }
+        let model = QuickOpenModel(store: undoStore, selectedText: nil, pastes: false)
+        let before = model.results.first { $0.node?.id == page.id }
+        check(before != nil, "an open Quick Open panel lists a library item")
+        // The library changes under the open panel: the same item with a new address, and then gone.
+        var edited = page
+        edited.url = "https://docs.example.com/new"
+        edited.name = "Documentation"
+        undoStore.perform("Rename") { nodes in
+            if let index = nodes.firstIndex(where: { $0.id == page.id }) { nodes[index] = edited }
+        }
+        settle { model.results.contains { $0.node?.id == page.id && $0.node?.url == "https://docs.example.com/new" } }
+        check(model.results.contains { $0.node?.id == page.id && $0.node?.url == "https://docs.example.com/new" },
+              "a library change refreshes the rows of an open panel")
+        if case .item(let opened, _)? = model.activatableKind(for: before?.id) {
+            check(opened.url == "https://docs.example.com/new", "a row opens the address the item has now")
+        } else { check(false, "a row opens the address the item has now") }
+        undoStore.perform("Delete Bookmark") { $0.removeNode(page.id) }
+        settle { !model.results.contains { $0.node?.id == page.id } }
+        check(!model.results.contains { $0.node?.id == page.id }, "removing an item elsewhere removes its row without a keystroke")
+        check(model.activatableKind(for: before?.id) == nil, "activating a row whose item is gone opens nothing")
+        check(model.activatableKind(for: "no-such-row") == nil, "a row that is not there opens nothing")
+    }
+    MainActor.assumeIsolated { run() }
+    undoStore.perform("Delete Bookmark") { nodes in
+        nodes.removeAll { $0.name == "Documentation" || $0.name == "Docs" }
+    }
+}
+
 // Restore Defaults changes the shortcuts without asking for Accessibility access. The Accessibility row asks.
 do {
     let savedHotkeys = UserDefaults.standard.data(forKey: "extraHotkeys")
