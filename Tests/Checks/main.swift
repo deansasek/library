@@ -41,6 +41,21 @@ check(WebFetch.isLocalTarget(URL(string: "http://localhost:8080/x")!) && WebFetc
 check(WebFetch.isLocalTarget(URL(string: "http://127.1/")!) && WebFetch.isLocalTarget(URL(string: "http://[::1]/")!), "short and bracketed loopback are local")
 check(WebFetch.isLocalTarget(URL(string: "http://10.0.0.7/admin")!) && WebFetch.isLocalTarget(URL(string: "http://192.168.0.1/")!), "LAN addresses are local")
 
+// ---- a connection to a private address is refused, even when the host check saw a public one ----
+let privateConnections: [String?] = ["192.168.1.20", "10.0.0.1:80", "127.0.0.1:443", "169.254.10.1:80", "0.0.0.0:80",
+                                      "[::1]:443", "[fd00::5]:443", "[fe80::1%en0]:443", "::ffff:10.0.0.1"]
+for address in privateConnections {
+    check(WebFetch.isPrivateConnection([address]), "private connection \(address ?? "nil")")
+}
+let publicConnections: [String?] = ["8.8.8.8", "8.8.8.8:443", "172.32.0.1:443", "192.169.0.1:443",
+                                    "[2606:4700::1111]:443", nil]
+for address in publicConnections {
+    check(!WebFetch.isPrivateConnection([address]), "public connection \(address ?? "nil")")
+}
+check(WebFetch.isPrivateConnection(["8.8.8.8", "192.168.1.20"]), "one private hop among several is refused")
+check(WebFetch.host(ofRemoteAddress: "[fd00::5]:443") == "fd00::5" && WebFetch.host(ofRemoteAddress: "8.8.8.8") == "8.8.8.8",
+      "a connection address keeps its host and drops the port")
+
 // ---- the update check has a total deadline ----
 do {
     let configuration = UpdateRules.sessionConfiguration()
