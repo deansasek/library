@@ -205,10 +205,16 @@ func newWindowFlag(bundleID: String) -> String? {
     return nil
 }
 
+/// The UserDefaults key of "Confirm before running a terminal command". The Settings toggle and `confirmCommand` both
+/// read it from here, so a rename in one place cannot quietly turn the confirmation off.
+enum TerminalConfirmation {
+    static let confirmKey = "confirmTerminalCommands"
+}
+
 /// Asks before a terminal command runs, when the Settings option is on. Cancel is the default button.
 @MainActor
 private func confirmCommand(_ node: LibraryItem, _ command: String) -> Bool {
-    guard UserDefaults.standard.bool(forKey: "confirmTerminalCommands") else { return true }
+    guard UserDefaults.standard.bool(forKey: TerminalConfirmation.confirmKey) else { return true }
     NSApp.activate(ignoringOtherApps: true)
     let alert = NSAlert()
     alert.messageText = String(format: String(localized: "Run “%@” in Terminal?", bundle: L10n.bundle), node.name)

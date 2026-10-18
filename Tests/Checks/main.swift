@@ -2702,6 +2702,19 @@ check(HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, sc
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 0.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "a corner with no display beside it is a corner")
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "the right edge of a lone display is a corner")
 
+// The Settings toggle and the code that asks before running a command must name the same defaults key, or the
+// confirmation is silently off. Both now read it from one constant, and no literal is left behind.
+do {
+    let opening = (try? String(contentsOfFile: swiftRoot + "Model/Opening.swift", encoding: .utf8)) ?? ""
+    let settings = (try? String(contentsOfFile: swiftRoot + "Settings/SettingsView.swift", encoding: .utf8)) ?? ""
+    check(opening.contains("confirmKey = \"\(TerminalConfirmation.confirmKey)\""), "Opening declares the confirm key")
+    check(opening.contains("UserDefaults.standard.bool(forKey: TerminalConfirmation.confirmKey)"), "confirmCommand reads the declared key")
+    check(settings.contains("@AppStorage(TerminalConfirmation.confirmKey)"), "the Settings toggle writes the same key")
+    check(opening.components(separatedBy: "\"confirmTerminalCommands\"").count - 1 == 1
+          && !settings.contains("\"confirmTerminalCommands\""),
+          "the key is a literal only where it is declared")
+}
+
 // The English strings that build.sh puts in the app's bundle are in the source tree, where the bundle is made from.
 do {
     let repoRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
