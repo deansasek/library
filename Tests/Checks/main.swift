@@ -2161,6 +2161,17 @@ check(LinkCheck.isDailyCheckDue(now: linkNow, lastRun: nil), "a daily check with
 check(!LinkCheck.isDailyCheckDue(now: linkNow, lastRun: linkDate(hoursAgo: 23.9)), "a daily check less than a day after the last is not due")
 check(LinkCheck.isDailyCheckDue(now: linkNow, lastRun: linkDate(hoursAgo: 24)) && LinkCheck.isDailyCheckDue(now: linkNow, lastRun: linkNow.addingTimeInterval(60)), "a day later, or a last run in the future, is due")
 check(LinkCheck.secondsUntilDailyCheck(now: linkNow, lastRun: nil) == 0 && LinkCheck.secondsUntilDailyCheck(now: linkNow, lastRun: linkDate(hoursAgo: 1)) == 23 * 3600, "the wait is the rest of the day")
+// A run cut short by quitting recorded nothing, so it leaves the day stamp alone and the next pass runs at once.
+check(!LinkCheck.stampsLastRun(cancelled: true, recorded: 0), "a run cancelled with no answer does not stamp the day")
+check(LinkCheck.stampsLastRun(cancelled: true, recorded: 3), "a run that recorded before it was cancelled stamps the day")
+check(LinkCheck.stampsLastRun(cancelled: false, recorded: 0) && LinkCheck.stampsLastRun(cancelled: false, recorded: 7),
+      "a run that finished stamps the day, with or without answers")
+do {
+    let stamp = Date(timeIntervalSince1970: 1_000_000)
+    check(LinkCheck.isDailyCheckDue(now: stamp, lastRun: stamp) == false
+          && LinkCheck.isDailyCheckDue(now: stamp.addingTimeInterval(86_400), lastRun: stamp),
+          "an unstamped run leaves the day due, a stamped one does not")
+}
 check(LinkCheck.startCount(running: 0, pending: 10) == 4 && LinkCheck.startCount(running: 3, pending: 10) == 1 && LinkCheck.startCount(running: 4, pending: 10) == 0, "at most four requests run at once")
 check(LinkCheck.startCount(running: 0, pending: 2) == 2 && LinkCheck.startCount(running: 0, pending: 0) == 0 && LinkCheck.startCount(running: 6, pending: 3) == 0, "no more requests than are waiting")
 let linkPage = LibraryItem(name: "Page", url: "https://example.com/page")

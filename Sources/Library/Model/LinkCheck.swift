@@ -92,6 +92,13 @@ enum LinkCheck {
         return elapsed < 0 || elapsed >= dailyInterval
     }
 
+    /// Whether a run writes the day stamp. A run that was cancelled before it recorded any answer did no work, so it
+    /// leaves the stamp alone and the next scheduled pass runs at once. A run that finished stamps the day, whether or
+    /// not it was cancelled after recording something.
+    static func stampsLastRun(cancelled: Bool, recorded: Int) -> Bool {
+        !cancelled || recorded > 0
+    }
+
     /// The wait until the next background check: none when one is due, else the rest of the day since the last run.
     static func secondsUntilDailyCheck(now: Date, lastRun: Date?) -> TimeInterval {
         guard !isDailyCheckDue(now: now, lastRun: lastRun), let lastRun else { return 0 }

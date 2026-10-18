@@ -46,13 +46,14 @@ enum LinkChecker {
         isChecking = true
         defer { isChecking = false }
         let now = Date.now
-        UserDefaults.standard.set(now, forKey: lastRunKey)
         let items = LinkCheck.itemsToCheck(store.nodes.leaves, now: now)
         var targets: [String: URL] = [:]
         for item in items {
             if let key = LinkCheck.key(for: item), targets[key] == nil, let link = item.link { targets[key] = link }
         }
         guard !targets.isEmpty else {
+            // The pass finished and found nothing due, which is a run of the day like any other.
+            stamp(now)
             if interactive {
                 show(String(localized: "Every bookmark was checked in the last 24 hours, so there was nothing to check.",
                             bundle: L10n.bundle))
@@ -89,12 +90,20 @@ enum LinkChecker {
             }
         }
         store.recordLinkStatuses(updates)
+        // A run that was cut short before it recorded anything leaves the stamp alone, so the next scheduled pass runs
+        // at once rather than the unchecked bookmarks waiting out the rest of the day.
+        if LinkCheck.stampsLastRun(cancelled: Task.isCancelled, recorded: updates.count) { stamp(now) }
         if interactive {
             let broken = kinds.values.filter { $0 == .broken }.count
             let unreachable = kinds.values.filter { $0 == .unreachable }.count
             show(String(localized: "Checked \(kinds.count) links. \(broken) are broken, and \(unreachable) can’t be reached.",
                         bundle: L10n.bundle))
         }
+    }
+
+    /// Records the day of a run. Nothing else writes the stamp, so a run that recorded no answer leaves it as it was.
+    private static func stamp(_ date: Date) {
+        UserDefaults.standard.set(date, forKey: lastRunKey)
     }
 
     private static func show(_ message: String) {
