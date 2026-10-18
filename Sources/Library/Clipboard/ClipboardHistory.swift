@@ -121,6 +121,11 @@ final class ClipboardHistory: ObservableObject {
     private var activationObserver: NSObjectProtocol?
     /// Counts copies, so an older copy that finishes building late does not take over `current`.
     private var captureGeneration = 0
+    /// Counts Clear History presses, so a copy that started building before the last one is not added after it. A
+    /// build carries the value it saw at `poll` and is dropped when the counter has moved on.
+    private var clearEpoch = 0
+    /// The clear count, so a check can add a built copy with the epoch the current history is on.
+    var clearEpochForChecks: Int { clearEpoch }
     /// Copies still being built in the background. Zero once every copy has been added.
     private(set) var pendingCaptures = 0
 
@@ -634,6 +639,9 @@ final class ClipboardHistory: ObservableObject {
     /// Removes everything that is not pinned.
     func clear() {
         if historyLoadStarted && !historyLoaded { clearedWhileLoading = true }
+        // A copy still being built belongs to the history the user just cleared, so it is counted as belonging to an
+        // earlier clear and dropped when its build finishes.
+        clearEpoch &+= 1
         let removed = items.filter { !$0.pinned }
         items.removeAll { !$0.pinned }
         forget(removed)
@@ -662,7 +670,7 @@ final class ClipboardHistory: ObservableObject {
         guard isEnabled else { return }
         let bytes = representations.reduce(0) { $0 + $1.values.reduce(0) { $0 + $1.count } }
         guard let item = Self.makeItem(representations: representations, bytes: bytes) else { return }
-        add(item, source: source, fromLibrary: false, generation: -1)
+        add(item, source: source, fromLibrary: false, generation: -1, epoch: clearEpoch)
     }
 
     /// Copies the first queued clip and takes it out of the queue. A Command-V in the app in front then pastes it.
@@ -761,17 +769,22 @@ final class ClipboardHistory: ObservableObject {
         let fromLibrary = sourceID == Bundle.main.bundleIdentifier
         let source = fromLibrary ? nil : frontApps.first { $0.bundleID == sourceID }?.name
         pendingCaptures += 1
+        let epoch = clearEpoch
         Task {
             defer { pendingCaptures -= 1 }
             let built = await Task.detached(priority: .userInitiated) {
                 Self.makeItem(representations: copied.representations, bytes: copied.bytes)
             }.value
             guard let built else { return }
-            add(built, source: source, fromLibrary: fromLibrary, generation: generation)
+            add(built, source: source, fromLibrary: fromLibrary, generation: generation, epoch: epoch)
         }
     }
 
-    private func add(_ copy: ClipItem, source: String?, fromLibrary: Bool, generation: Int) {
+    /// Adds a copy that has finished building. `epoch` is the clear count `poll` saw: a build that started before a
+    /// Clear History is dropped, since the user asked for it to be gone, and so is one made while history was off. Internal
+    /// so the checks can add a built copy on their own.
+    func add(_ copy: ClipItem, source: String?, fromLibrary: Bool, generation: Int, epoch: Int) {
+        guard epoch == clearEpoch, isEnabled else { return }
         var item = copy
         // Copying something again, or copying an item back from the history, moves it to the top.
         var previous: ClipItem?
