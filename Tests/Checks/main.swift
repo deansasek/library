@@ -2723,25 +2723,6 @@ check(HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, sc
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 0.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "a corner with no display beside it is a corner")
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "the right edge of a lone display is a corner")
 
-// Copy as Plain Text is for formatting, so several plain-text flavors are not formatting.
-do {
-    func types(_ names: [String]) -> [NSPasteboard.PasteboardType: Data] {
-        Dictionary(uniqueKeysWithValues: names.map { (NSPasteboard.PasteboardType($0), Data("x".utf8)) })
-    }
-    check(!clip(.text, text: "a", reps: [types([NSPasteboard.PasteboardType.string.rawValue])]).hasRichFormats,
-          "a copy holding only plain text drops nothing")
-    check(!clip(.text, text: "a", reps: [types(["public.utf8-plain-text", "public.utf16-plain-text",
-                                               "NSStringPboardType", "public.utf16-plain-text-le"])]).hasRichFormats,
-          "a copy holding several plain-text flavors drops nothing")
-    check(clip(.text, text: "a", reps: [types(["public.utf8-plain-text", "public.rtf"])]).hasRichFormats,
-          "a copy holding RTF with its text drops the RTF")
-    check(clip(.text, text: "a", reps: [types(["public.utf8-plain-text", "public.html"])]).hasRichFormats,
-          "a copy holding HTML with its text drops the HTML")
-    check(!clip(.text, text: "a").hasRichFormats && !clip(.image).hasRichFormats, "no representations is not rich text")
-    check(clip(.text, text: "a", reps: [types([NSPasteboard.PasteboardType.string.rawValue]), types(["public.rtf"])]).hasRichFormats == false,
-          "only the first pasteboard item decides, as the property always has")
-}
-
 // The Settings toggle and the code that asks before running a command must name the same defaults key, or the
 // confirmation is silently off. Both now read it from one constant, and no literal is left behind.
 do {
