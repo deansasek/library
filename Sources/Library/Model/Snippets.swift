@@ -42,6 +42,9 @@ final class SnippetStore: ObservableObject {
     /// True when snippets.json exists but cannot be read. Nothing is changed or written over it until it can be read,
     /// so add, update, and remove do nothing and the Manage window and the editor disable their save actions.
     @Published private(set) var saveBlocked = false
+    /// Undo and redo of snippet deletions, set by the Snippets sheet when it appears, so a deleted snippet can be
+    /// brought back from the sheet and the Edit menu. Nil leaves the deletion with no undo step.
+    var undoManager: UndoManager?
     private let file: URL?
 
     /// `file` is where the snippets are saved. Nil keeps them in memory only.
@@ -100,10 +103,29 @@ final class SnippetStore: ObservableObject {
         return true
     }
 
+    /// Removes snippets and records one undo step that puts them back where they were, with their name, keywords, and
+    /// text. Removing an id that is not in the list is not a step.
     func remove(_ ids: Set<UUID>) {
         guard !saveBlocked else { return }
-        snippets.removeAll { ids.contains($0.id) }
+        let kept = snippets.filter { !ids.contains($0.id) }
+        guard kept.count != snippets.count else { return }
+        replace(with: kept, actionName: "Delete")
+    }
+
+    /// Undo and redo both assign the whole list, so replacing the list registers the inverse step and redo needs no
+    /// extra code. The Redo step takes the name of the step it undoes, so the Edit menu shows what Redo will do.
+    private func replace(with next: [Snippet], actionName: String) {
+        guard next != snippets else { return }
+        let previous = snippets
+        snippets = next
         save()
+        undoManager?.registerUndo(withTarget: self) { store in
+            MainActor.assumeIsolated {
+                let name = store.undoManager?.undoActionName ?? actionName
+                store.replace(with: previous, actionName: name)
+            }
+        }
+        undoManager?.setActionName(actionName)
     }
 
     private func save() {
