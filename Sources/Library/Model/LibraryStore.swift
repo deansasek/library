@@ -235,9 +235,9 @@ final class LibraryStore: ObservableObject {
     }
 
     /// Sets the menu, Quick Open, and clipboard menu shortcuts back to their defaults. Open Link stays.
+    /// It never asks for Accessibility access; the Accessibility row does that when the user chooses Allow….
     func restoreDefaultHotkeys() {
         extraHotkeys = [Self.defaultHotkeys[0], Self.defaultHotkeys[1], extraHotkeys[2], Self.defaultHotkeys[3]]
-        if clickAccessMissing { HotKeys.requestClickAccess() }
     }
 
     /// Reloads when bookmarks.json changes outside the app. The folder is watched because

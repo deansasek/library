@@ -32,10 +32,15 @@ enum HotKeys {
     private static var cornerEntries: [Entry] = []
     private static var cornerArmed = true
 
-    static var hasClickAccess: Bool { AXIsProcessTrusted() }
+    /// The access check. Checks set this so they can test both outcomes without changing the Mac's setting.
+    static var hasClickAccessOverride: Bool?
+    static var hasClickAccess: Bool { hasClickAccessOverride ?? AXIsProcessTrusted() }
+    /// How often the app asked macOS for Accessibility access. Checks use it to prove that a path does not ask.
+    private(set) static var accessRequestCount = 0
 
     /// Shows the system prompt that sends the user to the Accessibility pane.
     static func requestClickAccess() {
+        accessRequestCount += 1
         // The value of kAXTrustedCheckOptionPrompt, which Swift 6 will not read as a global.
         let prompt = "AXTrustedCheckOptionPrompt"
         AXIsProcessTrustedWithOptions([prompt: true] as CFDictionary)
