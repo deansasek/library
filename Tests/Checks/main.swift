@@ -869,6 +869,21 @@ MainActor.assumeIsolated {
     ClipboardHistory.waitForSaves()
     check(history.items.isEmpty && !FileManager.default.fileExists(atPath: saveFile.path), "removing the last pin removes the file")
 
+    // A copy still being built when Clear History runs is dropped, so the clip the user removed does not come back.
+    copy("copy still building")
+    while history.pendingCaptures > 0 { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    check(history.items.map(\.title) == ["copy still building"], "the copy is recorded before the clear")
+    let stale = history.items[0]
+    history.clear()
+    history.add(stale, source: nil, fromLibrary: false, generation: -1, epoch: 0)
+    check(history.items.isEmpty, "a copy still building when Clear History runs is not added afterward")
+    let now = history.clearEpochForChecks
+    history.add(ClipItem(representations: [[.string: Data("copied after the clear".utf8)]], digest: "after-clear",
+                         kind: .text, title: "copied after the clear", plainText: "copied after the clear",
+                         link: nil, thumbnail: nil, gifURL: nil, fileURLs: [], byteCount: 18, animatedData: nil),
+                source: nil, fromLibrary: false, generation: -1, epoch: now)
+    check(history.items.map(\.title) == ["copied after the clear"], "a copy made after the clear is still recorded")
+
     // A paste goes back to the app that had the keyboard, and never to Library itself.
     check(FrontApp.canPaste(toProcess: 42, ownProcess: 7), "a paste may go to another app")
     check(!FrontApp.canPaste(toProcess: 7, ownProcess: 7), "a paste never goes to Library")
