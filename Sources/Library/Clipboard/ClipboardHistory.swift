@@ -803,6 +803,9 @@ final class ClipboardHistory: ObservableObject {
         items.insert(item, at: items.firstIndex { $0.date < item.date } ?? items.count)
         if generation == captureGeneration { current = item }
         trim()
+        // A pinned item carries its new date and source app in the pinned file, not only the history one, which skips
+        // pinned items. Without this the older values came back at the next launch.
+        if item.pinned { savePinned() }
         scheduleHistorySave()
         if playsGIFs, let url = item.gifURL, !item.isAnimated { fetchGIF(digest: item.digest, from: url) }
     }
