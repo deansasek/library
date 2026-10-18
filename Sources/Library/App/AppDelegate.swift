@@ -100,26 +100,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ClipboardHistory.shared.flushHistory()
     }
 
+    /// What a `library://` link asks Library to do. The scheme and the action are matched without regard to case,
+    /// since a URL's scheme and host are case-insensitive (RFC 3986) and macOS hands the app whatever was typed.
+    enum LinkAction: Equatable {
+        case menu
+        case search
+        /// `open`, with the item's name and the value that fills a single-field template.
+        case open(name: String?, value: String?)
+    }
+
+    /// The action a link asks for, or nil when the link is not a Library link or names an action Library does not
+    /// have. Pure, so the checks can cover the forms a Shortcut or a script can send.
+    static func linkAction(_ url: URL) -> LinkAction? {
+        guard url.scheme?.lowercased() == "library" else { return nil }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+        switch url.host?.lowercased() {
+        case "menu": return .menu
+        case "search": return .search
+        case "open": return .open(name: value("name"), value: value("value"))
+        default: return nil
+        }
+    }
+
     /// `library://open?name=Jira&value=ABC-123` opens an item and fills its template.
     /// `library://menu` shows the menu. `library://search` shows Quick Open.
     func application(_ application: NSApplication, open urls: [URL]) {
         let store = LibraryStore.shared
-        for url in urls where url.scheme == "library" {
-            if url.host == "menu" {
+        for url in urls {
+            switch Self.linkAction(url) {
+            case .menu:
                 store.showMenu()
-                continue
-            }
-            if url.host == "search" {
+            case .search:
                 store.showQuickOpen()
+            case .open(let name, let value):
+                guard let name, let node = Self.item(named: name, in: store.nodes) else { continue }
+                if linkOpenNeedsConfirmation(node, value: value), !confirmLinkOpen(node, value: value) { continue }
+                open(node, value: value)
+            case nil:
                 continue
-            }
-            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
-            func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
-            if url.host == "open", let name = value("name"),
-               let node = Self.item(named: name, in: store.nodes) {
-                let linkValue = value("value")
-                if linkOpenNeedsConfirmation(node, value: linkValue), !confirmLinkOpen(node, value: linkValue) { continue }
-                open(node, value: linkValue)
             }
         }
     }
