@@ -88,9 +88,23 @@ struct QuickOpenResult: Identifiable {
             return URL(string: text).flatMap { $0.host == nil || !WebFetch.isWeb($0) ? nil : $0 }
         }
         guard let url = URL(string: "https://\(text)"), let host = url.host,
-              let last = host.split(separator: ".").last, host.contains("."),
-              last.count >= 2, last.allSatisfy(\.isLetter) else { return nil }
+              isWebHost(host) else { return nil }
         return url
+    }
+
+    /// Whether a host is one a person would type on purpose: a dotted name whose last part is letters, such as
+    /// `example.com`, or a dotted-quad address or `localhost`, which is how a router or a local server is written.
+    /// A single word, or too few dots to be an address, is not one. The fetch-safety rules that refuse local and
+    /// private addresses apply to background requests, not to a link the user typed.
+    static func isWebHost(_ host: String) -> Bool {
+        if host.lowercased() == "localhost" { return true }
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        if parts.count == 4, parts.allSatisfy({ !$0.isEmpty && $0.allSatisfy(\.isNumber) }),
+           parts.allSatisfy({ (0...255).contains(Int($0) ?? -1) }) {
+            return true
+        }
+        guard host.contains("."), let last = parts.last else { return false }
+        return last.count >= 2 && last.allSatisfy(\.isLetter)
     }
 }
 

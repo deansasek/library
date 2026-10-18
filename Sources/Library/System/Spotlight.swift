@@ -31,7 +31,9 @@ enum Spotlight {
     /// The host of a bookmark's address, such as "jira.example.com". The address may have no scheme, since a bookmark can
     /// be saved as "jira.example.com/browse". Nil when no host can be read.
     static func host(of address: String) -> String? {
-        if let host = QuickOpenResult.link(from: address)?.host, !host.isEmpty { return host }
+        // A dotted host, as before: a bare `localhost` is a link a person can type, but there is no domain to show
+        // for it in Spotlight.
+        if let host = QuickOpenResult.link(from: address)?.host, host.contains(".") { return host }
         // A template's braces are not valid in a URL, so the host is read from the text by hand.
         var text = Substring(address.trimmingCharacters(in: .whitespaces))
         if let range = text.range(of: "://") { text = text[range.upperBound...] }
