@@ -60,8 +60,8 @@ enum ClipTransform: CaseIterable {
             case "\"":
                 out.append(opens(after: before) ? "“" : "”")
             case "'":
-                // A digit after an opening position is an abbreviated year, as in ’90s.
-                let openingQuote = opens(after: before) && after?.isNumber != true
+                // Only an abbreviated year keeps the closing mark, as in ’90s; a quoted number such as '42' opens.
+                let openingQuote = opens(after: before) && !isAbbreviatedYear(chars, at: i)
                 out.append(openingQuote ? "‘" : "’")
             default:
                 out.append(c)
@@ -75,5 +75,12 @@ enum ClipTransform: CaseIterable {
     private static func opens(after previous: Character?) -> Bool {
         guard let previous else { return true }
         return previous.isWhitespace || "([{<\"'“‘—–-".contains(previous)
+    }
+
+    /// True when the quote at `index` starts an abbreviated year such as ’90s: exactly two digits then a letter.
+    private static func isAbbreviatedYear(_ chars: [Character], at index: Int) -> Bool {
+        let firstDigit = index + 1
+        guard firstDigit + 2 < chars.count else { return false }
+        return chars[firstDigit].isNumber && chars[firstDigit + 1].isNumber && chars[firstDigit + 2].isLetter
     }
 }
