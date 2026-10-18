@@ -2052,6 +2052,27 @@ check(UsageOrder.frequent([frequentC, frequentB, frequentA], counts: idCounts).m
 let manyOpened = (0..<7).map { _ in LibraryItem(name: "M") }
 check(UsageOrder.frequent(manyOpened, counts: Dictionary(uniqueKeysWithValues: manyOpened.map { ($0.id, 2) })).count == 5,
       "Frequently Used lists at most five items")
+do {
+    // Every item has the same count, so only the tree order can sort them, and it has to be the same every call.
+    let tied = ["One", "Two", "Three", "Four", "Six", "Five"].map { LibraryItem(name: $0) }
+    let tiedCounts = Dictionary(uniqueKeysWithValues: tied.map { ($0.id, 4) })
+    let once = UsageOrder.frequent(tied, counts: tiedCounts).map(\.name)
+    check(once == ["One", "Two", "Three", "Four", "Six"], "Frequently Used: equal counts keep their tree order")
+    check((0..<8).allSatisfy { _ in UsageOrder.frequent(tied, counts: tiedCounts).map(\.name) == once },
+          "Frequently Used: the order does not change between calls")
+    let mixed = ["Low", "High1", "High2"].enumerated().map { LibraryItem(name: $1) }
+    let mixedCounts = [mixed[1].id: 2, mixed[2].id: 2, mixed[0].id: 9]
+    check(UsageOrder.frequent(mixed, counts: mixedCounts).map(\.name) == ["Low", "High1", "High2"],
+          "Frequently Used: a higher count still wins over tree order")
+    // The tree order has to come from the code, not from how a sort happens to treat equal elements, so a set larger
+    // than a sort's small-input path is checked too.
+    let many = (0..<40).map { LibraryItem(name: "Tie \($0)") }
+    let manyCounts = Dictionary(uniqueKeysWithValues: many.map { ($0.id, 3) })
+    check(UsageOrder.frequent(many, counts: manyCounts, limit: 40).map(\.name) == many.map(\.name),
+          "Frequently Used: a large run of equal counts keeps its tree order")
+    check((0..<6).allSatisfy { _ in UsageOrder.frequent(many, counts: manyCounts, limit: 40).map(\.name) == many.map(\.name) },
+          "Frequently Used: the large order does not change between calls")
+}
 check(ReadingList.state(after: .add, from: nil) == .unread && ReadingList.state(after: .add, from: .read) == .read, "adding gives unread, and keeps a state already there")
 check(ReadingList.state(after: .markRead, from: .unread) == .read && ReadingList.state(after: .markUnread, from: .read) == .unread, "marking read and unread changes an item in the list")
 check(ReadingList.state(after: .markRead, from: nil) == nil && ReadingList.state(after: .markUnread, from: nil) == nil, "marking never adds an item to the list")
@@ -2701,6 +2722,25 @@ let seamRight = CGRect(x: 1000, y: 0, width: 1000, height: 800)
 check(HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft, seamRight]), "the top edge at a seam has a neighbour")
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 0.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "a corner with no display beside it is a corner")
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "the right edge of a lone display is a corner")
+
+// Copy as Plain Text is for formatting, so several plain-text flavors are not formatting.
+do {
+    func types(_ names: [String]) -> [NSPasteboard.PasteboardType: Data] {
+        Dictionary(uniqueKeysWithValues: names.map { (NSPasteboard.PasteboardType($0), Data("x".utf8)) })
+    }
+    check(!clip(.text, text: "a", reps: [types([NSPasteboard.PasteboardType.string.rawValue])]).hasRichFormats,
+          "a copy holding only plain text drops nothing")
+    check(!clip(.text, text: "a", reps: [types(["public.utf8-plain-text", "public.utf16-plain-text",
+                                               "NSStringPboardType", "public.utf16-plain-text-le"])]).hasRichFormats,
+          "a copy holding several plain-text flavors drops nothing")
+    check(clip(.text, text: "a", reps: [types(["public.utf8-plain-text", "public.rtf"])]).hasRichFormats,
+          "a copy holding RTF with its text drops the RTF")
+    check(clip(.text, text: "a", reps: [types(["public.utf8-plain-text", "public.html"])]).hasRichFormats,
+          "a copy holding HTML with its text drops the HTML")
+    check(!clip(.text, text: "a").hasRichFormats && !clip(.image).hasRichFormats, "no representations is not rich text")
+    check(clip(.text, text: "a", reps: [types([NSPasteboard.PasteboardType.string.rawValue]), types(["public.rtf"])]).hasRichFormats == false,
+          "only the first pasteboard item decides, as the property always has")
+}
 
 // The Settings toggle and the code that asks before running a command must name the same defaults key, or the
 // confirmation is silently off. Both now read it from one constant, and no literal is left behind.

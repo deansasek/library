@@ -80,9 +80,24 @@ struct ClipItem: Identifiable {
         return nil
     }
 
-    /// True when copying as plain text would drop formatting.
+    /// The pasteboard types that are plain text, so a copy carrying several of them is still plain text. A copy from a
+    /// browser or a notes app can hold UTF-8, UTF-16 and a legacy string type all at once, and dropping those would
+    /// drop nothing.
+    static let plainTextTypes: Set<NSPasteboard.PasteboardType> = [
+        NSPasteboard.PasteboardType.string,
+        NSPasteboard.PasteboardType("public.utf8-plain-text"),
+        NSPasteboard.PasteboardType("public.utf16-plain-text"),
+        NSPasteboard.PasteboardType("public.utf16-plain-text-le"),
+        NSPasteboard.PasteboardType("public.utf16-plain-text-be"),
+        NSPasteboard.PasteboardType("NSStringPboardType"),
+        NSPasteboard.PasteboardType("com.apple.utf16-text"),
+    ]
+
+    /// True when copying as plain text would drop formatting. A text clip counts only when its first pasteboard item
+    /// holds a type that is not a plain-text flavor, such as RTF, HTML, or PDF.
     var hasRichFormats: Bool {
-        kind == .text && (representations.first?.count ?? 0) > 1
+        guard kind == .text, let types = representations.first else { return false }
+        return types.contains { !Self.plainTextTypes.contains($0.key) }
     }
 
     @MainActor private static let times: RelativeDateTimeFormatter = {
