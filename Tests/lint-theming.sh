@@ -6,19 +6,33 @@
 #   opacity    .opacity() on a text foreground. Use a semantic style such as .secondary or .tertiary.
 #   button     a button or menu whose label is only an SF Symbol image, with no accessibilityLabel, help, or text.
 # Each rule can be excepted per line in Tests/theming-allowlist.txt (tab-separated: file, exact trimmed line, reason).
-# An entry that no longer matches any line fails too, so the list stays current. Uses only zsh, grep, sed, and awk.
+# An entry that no longer matches any line fails too, so the list stays current. A missing Sources/Library or allowlist
+# fails as well, so the lint cannot pass because it checked nothing. Uses only zsh, grep, sed, and awk.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 root="Sources/Library"
 allowlist="Tests/theming-allowlist.txt"
+
+# The lint has to be able to read both, or it would check nothing and still pass. A missing Sources/Library hides every
+# rule, and a missing allowlist leaves no way to except a line, so both fail before anything is searched.
+[[ -d "$root" ]] || { print -u2 "Theming lint: $root is missing, so no file could be checked."; exit 1; }
+[[ -f "$allowlist" ]] || { print -u2 "Theming lint: $allowlist is missing, so a violation could not be excepted."; exit 1; }
+
 violations="$(mktemp)"
 trap 'rm -f "$violations"' EXIT
 
-# Lines are printed as: rule, file, line number, trimmed text.
+# Lines are printed as: rule, file, line number, trimmed text. grep returns 1 when it found no match, which is a rule
+# that passed, and anything else when it could not search, which is a rule that could not run and must not pass.
 grep_rule() {
-    local rule="$1" pattern="$2"
-    { grep -rnE --include='*.swift' -- "$pattern" "$root" || true; } \
+    local rule="$1" pattern="$2" matches code=0
+    matches="$(grep -rnE --include='*.swift' -- "$pattern" "$root")" || code=$?
+    case "$code" in
+        0) ;;
+        1) return 0 ;;
+        *) print -u2 "Theming lint: the $root search for '$rule' failed with exit code $code."; exit 1 ;;
+    esac
+    print -r -- "$matches" \
         | awk -F: -v rule="$rule" '{ file=$1; n=$2; sub(/^[^:]*:[^:]*:/, ""); gsub(/^[ \t]+|[ \t]+$/, ""); print rule "\t" file "\t" n "\t" $0 }' \
         >> "$violations"
 }
@@ -58,7 +72,10 @@ for file in $(find "$root" -name '*.swift' | sort); do
         }' "$file" >> "$violations"
 done
 
-# Drop the lines the allowlist excepts, and report allowlist entries that no longer match anything.
+# Drop the lines the allowlist excepts, and report allowlist entries that no longer match anything. awk returns 1 for a
+# violation it printed and a higher exit code for a file it could not read, so both fail the script rather than
+# printing nothing and passing.
+code=0
 result="$(awk -F'\t' '
     FNR == NR {
         if ($0 ~ /^#/ || NF < 3) next
@@ -78,9 +95,14 @@ result="$(awk -F'\t' '
             failed = 1
         }
         exit failed
-    }' "$allowlist" "$violations" || true)"
+    }' "$allowlist" "$violations")" || code=$?
 
-if [[ -n "$result" ]]; then
+if [[ "$code" -gt 1 ]]; then
+    print -r -- "$result"
+    print -u2 "Theming lint: the allowlist or the violations could not be read, so no rule could be applied."
+    exit 1
+fi
+if [[ "$code" -eq 1 || -n "$result" ]]; then
     print -r -- "$result"
     print -r -- "Theming lint failed. Fix the line, or add an exception with a reason to $allowlist."
     exit 1
