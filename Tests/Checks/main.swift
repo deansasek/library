@@ -2314,6 +2314,22 @@ for address in ["https://shop.example.com/logout", "https://example.com/Unsubscr
     check(LinkCheck.looksLikeAction(URL(string: address)!), "action address \(address) is not checked")
 }
 check(!LinkCheck.looksLikeAction(URL(string: "https://example.com/docs/intro?page=2")!) && !LinkCheck.looksLikeAction(URL(string: "https://example.com/")!), "ordinary addresses are checked")
+for address in ["https://example.com/docs/deleted-items", "https://example.com/docs/deleted", "https://example.com/confirmed",
+                "https://example.com/help?confirmed=1", "https://example.com/undeletion-guide", "https://example.com/products/unconfirmed",
+                "https://example.com/a?unconfirmed=true", "https://example.com/deletion-log"] {
+    check(!LinkCheck.looksLikeAction(URL(string: address)!), "an address that merely contains a word is checked: \(address)")
+}
+// A path segment that is exactly an action word is still left alone, even when it reads harmlessly: the rule cannot
+// tell a page about confirming an order from a confirmation page, and it stays on the safe side.
+for address in ["https://example.com/docs/confirm.html", "https://example.com/products/confirm-now", "https://example.com/toggle-documentation"] {
+    check(LinkCheck.looksLikeAction(URL(string: address)!), "a segment that is the action word itself is skipped: \(address)")
+}
+check(LinkCheck.addressWords(URL(string: "https://example.com/docs/deleted-items?q=a-b")!) == ["docs", "deleted", "items", "q", "a", "b"],
+      "an address is split into words at the separators that end one")
+check(LinkCheck.normalizedActionWords.contains("signout") && LinkCheck.normalizedActionWords.contains("logout")
+      && !LinkCheck.normalizedActionWords.contains("log"), "a hyphenated action word is one word on both sides")
+check(LinkCheck.looksLikeAction(URL(string: "https://example.com/SIGN_OUT")!) && LinkCheck.looksLikeAction(URL(string: "https://example.com/log_out")!),
+      "a hyphenated action word is found whatever separator the address uses")
 check(LinkCheck.retriesWithGET(afterHEAD: 405) && LinkCheck.outcome(statusCode: 200, redirectRefused: false) == .ok && LinkCheck.outcome(statusCode: 404, redirectRefused: false) == .broken, "a HEAD refused with 405 takes the status of the GET that follows")
 check(LinkCheck.followsRedirect(after: 0, to: URL(string: "https://example.com/next")) && LinkCheck.followsRedirect(after: 4, to: URL(string: "http://example.com/")), "redirects up to five are followed")
 check(!LinkCheck.followsRedirect(after: 5, to: URL(string: "https://example.com/next")), "the sixth redirect is refused")
