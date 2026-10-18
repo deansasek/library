@@ -919,6 +919,72 @@ MainActor.assumeIsolated {
     check(repinning.items[0].pinned, "copying a pinned clip again keeps it pinned")
     try? FileManager.default.removeItem(at: repinFile)
 
+    // A key that fails at launch leaves the file closed for the whole session. A pin made while it is unavailable is
+    // written once the key answers, without another launch.
+    final class Refusals: @unchecked Sendable {
+        private var remaining: Int
+        private let lock = NSLock()
+        init(remaining: Int) { self.remaining = remaining }
+        /// True while a refusal is still owed, and counts one off.
+        func take() -> Bool {
+            lock.lock(); defer { lock.unlock() }
+            guard remaining > 0 else { return false }
+            remaining -= 1
+            return true
+        }
+        /// How many refusals are still owed.
+        var owed: Int { lock.lock(); defer { lock.unlock() }; return remaining }
+    }
+    let retryFolder = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-retry-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: retryFolder, withIntermediateDirectories: true)
+    let retryFile = retryFolder.appendingPathComponent("clipboard.json")
+    let seedRetry = [PinnedFile.Clip(source: "Notes", date: Date(), representations: [["public.utf8-plain-text": Data("pin from before".utf8)]])]
+    let seedBytes = (try? PinnedFile.encode(seedRetry, key: testKey)) ?? Data()
+    try? seedBytes.write(to: retryFile)
+    // The launch read and the first retry both fail, so the closed file can be seen before the key comes back.
+    let refusals = Refusals(remaining: 2)
+    let refusingKey: @Sendable () throws -> SymmetricKey = {
+        if refusals.take() { throw ClipboardKey.KeychainError(status: -1) }
+        return testKey
+    }
+    let retryBoard = NSPasteboard(name: NSPasteboard.Name("library-checks-retry-\(UUID().uuidString)"))
+    let retrying = ClipboardHistory(pasteboard: retryBoard, file: retryFile, key: refusingKey)
+    waitForLoad(retrying)
+    check(retrying.items.isEmpty, "a key that fails at launch leaves the pinned file unopened")
+    @MainActor func pasteOnto(_ text: String, on board: NSPasteboard, into target: ClipboardHistory) {
+        board.clearContents()
+        let item = NSPasteboardItem()
+        item.setString(text, forType: .string)
+        board.writeObjects([item])
+        target.poll()
+        let deadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
+        while target.pendingCaptures > 0, Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+    /// Waits for the background retry, which is not a published load the usual wait can see.
+    func waitFor(_ condition: () -> Bool) {
+        let deadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
+        while !condition(), Date() < deadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    }
+    func retryClips() -> [PinnedFile.Clip]? {
+        guard case .clips(let clips, _) = PinnedFile.read((try? Data(contentsOf: retryFile)) ?? Data(), key: testKey)
+        else { return nil }
+        return clips
+    }
+    pasteOnto("pinned while the key was away", on: retryBoard, into: retrying)
+    retrying.togglePin(retrying.items[0])
+    waitFor { refusals.owed == 0 }
+    ClipboardHistory.waitForSaves()
+    check((try? Data(contentsOf: retryFile)) == seedBytes, "nothing is written over a pinned file the key has not opened")
+    // The next change retries, the key answers this time, and the file is read, merged and written.
+    pasteOnto("pinned while the key was away", on: retryBoard, into: retrying)
+    waitFor { retryClips()?.count == 2 }
+    ClipboardHistory.waitForSaves()
+    check(retrying.items.contains { $0.title == "pin from before" }, "the pinned file is read again once the key answers")
+    check(retryClips()?.count == 2, "a pin made while the key was away is written once it answers, and the older pin is kept")
+    check(retryClips()?.contains { $0.representations.first?.values.first.map { String(decoding: $0, as: UTF8.self) } == "pinned while the key was away" } == true,
+          "the pin made while the key was away is the one on disk")
+    try? FileManager.default.removeItem(at: retryFolder)
+
     // Quitting waits for the pinned writes even when no history file is kept, which is the default, so the last pin
     // reaches disk. There is no waitForSaves between the pin and the flush, so only the flush itself can finish it.
     let quitFile = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-quit-\(UUID().uuidString).json")
