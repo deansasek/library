@@ -34,5 +34,5 @@ The app connects to the internet only for these:
 
 If Library can't read `bookmarks.json`, it saves a copy as `bookmarks-damaged-<time>.json` and tells you when it launches. Updates don't change your data.
 
-Some files are written briefly to the system's temporary folder and then removed. A copy of a clip is written while you preview it in Quick Look. A terminal command is written as a script that deletes itself when Terminal runs it. A calendar event is written as an `.ics` file for Calendar. **Export** writes a backup file to the place you choose; it does not include clipboard items.
+Some files are written briefly to the system's temporary folder, and Library removes them again: a copy of a clip is written while you preview it in Quick Look, and a terminal command is written as a script that deletes itself when Terminal runs it. One file is left behind: a calendar event is written as an `.ics` file that stays in the temporary folder until macOS clears it, because Calendar may read it at any time after Library opens it. **Export** writes a backup file to the place you choose; it does not include clipboard items.
 
