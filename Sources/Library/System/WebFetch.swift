@@ -57,6 +57,27 @@ enum WebFetch {
             || (a == 192 && b == 168)
     }
 
+    /// The numeric host in a URLSession transaction's `remoteAddress`. The address is bare or `address:port`
+    /// (`[address]:port` for IPv6). Nil when there is no address.
+    static func host(ofRemoteAddress remoteAddress: String?) -> String? {
+        guard let address = remoteAddress?.trimmingCharacters(in: .whitespaces), !address.isEmpty else { return nil }
+        if address.hasPrefix("[") {
+            guard let end = address.firstIndex(of: "]"), end > address.index(after: address.startIndex) else { return nil }
+            return String(address[address.index(after: address.startIndex)..<end])
+        }
+        // An IPv6 address carries no port and has more than one colon; an IPv4 address may end in `:port`.
+        guard address.filter({ $0 == ":" }).count == 1, let colon = address.firstIndex(of: ":") else { return address }
+        return String(address[..<colon])
+    }
+
+    /// True when a download's connections reached a loopback, private, link-local, or unspecified address. A host can
+    /// answer `isLocalTarget` with a public address and connect to a private one when the request is made, so the
+    /// addresses of the connections themselves are checked, including each redirect hop. Such a download's body is
+    /// never used.
+    static func isPrivateConnection(_ remoteAddresses: [String?]) -> Bool {
+        remoteAddresses.contains { isPrivateAddress(host(ofRemoteAddress: $0) ?? "") }
+    }
+
     /// The numeric addresses a host name resolves to, or none when it does not resolve.
     static func resolvedAddresses(of host: String) -> [String] {
         var hints = addrinfo()
@@ -204,6 +225,15 @@ enum WebFetch {
                 && (options.maxRedirects.map { redirects <= $0 } ?? true)
             if !allowed { failed = true }
             completionHandler(allowed ? request : nil)
+        }
+
+        /// Called after every connection the download made, but before it completes. A host that answered the address
+        /// check with a public address can connect to a private one, so the connections' addresses are checked here
+        /// and a private one fails the download before its body is returned.
+        func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+            if WebFetch.isPrivateConnection(metrics.transactionMetrics.map(\.remoteAddress)) {
+                failed = true
+            }
         }
 
         func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
