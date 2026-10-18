@@ -224,11 +224,13 @@ private func confirmCommand(_ node: LibraryItem, _ command: String) -> Bool {
 }
 
 /// Whether a `library://open` link must ask before it opens the item. An app with arguments asks, and so does a
-/// template that the link fills with a value. Bookmarks and plain apps open without a prompt.
+/// single-field template that the link fills with a value. Bookmarks and plain apps open without a prompt. A
+/// template with several fields never takes the link's value, since `open` asks for each field instead, so asking
+/// here would name a value that is then not used.
 func linkOpenNeedsConfirmation(_ node: LibraryItem, value: String?) -> Bool {
     if node.command != nil { return false }
     if node.appPath != nil { return !splitArguments(node.arguments ?? "").isEmpty }
-    return node.isTemplate && value != nil
+    return node.isTemplate && node.placeholders.count == 1 && value != nil
 }
 
 /// Asks before a web page's link opens an app with arguments or fills a template. Cancel is the default button.
