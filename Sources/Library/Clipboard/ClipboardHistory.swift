@@ -105,6 +105,9 @@ final class ClipboardHistory: ObservableObject {
     private var savesAfterLoad = false
     /// Every write of clipboard.json runs here, one at a time and in the order they were queued.
     private static let writeQueue = DispatchQueue(label: "com.deansasek.library.clipboard-save")
+    /// True once a save has failed and the user has been told. Cleared by the next save that works, so a folder that
+    /// stays unwritable is reported once rather than on every copy.
+    private static var reportedWriteFailure = false
     private var timer: Timer?
     private var lastChange: Int
     /// An app that has been in front since the last poll, so a copy seen late is judged by the app that made it.
@@ -342,6 +345,28 @@ final class ClipboardHistory: ObservableObject {
         Self.writeQueue.sync { Self.persistHistory(clips, to: historyFile, key: loadKey) }
     }
 
+    /// Whether the user is told about a failed write. Only the first failure of a streak speaks, so a folder that
+    /// stays unwritable does not repeat the message on every copy. A write that works clears the streak.
+    nonisolated static func reportsWriteFailure(reported: Bool) -> Bool { !reported }
+
+    /// Writes `data` to `file` through a temporary file that is private from the moment it is created, so the text is
+    /// never readable by anyone else, not even briefly. False when the temporary file could not be created or could
+    /// not be moved into place, which is logged rather than passed over in silence. Runs on `writeQueue`.
+    nonisolated static func writeAtomically(_ data: Data, to file: URL, stem: String) -> Bool {
+        let folder = file.deletingLastPathComponent()
+        let temporary = folder.appendingPathComponent(".\(stem)-\(UUID().uuidString).tmp")
+        guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else {
+            NSLog("Library: \(file.lastPathComponent) was not saved, because no temporary file could be created in \(folder.path)")
+            return false
+        }
+        guard rename(temporary.path, file.path) == 0 else {
+            NSLog("Library: \(file.lastPathComponent) was not saved, because its temporary file could not be moved into place")
+            try? FileManager.default.removeItem(at: temporary)
+            return false
+        }
+        return true
+    }
+
     /// Seals the items and writes them atomically, or removes the file when none are left. Runs on `writeQueue`.
     /// Nothing is written when the key is unavailable, so no plain text is ever saved.
     nonisolated private static func persistHistory(_ clips: [PinnedFile.Clip], to file: URL, key loadKey: @Sendable () throws -> SymmetricKey) {
@@ -357,9 +382,7 @@ final class ClipboardHistory: ObservableObject {
             return
         }
         // Same as clipboard.json: the temporary file is private from creation, then renamed over the old file.
-        let temporary = file.deletingLastPathComponent().appendingPathComponent(".clipboard-history-\(UUID().uuidString).tmp")
-        guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return }
-        if rename(temporary.path, file.path) != 0 { try? FileManager.default.removeItem(at: temporary) }
+        noteWrite(writeAtomically(data, to: file, stem: "clipboard-history"))
     }
 
     /// Deletes the history file, after any write already queued. Used when the setting is turned off.
@@ -429,7 +452,6 @@ final class ClipboardHistory: ObservableObject {
         let loadKey = self.loadKey
         // The temporary file is private from the moment it is created, then renamed over the old one, so the
         // text is never readable by anyone else, not even briefly.
-        let temporary = file.deletingLastPathComponent().appendingPathComponent(".clipboard-\(UUID().uuidString).tmp")
         Self.writeQueue.async {
             let data: Data
             do {
@@ -438,8 +460,23 @@ final class ClipboardHistory: ObservableObject {
                 NSLog("Library: pinned clipboard items were not saved, because the key is unavailable: \(error)")
                 return
             }
-            guard FileManager.default.createFile(atPath: temporary.path, contents: data, attributes: [.posixPermissions: 0o600]) else { return }
-            if rename(temporary.path, file.path) != 0 { try? FileManager.default.removeItem(at: temporary) }
+            Self.noteWrite(Self.writeAtomically(data, to: file, stem: "clipboard"))
+        }
+    }
+
+    /// Tells the user once that a save did not reach disk. Runs off the main actor, from `writeQueue`, so a copy is
+    /// never held up by the message. The items stay in memory, so the next save writes them once the folder works.
+    nonisolated private static func noteWrite(_ wrote: Bool) {
+        Task { @MainActor in
+            if wrote {
+                reportedWriteFailure = false
+            } else if reportsWriteFailure(reported: reportedWriteFailure) {
+                reportedWriteFailure = true
+                NSSound.beep()
+                AccessibilityNotification.Announcement(
+                    String(localized: "Library could not save your clipboard items. Check that its folder can be written to, then try again.",
+                           bundle: L10n.bundle)).post()
+            }
         }
     }
 
@@ -464,6 +501,7 @@ final class ClipboardHistory: ObservableObject {
         }
         leavesPinnedFile = false
         leavesHistoryFile = false
+        Self.reportedWriteFailure = false
         scheduleHistorySave()
     }
 

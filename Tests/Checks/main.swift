@@ -750,6 +750,31 @@ MainActor.assumeIsolated {
     check(locked.items.isEmpty && (try? Data(contentsOf: lockedFile)) == sealedBytes, "no key leaves the sealed file untouched")
     try? FileManager.default.removeItem(at: lockedFile)
 
+    // A folder that cannot be written to leaves the pinned file absent, and the next save once it can writes every pin.
+    let stuckFolder = FileManager.default.temporaryDirectory.appendingPathComponent("library-checks-stuck-\(UUID().uuidString)")
+    try? FileManager.default.createDirectory(at: stuckFolder, withIntermediateDirectories: true)
+    let stuckFile = stuckFolder.appendingPathComponent("clipboard.json")
+    let stuckBoard = NSPasteboard(name: NSPasteboard.Name("library-checks-stuck-\(UUID().uuidString)"))
+    let stuck = ClipboardHistory(pasteboard: stuckBoard, file: stuckFile, key: { testKey })
+    waitForLoad(stuck)
+    stuckBoard.clearContents()
+    let stuckItem = NSPasteboardItem()
+    stuckItem.setString("pin that cannot be saved", forType: .string)
+    stuckBoard.writeObjects([stuckItem])
+    stuck.poll()
+    let stuckDeadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
+    while stuck.pendingCaptures > 0, Date() < stuckDeadline { RunLoop.main.run(until: Date().addingTimeInterval(0.01)) }
+    try? FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: stuckFolder.path)
+    stuck.togglePin(stuck.items[0])
+    ClipboardHistory.waitForSaves()
+    check(!FileManager.default.fileExists(atPath: stuckFile.path), "a pin nothing can write leaves no file, and nothing is lost")
+    try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: stuckFolder.path)
+    stuck.togglePin(stuck.items[0])  // unpin then pin again, so the save runs against the folder that works
+    stuck.togglePin(stuck.items[0])
+    ClipboardHistory.waitForSaves()
+    check(FileManager.default.fileExists(atPath: stuckFile.path), "the next save after the folder works writes the pinned items")
+    try? FileManager.default.removeItem(at: stuckFolder)
+
     // Copies are built in the background, so a check waits until the history has added them.
     @MainActor func settle() {
         let deadline = Date().addingTimeInterval(60)  // a limit only; the wait ends as soon as the condition holds
@@ -2777,6 +2802,17 @@ let seamRight = CGRect(x: 1000, y: 0, width: 1000, height: 800)
 check(HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft, seamRight]), "the top edge at a seam has a neighbour")
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 0.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "a corner with no display beside it is a corner")
 check(!HotKeys.hasNeighbour(beyond: CGPoint(x: 999.5, y: 799.5), in: seamLeft, screens: [seamLeft]), "the right edge of a lone display is a corner")
+
+// A save that cannot reach disk says so once, and the next save that works writes everything again.
+do {
+    check(ClipboardHistory.reportsWriteFailure(reported: false), "the first failed save is reported")
+    check(!ClipboardHistory.reportsWriteFailure(reported: true), "a folder that stays unwritable is reported once")
+    check(ClipboardHistory.writeAtomically(Data("sealed".utf8),
+                                           to: FileManager.default.temporaryDirectory
+                                               .appendingPathComponent("library-checks-write-\(UUID().uuidString).json"),
+                                           stem: "clipboard"),
+          "a writable folder takes the file")
+}
 
 // The Settings toggle and the code that asks before running a command must name the same defaults key, or the
 // confirmation is silently off. Both now read it from one constant, and no literal is left behind.
